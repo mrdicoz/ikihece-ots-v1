@@ -1,0 +1,26 @@
+        /* TEMEL AYARLAR */
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+        
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* İÇERİK ALANI - Esneyerek footer'ı alta itecek */
+        main {
+            flex: 1 0 auto;
+            padding-bottom: 20px; /* Footer ile içerik arası boşluk */
+        }
+        
+        /* FOOTER STİLLERİ */
+        footer {
+            flex-shrink: 0;
+            padding: 20px 0;
+            text-align: center;
+            border-top: 1px solid #dee2e6;
+        }
+
+        

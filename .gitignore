@@ -1,0 +1,26 @@
+# Ortam değişkenleri - KESİNLİKLE GÖNDERİLMEZ!
+.env
+
+# Composer bağımlılıkları
+/vendor
+
+# CodeIgniter log ve cache dosyaları
+/writable/cache/*
+/writable/debugbar/*
+/writable/logs/*
+!/writable/logs/index.html
+/writable/session/*
+/writable/uploads/*
+!/writable/uploads/index.html
+
+# Proje dosyaları
+spark
+
+# Build dosyaları (eğer kullanılıyorsa)
+/builds
+
+# Editör ve İşletim Sistemi dosyaları
+.idea
+.vscode
+Thumbs.db
+.DS_Store
