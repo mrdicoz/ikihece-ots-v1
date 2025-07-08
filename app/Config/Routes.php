@@ -32,6 +32,28 @@ $routes->group('admin', ['filter' => 'group:admin,except:profile*'], static func
     $routes->get('logs', 'Admin\LogController::index', ['as' => 'admin.logs.index']);
     $routes->get('students/import', 'Admin\StudentController::importView');
     $routes->post('students/import', 'Admin\StudentController::import');
-    $routes->resource('students', ['controller' => 'Admin\StudentController']);
 });
 
+// --- YENİ ÖĞRENCİ ROTLARI ---
+// Bu rotalara sadece belirtilen gruplardaki giriş yapmış kullanıcılar erişebilir.
+$studentAccessGroups = 'group:admin,yonetici,mudur,sekreter';
+$routes->group('', ['filter' => $studentAccessGroups], static function ($routes) {
+    /**
+     * $routes->resource('students') satırı, bizim için aşağıdaki tüm rotaları
+     * TEK BAŞINA otomatik olarak oluşturur:
+     *
+     * - GET    /students           -> StudentController::index()     (Listeleme sayfası)
+     * - GET    /students/new       -> StudentController::new()       (Yeni ekleme formu)
+     * - POST   /students           -> StudentController::create()    (Yeni öğrenciyi kaydeder)
+     * - GET    /students/(:num)    -> StudentController::show($1)    (Detay sayfası)
+     * - GET    /students/(:num)/edit -> StudentController::edit($1)    (Düzenleme formu)
+     * - PUT    /students/(:num)    -> StudentController::update($1)  (Güncelleme işlemini yapar)
+     * - DELETE /students/(:num)    -> StudentController::delete($1)  (Silme işlemini yapar)
+     *
+     * Bu sayede tüm sayfalarımız doğru URL'ler ile çalışır.
+     */
+    $routes->get('students/view-ram-report/(:num)', 'StudentController::viewRamReport/$1', ['as' => 'students.viewRamReport']);
+    $routes->resource('students', ['controller' => 'StudentController']);
+
+
+});

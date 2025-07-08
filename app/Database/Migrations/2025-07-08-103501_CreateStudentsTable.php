@@ -34,7 +34,7 @@ class CreateStudentsTable extends Migration
             'veli_anne_is_adresi' => ['type' => 'TEXT', 'null' => true],
             'veli_anne_gorevi' => ['type' => 'VARCHAR', 'constraint' => '100', 'null' => true],
             'veli_anne_mezuniyet' => ['type' => 'VARCHAR', 'constraint' => '100', 'null' => true],
-            'veli_anne_sag_durumu' => ['type' => 'VARCHAR', 'constraint' => '20', 'null' => true], // Sağ, Vefat
+            'veli_anne_sag_durumu' => ['type' => 'VARCHAR', 'constraint' => '20', 'null' => true],
 
             // VELİ BİLGİLERİ - BABA
             'veli_baba_tc' => ['type' => 'VARCHAR', 'constraint' => '11', 'null' => true],
@@ -44,7 +44,7 @@ class CreateStudentsTable extends Migration
             'veli_baba_is_adresi' => ['type' => 'TEXT', 'null' => true],
             'veli_baba_gorevi' => ['type' => 'VARCHAR', 'constraint' => '100', 'null' => true],
             'veli_baba_mezuniyet' => ['type' => 'VARCHAR', 'constraint' => '100', 'null' => true],
-            'veli_baba_sag_durumu' => ['type' => 'VARCHAR', 'constraint' => '20', 'null' => true], // Sağ, Vefat
+            'veli_baba_sag_durumu' => ['type' => 'VARCHAR', 'constraint' => '20', 'null' => true],
 
             // ACİL DURUM
             'acil_durum_aranacak_kisi_1_adi' => ['type' => 'VARCHAR', 'constraint' => '200', 'null' => true],
@@ -91,8 +91,12 @@ class CreateStudentsTable extends Migration
 
             // SONRADAN EKLENEN ALANLAR
             'google_konum' => ['type' => 'TEXT', 'null' => true],
-            'profile_image' => ['type'=> 'VARCHAR', 'constraint' => '255', 'null'=> true, 'default'=> null, ],
-
+            'profile_image' => ['type'=> 'VARCHAR', 'constraint' => '255', 'null'=> true, 'default'=> null],
+            
+            // --- YENİ EKLENEN RAM ALANLARI ---
+            'ram_raporu' => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true],
+            'ram_baslangic_tarihi' => ['type' => 'DATE', 'null' => true],
+            'ram_bitis_tarihi' => ['type' => 'DATE', 'null' => true],
             
             // Codeigniter Timestamps
             'created_at' => ['type' => 'DATETIME', 'null' => true],

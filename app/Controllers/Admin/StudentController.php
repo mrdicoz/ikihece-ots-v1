@@ -8,11 +8,19 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class StudentController extends BaseController
 {
+    /**
+     * Excel/CSV dosyasından toplu öğrenci aktarma formunu gösterir.
+     */
     public function importView()
     {
+        // View dosyasının yolu aynı kalabilir veya admin altına taşınabilir.
+        // Mevcut yapıyı korumak adına aynı bırakıyorum.
         return view('admin/students/import');
     }
 
+    /**
+     * Yüklenen Excel/CSV dosyasını işleyerek öğrencileri veritabanına aktarır.
+     */
     public function import()
     {
         $file = $this->request->getFile('file');
@@ -25,23 +33,17 @@ class StudentController extends BaseController
             $sheetData = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
 
             $dataToUpsert = [];
-            // Veri 4. satırdan başlıyor
             for ($i = 4; $i <= count($sheetData); $i++) {
                 $row = $sheetData[$i] ?? null;
-                if ($row === null) continue;
-
-                // Adı (D sütunu) veya Soyadı (E sütunu) boşsa o satırı atla
-                if (empty(trim($row['D'])) || empty(trim($row['E']))) {
+                if ($row === null || (empty(trim($row['D'])) || empty(trim($row['E'])))) {
                     continue;
                 }
 
-                // --- KESİN EŞLEŞTİRME (VERİLEN ÇIKTIYA GÖRE) ---
                 $ogrenci_tc = trim($row['F']);
                 $anne_tc = trim($row['AN']);
                 $baba_tc = trim($row['AU']);
 
                 $dataToUpsert[] = [
-                    // Öğrenci Bilgileri
                     'okul_no'                   => $row['C'] ?? null,
                     'adi'                       => $row['D'] ?? null,
                     'soyadi'                    => $row['E'] ?? null,
@@ -56,14 +58,10 @@ class StudentController extends BaseController
                     'adres_ilce'                => $row['AB'] ?? null,
                     'adres_mahalle'             => $row['AC'] ?? null,
                     'adres_detay'               => $row['O'] ?? null,
-
-                    // Anne (Veli 1) Bilgileri
                     'veli_anne_tc'              => (is_numeric($anne_tc) && strlen($anne_tc) === 11) ? $anne_tc : null,
                     'veli_anne_adi_soyadi'      => $row['AO'] ?? null,
                     'veli_anne_telefon'         => $row['AP'] ?? null,
                     'veli_anne_is_adresi'       => $row['AT'] ?? null,
-
-                    // Baba (Veli 2) Bilgileri
                     'veli_baba_tc'              => (is_numeric($baba_tc) && strlen($baba_tc) === 11) ? $baba_tc : null,
                     'veli_baba_adi_soyadi'      => $row['AV'] ?? null,
                     'veli_baba_telefon'         => $row['AW'] ?? null,
@@ -77,14 +75,13 @@ class StudentController extends BaseController
 
             $studentModel = new StudentModel();
             $studentModel->upsertBatch($dataToUpsert);
-            return redirect()->to('/panel/students')->with('success', count($dataToUpsert) . ' öğrenci kaydı başarıyla işlendi.');
+            // Başarılı aktarma sonrası ana öğrenci listesine yönlendiriyoruz.
+            return redirect()->to('/students')->with('success', count($dataToUpsert) . ' öğrenci kaydı başarıyla işlendi.');
             
         } catch (\Exception $e) {
-            // Hata mesajını daha anlaşılır hale getirelim
             return redirect()->back()->with('error', 'Dosya işlenirken kritik bir hata oluştu: ' . $e->getMessage() . ' (Dosya: ' . $e->getFile() . ' Satır: ' . $e->getLine() . ')');
         }
     }
-
     
     private function formatDate($dateString): ?string
     {

@@ -14,7 +14,10 @@ $username = auth()->user()->username ?? 'Misafir'; // Shield hazır olunca bu ç
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto align-items-lg-center">
-                                                            <?php if (auth()->loggedIn() && auth()->user()->inGroup('admin')) : ?>
+                <li class="nav-item">
+                    <a class="nav-link" href="<?= site_url('/students') ?>"><i class="bi bi-backpack2"></i> Öğrenci Yönetimi</a>
+                </li>
+                <?php if (auth()->loggedIn() && auth()->user()->inGroup('admin')) : ?>
     <li class="nav-item dropdown">
         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
             <i class="bi bi-sliders"></i> Sistem Yönetimi
@@ -22,7 +25,7 @@ $username = auth()->user()->username ?? 'Misafir'; // Shield hazır olunca bu ç
         <ul class="dropdown-menu">
             <li>
                 <a class="dropdown-item" href="<?= site_url('admin/users') ?>">
-                    <i class="bi bi-people-fill"></i> Kullanıcılar
+                    <i class="bi bi-people"></i> Kullanıcılar
                 </a>
             </li>
             <li><hr class="dropdown-divider"></li>
