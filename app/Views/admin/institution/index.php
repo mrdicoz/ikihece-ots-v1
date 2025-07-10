@@ -17,7 +17,7 @@
             <form action="<?= route_to('admin.institution.save') ?>" method="post">
                 <?= csrf_field() ?>
                 
-                <h5 class="text-primary">KURUM BİLGİLERİ</h5>
+                <h5 class="text-success">KURUM BİLGİLERİ</h5>
                 <hr>
                 <div class="row g-3">
                     <div class="col-md-4">
@@ -71,7 +71,7 @@
                     </div>
                 </div>
 
-                <h5 class="mt-4 text-primary">KURUCU-TEMSİLCİ BİLGİLERİ</h5>
+                <h5 class="mt-4 text-success">KURUCU-TEMSİLCİ BİLGİLERİ</h5>
                 <hr>
                 <div class="row g-3">
                     <div class="col-md-4">
