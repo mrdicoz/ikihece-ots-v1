@@ -32,6 +32,8 @@ $routes->group('admin', ['filter' => 'group:admin,except:profile*'], static func
     $routes->get('logs', 'Admin\LogController::index', ['as' => 'admin.logs.index']);
     $routes->get('students/import', 'Admin\StudentController::importView');
     $routes->post('students/import', 'Admin\StudentController::import');
+    $routes->get('institution', 'Admin\InstitutionController::index', ['as' => 'admin.institution.index']);
+    $routes->post('institution/save', 'Admin\InstitutionController::save', ['as' => 'admin.institution.save']);
 });
 
 // --- YENİ ÖĞRENCİ ROTLARI ---
