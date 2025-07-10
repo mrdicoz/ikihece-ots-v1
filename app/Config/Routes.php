@@ -34,6 +34,11 @@ $routes->group('admin', ['filter' => 'group:admin,except:profile*'], static func
     $routes->post('students/import', 'Admin\StudentController::import');
     $routes->get('institution', 'Admin\InstitutionController::index', ['as' => 'admin.institution.index']);
     $routes->post('institution/save', 'Admin\InstitutionController::save', ['as' => 'admin.institution.save']);
+    $routes->get('assignments', 'Admin\AssignmentController::index', ['as' => 'admin.assignments.index']);
+    $routes->post('assignments/save', 'Admin\AssignmentController::save', ['as' => 'admin.assignments.save']);
+    $routes->get('assignments/get-assigned/(:num)', 'Admin\AssignmentController::getAssigned/$1', ['as' => 'admin.assignments.getAssigned']);
+
+// ...
 });
 
 // --- YENİ ÖĞRENCİ ROTLARI ---

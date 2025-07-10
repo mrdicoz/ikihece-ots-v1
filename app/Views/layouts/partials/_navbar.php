@@ -39,6 +39,11 @@ $avatar = $userAvatar ?? base_url('assets/images/user.jpg');
             <i class="bi bi-building"></i> Kurum Ayarları
         </a>
     </li>
+    <li>
+    <a class="dropdown-item" href="<?= route_to('admin.assignments.index') ?>">
+        <i class="bi bi-person-badge"></i> Sorumlu Atama
+    </a>
+</li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="<?= route_to('admin.logs.index') ?>"><i class="bi bi-journal-text"></i> Log Kayıtları</a></li>
             <li><a class="dropdown-item" href="<?= site_url('admin/students/import') ?>"><i class="bi bi-cloud-upload-fill"></i> İçe Aktar</a></li>
