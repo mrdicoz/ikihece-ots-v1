@@ -5,10 +5,19 @@
 <?= $this->section('main') ?>
 <div class="container-fluid mt-4">
     <div class="d-sm-flex align-items-center justify-content-between mb-3">
-        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-person-badge"></i> Öğrenci Profili</h1>
-        <a href="<?= site_url('students') ?>" class="btn btn-secondary btn-sm shadow-sm">
-            <i class="bi bi-arrow-left fa-sm text-white-50"></i> Listeye Dön
-        </a>
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-backpack2"></i> Öğrenci Profili</h1>
+        
+               <div class="mt-2 mt-sm-0">
+             <div class="d-grid d-sm-flex gap-2">
+                <a href="<?= site_url('students') ?>" class="btn btn-secondary btn-sm shadow-sm">
+                    <i class="bi bi-arrow-left"></i> Listeye Dön
+                </a>
+                <button type="button" class="btn btn-danger btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#deleteStudentModal">
+                    <i class="bi bi-trash-fill"></i> Öğrenciyi Sil
+                </button>
+            </div>
+        </div>
+
     </div>
 
     <div class="row">
@@ -48,65 +57,93 @@
                 <div class="card-body">
                     <div class="tab-content" id="studentTabContent">
                         <div class="tab-pane fade show active" id="temel" role="tabpanel">
-                            <h5 class="mb-3">Temel Bilgiler</h5>
-                            <dl class="row"><dt class="col-sm-4">TC Kimlik No</dt><dd class="col-sm-8"><?= esc($student['tc_kimlik_no']) ?></dd><dt class="col-sm-4">Cinsiyet</dt><dd class="col-sm-8"><?= esc($student['cinsiyet']) ?></dd><dt class="col-sm-4">Doğum Tarihi</dt><dd class="col-sm-8"><?= esc($student['dogum_tarihi']) ?></dd></dl>
-                            <h5 class="mt-4 mb-3">Okul Bilgileri</h5>
-                            <dl class="row"><dt class="col-sm-4">Kayıt Tarihi</dt><dd class="col-sm-8"><?= esc($student['kayit_tarihi']) ?></dd><dt class="col-sm-4">Sınıfı / Şubesi</dt><dd class="col-sm-8"><?= esc($student['sinifi']) ?> / <?= esc($student['subesi']) ?></dd><dt class="col-sm-4">Servis Durumu</dt><dd class="col-sm-8"><?= esc($student['servis_durumu']) ?></dd></dl>
+                            <h5 class="card-title">Temel Bilgiler</h5>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item"><strong>Cinsiyet:</strong> <?= esc($student['cinsiyet'] ?? 'Belirtilmemiş') ?></li>
+                                <li class="list-group-item"><strong>Doğum Tarihi:</strong> <?= esc($student['dogum_tarihi'] ?? 'Belirtilmemiş') ?></li>
+                                <li class="list-group-item"><strong>Servis Durumu:</strong> <?= esc($student['servis_durumu'] ?? 'Belirtilmemiş') ?></li>
+                            </ul>
+                            <hr>
+                            <h5 class="card-title">Acil Durum Kişisi</h5>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item"><strong>Adı Soyadı:</strong> <?= esc($student['acil_durum_aranacak_kisi_1_adi'] ?? 'Belirtilmemiş') ?></li>
+                                <li class="list-group-item"><strong>Yakınlık:</strong> <?= esc($student['acil_durum_aranacak_kisi_1_yakinlik'] ?? 'Belirtilmemiş') ?></li>
+                                <li class="list-group-item"><strong>Telefon:</strong> <?= esc($student['acil_durum_aranacak_kisi_1_telefon'] ?? 'Belirtilmemiş') ?></li>
+                            </ul>
                         </div>
                         
                         <div class="tab-pane fade" id="veli" role="tabpanel">
                             <div class="row">
-                                <div class="col-md-6"><h5 class="mb-3">Anne Bilgileri</h5><dl class="row"><dt class="col-sm-5">Adı Soyadı</dt><dd class="col-sm-7"><?= esc($student['veli_anne_adi_soyadi']) ?></dd><dt class="col-sm-5">Telefon</dt><dd class="col-sm-7"><?= esc($student['veli_anne_telefon']) ?></dd></dl></div>
-                                <div class="col-md-6"><h5 class="mb-3">Baba Bilgileri</h5><dl class="row"><dt class="col-sm-5">Adı Soyadı</dt><dd class="col-sm-7"><?= esc($student['veli_baba_adi_soyadi']) ?></dd><dt class="col-sm-5">Telefon</dt><dd class="col-sm-7"><?= esc($student['veli_baba_telefon']) ?></dd></dl></div>
+                                <div class="col-md-6">
+
+                            <h5 class="card-title">Anne Bilgileri</h5>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item"><strong>Adı Soyadı:</strong> <?= esc($student['veli_anne_adi_soyadi']) ?></li>
+                                <li class="list-group-item"><strong>Telefon:</strong> <?= esc($student['veli_anne_telefon']) ?></li>
+                                <li class="list-group-item"><strong>E-posta:</strong> <?= esc($student['veli_anne_eposta']) ?></li>
+                                <li class="list-group-item"><strong>TCKN:</strong> <?= esc($student['veli_anne_tc']) ?></li>
+                            </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5 class="card-title">Baba Bilgileri</h5>
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item"><strong>Adı Soyadı:</strong> <?= esc($student['veli_baba_adi_soyadi']) ?></li>
+                                        <li class="list-group-item"><strong>Telefon:</strong> <?= esc($student['veli_baba_telefon']) ?></li>
+                                        <li class="list-group-item"><strong>E-posta:</strong> <?= esc($student['veli_baba_eposta']) ?></li>
+                                        <li class="list-group-item"><strong>TCKN:</strong> <?= esc($student['veli_baba_tc']) ?></li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
 
-<div class="tab-pane fade" id="saglik" role="tabpanel">
-    <h5 class="mb-3">Genel Sağlık Bilgileri</h5>
-    <dl class="row"><dt class="col-sm-4">Kan Grubu</dt><dd class="col-sm-8"><?= esc($student['kan_grubu']) ?></dd><dt class="col-sm-4">Geçirilen Hastalıklar</dt><dd class="col-sm-8"><?= esc($student['gecirilen_hastaliklar']) ?></dd><dt class="col-sm-4">Alerjiler</dt><dd class="col-sm-8"><?= esc($student['alerjiler']) ?></dd></dl>
+                        <div class="tab-pane fade" id="saglik" role="tabpanel">
+                                    <h5 class="card-title">Genel Sağlık Bilgileri</h5>
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item"><strong>Kan Grubu:</strong>  <?= esc($student['kan_grubu'] ?? 'Belirtilmemiş') ?></li>
+                                    <li class="list-group-item"><strong>Geçirilen Hastalıklar:</strong>  <?= esc($student['gecirilen_hastaliklar'] ?? 'Belirtilmemiş') ?></li>
+                                    <li class="list-group-item"><strong>Alerjiler:</strong>  <?= esc($student['alerjiler'] ?? 'Belirtilmemiş') ?></li>
+                                </ul>
     <hr>
-    <h5 class="mt-4 mb-3">RAM Rapor Bilgileri</h5>
-    <dl class="row">
-        <dt class="col-sm-4">Rapor Başlangıç Tarihi</dt>
-        <dd class="col-sm-8"><?= esc($student['ram_baslangic_tarihi']) ?></dd>
-        <dt class="col-sm-4">Rapor Bitiş Tarihi</dt>
-        <dd class="col-sm-8"><?= esc($student['ram_bitis_tarihi']) ?></dd>
-        <dt class="col-sm-4">Rapor Dosyası</dt>
-<dd class="col-sm-8">
-    <?php if (!empty($student['ram_raporu'])): ?>
+
+                                        <h5 class="card-title">RAM Rapor Bilgileri</h5>
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item"><strong>Rapor Başlangıç Tarihi:</strong>  <?= esc($student['ram_baslangic_tarihi'] ?? 'Belirtilmemiş') ?></li>
+                                    <li class="list-group-item"><strong>Rapor Bitiş Tarihi:</strong>  <?= esc($student['ram_bitis_tarihi'] ?? 'Belirtilmemiş') ?></li>
+                                    <li class="list-group-item"><strong>Rapor Dosyası:</strong>
+                                    <?php if (!empty($student['ram_raporu'])): ?>
         <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#reportModal" data-src="<?= site_url('students/view-ram-report/' . $student['id']) ?>">
             <i class="bi bi-eye-fill"></i> Raporu Görüntüle
         </button>
     <?php else: ?>
-        <span class="text-muted">Rapor yüklenmemiş.</span>
+        <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#reportModal" data-src="#" disabled>
+            <i class="bi bi-eye-fill"></i> Raporu Görüntüle
+        </button>
     <?php endif; ?>
-</dd>
-    </dl>
-</div>
+                                </li>
+                                </ul>
+                        </div>
                         
                         <div class="tab-pane fade" id="adres" role="tabpanel">
-                             <h5 class="mb-3">Adres ve Konum Bilgisi</h5>
-                             <p><?= esc($student['adres_detay']) ?> <?= esc($student['adres_mahalle']) ?>, <?= esc($student['adres_ilce']) ?> / <?= esc($student['adres_il']) ?></p>
-                             <div id="map-container" class="alert alert-info">Harita özelliği için bir API anahtarı gereklidir. Bu özellik daha sonra eklenecektir.</div>
+                            <h5 class="mb-3">Adres ve Konum Bilgisi</h5>
+                            <p><?= esc($student['adres_detay']) ?> <?= esc($student['adres_mahalle']) ?>, <?= esc($student['adres_ilce']) ?> / <?= esc($student['adres_il']) ?></p>
+                            <div id="map-container" class="alert alert-info">Harita özelliği için bir API anahtarı gereklidir. Bu özellik daha sonra eklenecektir.</div>
                         </div>
 
                         <div class="tab-pane fade" id="diger" role="tabpanel">
-                             <h5 class="mb-3">Acil Durum Kişileri</h5>
-                             <p><b>Kişi 1:</b> <?= esc($student['acil_durum_aranacak_kisi_1_adi']) ?> (<?= esc($student['acil_durum_aranacak_kisi_1_yakinlik']) ?>) - <?= esc($student['acil_durum_aranacak_kisi_1_telefon']) ?></p>
-                             <hr>
-                             <h5 class="mt-4 mb-3">Kardeş Bilgileri</h5>
-                             <p><?= esc($student['kardes_adi_1']) ?></p>
-                             <hr>
-                             <h5 class="mt-4 mb-3">Muhasebe Bilgileri</h5>
-                             <dl class="row"><dt class="col-sm-4">Sözleşme Tutarı</dt><dd class="col-sm-8"><?= esc($student['sozlesme_tutari']) ?> ₺</dd></dl>
+                            <h5 class="mb-3">Acil Durum Kişileri</h5>
+                            <p><b>Kişi 1:</b> <?= esc($student['acil_durum_aranacak_kisi_1_adi']) ?> (<?= esc($student['acil_durum_aranacak_kisi_1_yakinlik']) ?>) - <?= esc($student['acil_durum_aranacak_kisi_1_telefon']) ?></p>
+                            <hr>
+                            <h5 class="mt-4 mb-3">Kardeş Bilgileri</h5>
+                            <p><?= esc($student['kardes_adi_1']) ?></p>
+                            <hr>
+                            <h5 class="mt-4 mb-3">Muhasebe Bilgileri</h5>
+                            <dl class="row"><dt class="col-sm-4">Sözleşme Tutarı</dt><dd class="col-sm-8"><?= esc($student['sozlesme_tutari']) ?> ₺</dd></dl>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
-</div>
 </div>
 
 <div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportModalLabel" aria-hidden="true">
@@ -123,29 +160,71 @@
   </div>
 </div>
 
+<div class="modal fade" id="deleteStudentModal" tabindex="-1" aria-labelledby="deleteStudentModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="deleteStudentModalLabel"><i class="bi bi-exclamation-triangle-fill"></i> Silme İşlemi Onayı</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p><b><?= esc($student['adi'] . ' ' . $student['soyadi']) ?></b> adlı öğrenciyi kalıcı olarak silmek (arşivlemek) üzeresiniz. Bu işlem geri alınamaz.</p>
+        <p>Devam etmek için lütfen aşağıdaki alana öğrencinin tam adını (<strong class="text-danger"><?= esc($student['adi'] . ' ' . $student['soyadi']) ?></strong>) yazarak onaylayın:</p>
+        <div class="mb-3">
+            <label for="studentNameConfirm" class="form-label">Onay için Ad Soyad:</label>
+            <input type="text" class="form-control" id="studentNameConfirm" autocomplete="off">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Vazgeç</button>
+        <form action="<?= site_url('students/' . $student['id']) ?>" method="post">
+            <?= csrf_field() ?>
+            <input type="hidden" name="_method" value="DELETE">
+            <button type="submit" id="confirmDeleteButton" class="btn btn-danger" disabled>Evet, Sil</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 <?= $this->endSection() ?>
+
 <?= $this->section('pageScripts') ?>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // Rapor Görüntüleme Modal Script'i
     const reportModal = document.getElementById('reportModal');
     if (reportModal) {
         reportModal.addEventListener('show.bs.modal', function (event) {
-            // Modal'ı tetikleyen butonu al
             const button = event.relatedTarget;
-            // Butonun data-src özelliğinden PDF linkini al
             const pdfUrl = button.getAttribute('data-src');
-            
-            // Modal içindeki iframe'i bul
             const iframe = document.getElementById('report-iframe');
-            
-            // iframe'in src özelliğine PDF linkini ata
             iframe.setAttribute('src', pdfUrl);
         });
-
-        // Modal kapandığında iframe'in içeriğini temizle (kaynak tüketimini önlemek için)
         reportModal.addEventListener('hidden.bs.modal', function () {
             const iframe = document.getElementById('report-iframe');
             iframe.setAttribute('src', '');
+        });
+    }
+
+    // Silme Onay Modal Script'i
+    const deleteModalEl = document.getElementById('deleteStudentModal');
+    if (deleteModalEl) {
+        const studentName = "<?= esc($student['adi'] . ' ' . $student['soyadi']) ?>";
+        const confirmInput = deleteModalEl.querySelector('#studentNameConfirm');
+        const confirmButton = deleteModalEl.querySelector('#confirmDeleteButton');
+
+        confirmInput.addEventListener('input', function() {
+            if (confirmInput.value.trim().toLowerCase() === studentName.toLowerCase()) {
+                confirmButton.disabled = false;
+            } else {
+                confirmButton.disabled = true;
+            }
+        });
+        
+        deleteModalEl.addEventListener('hidden.bs.modal', function () {
+            confirmInput.value = '';
+            confirmButton.disabled = true;
         });
     }
 });

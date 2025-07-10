@@ -23,4 +23,93 @@
             border-top: 1px solid #dee2e6;
         }
 
-        
+
+
+/* Normal durumda: beyaz arka plan, yeşil yazı, yeşil kenarlık */
+.page-link {
+    color: #198754 !important;               /* Yazı rengi yeşil */
+    background-color: #fff !important;       /* Arka plan beyaz */
+    border: 1px solid #198754 !important;    /* Kenarlık yeşil */
+    transition: background-color 0.2s, color 0.2s;
+}
+
+/* Aktif, focus veya hover olduğunda: arka plan yeşil, yazı beyaz */
+.page-link.active,
+.page-item.active .page-link,
+.page-link:focus,
+.page-link:hover {
+    color: #fff !important;                  /* Yazı beyaz */
+    background-color: #198754 !important;    /* Arka plan yeşil */
+    border-color: #198754 !important;        /* Kenarlık yeşil */
+}
+
+/* --- ZAMAN TÜNELİ (TIMELINE) STİLLERİ --- */
+.timeline {
+    position: relative;
+    padding: 20px 0;
+}
+
+/* Zaman tünelinin dikey çizgisi */
+.timeline::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20px;
+    height: 100%;
+    width: 4px;
+    background: #e9ecef;
+    border-radius: 2px;
+}
+
+/* Her bir log kaydı */
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+    padding-left: 60px; /* İkon için boşluk bırak */
+}
+
+/* Log ikonunun dairesi */
+.timeline-icon {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.2rem;
+    border: 3px solid #e9ecef;
+}
+
+/* Log içeriğinin olduğu kart */
+.timeline-content {
+    position: relative;
+}
+
+.drop-zone {
+    border: 2px dashed #ccc;
+    border-radius: 10px;
+    padding: 50px;
+    text-align: center;
+    color: #aaa;
+    cursor: pointer;
+    transition: all 0.3s ease-in-out;
+}
+
+.drop-zone .drop-zone-text {
+    font-size: 1.2rem;
+}
+
+.drop-zone.dragover {
+    border-color: #0d6efd; /* Bootstrap primary color */
+    color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+.file-name-display {
+    font-weight: bold;
+    color: #28a745; /* Bootstrap success color */
+}

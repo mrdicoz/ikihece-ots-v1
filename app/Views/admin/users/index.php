@@ -1,19 +1,20 @@
 <?= $this->extend('layouts/app') ?>
 
 <?= $this->section('main') ?>
-<div class="container mt-4">
+<div class="container-fluid mt-4">
     <div class="row mb-3">
         <div class="col-6">
-            <h4><i class="bi bi-people-fill"></i> <?= esc($title) ?></h4>
+            <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-people"></i> <?= esc($title) ?></h1>
         </div>
+
         <div class="col-6 text-end">
             <a href="<?= route_to('admin.users.new') ?>" class="btn btn-success btn-sm">
-                <i class="bi bi-plus-circle"></i> Yeni Kullanıcı Ekle
+                <i class="bi bi-person-plus-fill fa-sm text-white-50"></i> Yeni Kullanıcı Ekle
             </a>
         </div>
     </div>
 
-    <div class="card">
+    <div class="card shadow">
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-striped table-hover" id="users-table">
@@ -42,7 +43,7 @@
                                     $groups = explode(',', $user->user_groups ?? '');
                                     foreach($groups as $group): 
                                         if (!empty(trim($group))): ?>
-                                            <span class="badge bg-info text-dark"><?= esc(trim($group)) ?></span>
+                                            <span class="badge bg-secondary"><?= esc(trim($group)) ?></span>
                                     <?php 
                                         endif;
                                     endforeach; ?>

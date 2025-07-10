@@ -6,6 +6,10 @@ class Home extends BaseController
 {
     public function index(): string
     {
-        return view('dashboard');
+                // $this->data dizisine bu sayfaya özel verileri ekleyebiliriz.
+        $this->data['title'] = "Anasayfa";
+
+        // $this->data dizisini view'a gönderiyoruz.
+        return view('dashboard', $this->data);
     }
 }

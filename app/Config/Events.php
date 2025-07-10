@@ -100,3 +100,7 @@ Events::on('user.created', [new LogListener(), 'handleUserCreation']);
 Events::on('user.updated', [new LogListener(), 'handleUserUpdate']);   // YENİ
 Events::on('user.deleted', [new LogListener(), 'handleUserDeletion']); // YENİ
 
+// YENİ EKLENEN ÖĞRENCİ OLAYLARI
+Events::on('student.created', [new LogListener(), 'handleStudentCreation']);
+Events::on('student.updated', [new LogListener(), 'handleStudentUpdate']);
+Events::on('student.deleted', [new LogListener(), 'handleStudentDeletion']);

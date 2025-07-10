@@ -68,4 +68,68 @@ class LogListener
             'ip_address' => request()->getIPAddress(),
             'created_at' => date('Y-m-d H:i:s')
         ]);
-    }}
+    }
+    // --- YENİ ÖĞRENCİ METODLARI ---
+
+    /**
+     * Bir öğrenci oluşturulduğunda log kaydı tutar.
+     * @param array $student    Oluşturulan öğrencinin veri dizisi
+     * @param object $actor     İşlemi yapan kullanıcı
+     */
+    public function handleStudentCreation($student, $actor)
+    {
+        $this->log(
+            $actor->id,
+            'student.created',
+            "Kullanıcı '{$actor->username}', '{$student['adi']} {$student['soyadi']}' (ID: {$student['id']}) adlı yeni bir öğrenci kaydı oluşturdu."
+        );
+    }
+
+    /**
+     * Bir öğrenci güncellendiğinde log kaydı tutar.
+     * @param array $student    Güncellenen öğrencinin veri dizisi
+     * @param object $actor     İşlemi yapan kullanıcı
+     */
+    public function handleStudentUpdate($student, $actor)
+    {
+        $this->log(
+            $actor->id,
+            'student.updated',
+            "Kullanıcı '{$actor->username}', '{$student['adi']} {$student['soyadi']}' (ID: {$student['id']}) adlı öğrencinin bilgilerini güncelledi."
+        );
+    }
+
+    /**
+     * Bir öğrenci silindiğinde log kaydı tutar.
+     * @param array $student    Silinen öğrencinin veri dizisi
+     * @param object $actor     İşlemi yapan kullanıcı
+     */
+    public function handleStudentDeletion($student, $actor)
+    {
+        $this->log(
+            $actor->id,
+            'student.deleted',
+            "Kullanıcı '{$actor->username}', '{$student['adi']} {$student['soyadi']}' (ID: {$student['id']}) adlı öğrenci kaydını sildi."
+        );
+    }
+
+
+    /**
+     * Log verisini veritabanına kaydeden yardımcı metod.
+     */
+    private function log(int $userId, string $event, string $message): void
+    {
+        $logModel = new LogModel();
+        $logModel->insert([
+            'user_id'    => $userId,
+            'event'      => $event,
+            'message'    => $message,
+            'ip_address' => request()->getIPAddress(),
+            'created_at' => date('Y-m-d H:i:s')
+        ]);
+    }
+
+
+}
+
+    

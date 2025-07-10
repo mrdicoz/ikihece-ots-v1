@@ -73,6 +73,11 @@ class StudentController extends BaseController
 
 
         if ($model->insert($data)) {
+            // --- LOGLAMA EKLENDİ ---
+        $yeniOgrenciId = $model->getInsertID();
+        $yeniOgrenciData = $model->find($yeniOgrenciId);
+        \CodeIgniter\Events\Events::trigger('student.created', $yeniOgrenciData, auth()->user());
+        // --- LOGLAMA SONU ---
             return redirect()->to(site_url('students'))->with('success', 'Öğrenci başarıyla eklendi.');
         }
 
@@ -156,6 +161,11 @@ class StudentController extends BaseController
         }
 
         if ($model->update($id, $data)) {
+            // --- LOGLAMA EKLENDİ ---
+        // Log için güncellenmiş öğrenci verisini tekrar çekelim
+        $guncelOgrenciData = $model->find($id);
+        \CodeIgniter\Events\Events::trigger('student.updated', $guncelOgrenciData, auth()->user());
+        // --- LOGLAMA SONU ---
             return redirect()->to(site_url('students'))->with('success', 'Öğrenci başarıyla güncellendi.');
         }
 
@@ -168,7 +178,20 @@ class StudentController extends BaseController
     public function delete($id = null)
     {
         $model = new StudentModel();
+
+            // --- LOGLAMA EKLENDİ ---
+                // Silmeden önce öğrencinin bilgilerini alıyoruz ki log mesajında kullanabilelim.
+                $silinecekOgrenci = $model->find($id);
+                if (!$silinecekOgrenci) {
+                    return redirect()->back()->with('error', 'Silinecek öğrenci bulunamadı.');
+                }
+                // --- LOGLAMA SONU ---
+
+
         if ($model->delete($id)) {
+            // --- LOGLAMA EKLENDİ ---
+        \CodeIgniter\Events\Events::trigger('student.deleted', $silinecekOgrenci, auth()->user());
+        // --- LOGLAMA SONU ---
             return redirect()->to(site_url('students'))->with('success', 'Öğrenci başarıyla silindi.');
         }
 

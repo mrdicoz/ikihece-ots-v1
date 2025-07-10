@@ -6,7 +6,7 @@
 <div class="container-fluid mt-4">
 
     <div class="d-sm-flex align-items-center justify-content-between mb-3">
-        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-people"></i> <?= esc($title) ?></h1>
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-backpack2"></i> <?= esc($title) ?></h1>
         <a href="<?= site_url('students/new') ?>" class="btn btn-success btn-sm shadow-sm">
             <i class="bi bi-person-plus-fill fa-sm text-white-50"></i> Yeni Öğrenci Ekle
         </a>
@@ -68,7 +68,10 @@
             "info": true,
             "lengthChange": true,
             "pageLength": 10,
-            "order": [[ 1, "asc" ]], // Başlangıçta 1. sütuna (Adı Soyadı) göre sırala
+            "order": [[ 1, "asc" ]], 
+            "columnDefs": [
+                { "type": "turkish", "targets": "_all" }
+            ],// Başlangıçta 1. sütuna (Adı Soyadı) göre sırala
             // İşlemler sütunu kaldırıldığı için columnDefs'e gerek kalmadı.
         });
 

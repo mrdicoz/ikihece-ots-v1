@@ -35,7 +35,7 @@
                                 <li class="list-group-item"><strong>Gruplar:</strong>
                                     <?php if (!empty($groups)):
                                         foreach($groups as $group): ?>
-                                            <span class="badge bg-info text-dark"><?= esc(trim($group->group)) ?></span>
+                                            <span class="badge bg-secondary"><?= esc(trim($group->group)) ?></span>
                                         <?php endforeach;
                                     else:
                                         echo 'Grup atanmamış';

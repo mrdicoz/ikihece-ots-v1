@@ -8,6 +8,7 @@ use CodeIgniter\HTTP\IncomingRequest;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
 use Psr\Log\LoggerInterface;
+use App\Models\UserProfileModel; // UserProfileModel'i dahil et
 
 /**
  * Class BaseController
@@ -26,7 +27,7 @@ abstract class BaseController extends Controller
      *
      * @var CLIRequest|IncomingRequest
      */
-    protected $request;
+    protected $data = [];
 
     /**
      * An array of helpers to be loaded automatically upon
@@ -35,7 +36,7 @@ abstract class BaseController extends Controller
      *
      * @var list<string>
      */
-    protected $helpers = [];
+    protected $helpers = ['auth', 'setting']; // auth ve setting helper'ları burada olmalı
 
     /**
      * Be sure to declare properties for any property fetch you initialized.
@@ -48,11 +49,25 @@ abstract class BaseController extends Controller
      */
     public function initController(RequestInterface $request, ResponseInterface $response, LoggerInterface $logger)
     {
-        // Do Not Edit This Line
         parent::initController($request, $response, $logger);
 
-        // Preload any models, libraries, etc, here.
+        // --- YENİ EKLENEN BÖLÜM ---
+        // Eğer kullanıcı giriş yapmışsa, profil bilgilerini çek ve $this->data'ya ata
+        if (auth()->loggedIn()) {
+            $profileModel = new UserProfileModel();
+            $userProfile = $profileModel->where('user_id', auth()->id())->first();
 
-        // E.g.: $this->session = service('session');
+            // Kullanıcının tam adını belirle (varsa Ad Soyad, yoksa username)
+            $fullName = trim(($userProfile->first_name ?? '') . ' ' . ($userProfile->last_name ?? ''));
+            $this->data['userDisplayName'] = !empty($fullName) ? $fullName : auth()->user()->username;
+
+            // Avatar yolunu belirle
+            $this->data['userAvatar'] = base_url($userProfile->profile_photo ?? 'assets/images/user.jpg');
+        }
+
+        // Tüm view'larda $this->data'yı kullanılabilir yap
+        $this->response->setBody(view('layouts/app', $this->data));
     }
+
+    
 }

@@ -1,14 +1,12 @@
 <?= $this->extend('layouts/app') ?>
 
-<?= $this->section('title') ?>
-    <?= esc($title) ?>
-<?= $this->endSection() ?>
+<?= $this->section('title') ?><?= esc($title) ?><?= $this->endSection() ?>
 
 <?= $this->section('main') ?>
 <div class="container-fluid mt-4">
 
-    <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-user-plus"></i> Yeni Öğrenci Ekle</h1>
+    <div class="d-sm-flex align-items-center justify-content-between mb-3">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-backpack2"></i> Yeni Öğrenci Ekle</h1>
     </div>
 
     <form action="<?= site_url('students') ?>" method="post" enctype="multipart/form-data">
@@ -46,7 +44,7 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header"><h5 class="modal-title">Fotoğrafı Kırp</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body"><img id="cropper-image" src="" style="max-width: 100%;"></div>
+            <div class="modal-body"><img id="cropper-image" src="" style="max-width: 50%;"></div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
                 <button type="button" class="btn btn-success" id="crop-button">Kırp ve Kaydet</button>

@@ -23,7 +23,7 @@
                         <div class="text-center mb-4">
                             <img src="<?= base_url($profile->profile_photo ?? '/assets/images/user.jpg') . '?v=' . time() ?>" alt="Profil Fotoğrafı" id="profile-pic-preview" class="img-thumbnail rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
                             <br>
-                            <label for="profile_photo_input" class="btn btn-outline-primary btn-sm mt-2">
+                            <label for="profile_photo_input" class="btn btn-outline-success btn-sm mt-2">
                                 <i class="bi bi-camera"></i> Fotoğrafı Değiştir
                             </label>
                             <input type="file" id="profile_photo_input" class="d-none" accept="image/*">
@@ -91,12 +91,12 @@
             </div>
             <div class="modal-body">
                 <div>
-                    <img id="cropper-image" src="" style="max-width: 100%;">
+                    <img id="cropper-image" src="" style="max-width: 50%;">
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-                <button type="button" class="btn btn-primary" id="crop-button">Kırp ve Kaydet</button>
+                <button type="button" class="btn btn-success" id="crop-button">Kırp ve Kaydet</button>
             </div>
         </div>
     </div>
