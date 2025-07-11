@@ -18,7 +18,7 @@ $avatar = $userAvatar ?? base_url('assets/images/user.jpg');
                     <a class="nav-link" href="#"><i class="bi bi-bus-front"></i> Servis</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="#"><i class="bi bi-calendar3"></i> Ders Programı</a>
+                    <a class="nav-link" href="<?= site_url('schedule') ?>"><i class="bi bi-calendar3"></i> Ders Programı</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="<?= site_url('/students') ?>"><i class="bi bi-backpack2"></i> Öğrenci Yönetimi</a>

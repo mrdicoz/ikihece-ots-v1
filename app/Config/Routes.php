@@ -64,3 +64,41 @@ $routes->group('', ['filter' => $studentAccessGroups], static function ($routes)
 
 
 });
+
+/**
+ * --------------------------------------------------------------------
+ * Ders Programı (Schedule) Rotaları
+ * --------------------------------------------------------------------
+ */
+// Bu gruba sadece 'admin', 'mudur' ve 'sekreter' rollerindekiler erişebilir.
+$routes->group('schedule', ['filter' => 'group:admin,mudur,sekreter'], static function ($routes) {
+    // Ana takvim sayfası
+    $routes->get('/', 'ScheduleController::index', ['as' => 'schedule.index']);
+    
+    // Takvimdeki dersleri JSON olarak çeker
+    $routes->get('get-month-lessons', 'ScheduleController::getLessonsForMonth', ['as' => 'schedule.get_month_lessons']);
+
+    // YENİ EKLENEN ROTALAR
+    // Günlük program grid'ini gösteren sayfa
+    $routes->get('daily/(:segment)', 'ScheduleController::dailyGrid/$1', ['as' => 'schedule.daily']);
+    
+    // Ders ekleme formu için öğrencileri getiren AJAX rotası
+    $routes->get('get-students', 'ScheduleController::getStudentsForSelect', ['as' => 'schedule.get_students']);
+    
+    // Dersi veritabanına kaydeden AJAX rotası
+    $routes->post('create-lesson', 'ScheduleController::createLesson', ['as' => 'schedule.create']);
+
+    // Mevcut bir dersin detaylarını AJAX ile getirir
+    $routes->get('get-lesson-details/(:num)', 'ScheduleController::getLessonDetails/$1', ['as' => 'schedule.get_details']);
+    
+    // Mevcut bir dersi siler
+    $routes->post('delete-lesson/(:num)', 'ScheduleController::deleteLesson/$1', ['as' => 'schedule.delete_lesson']);
+});
+
+/**
+ * --------------------------------------------------------------------
+ * Anlık Bildirim (Push Notification) Rotaları
+ * --------------------------------------------------------------------
+ */
+// Sadece giriş yapmış kullanıcıların aboneliklerini kaydedebilmesi için 'session' filtresi yeterlidir.
+$routes->post('notifications/save', 'NotificationController::saveSubscription', ['as' => 'notifications.save', 'filter' => 'session']);
