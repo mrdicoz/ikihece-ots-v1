@@ -10,7 +10,8 @@ class CreatePushSubscriptionsTable extends Migration
     {
         $this->forge->addField([
             'id' => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
-            'user_id' => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'unique' => true],
+            // SADECE 'unique' => true kısmını sildik.
+            'user_id' => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true],
             'endpoint' => ['type' => 'TEXT'],
             'p256dh' => ['type' => 'VARCHAR', 'constraint' => 255],
             'auth' => ['type' => 'VARCHAR', 'constraint' => 255],
@@ -26,3 +27,7 @@ class CreatePushSubscriptionsTable extends Migration
         $this->forge->dropTable('push_subscriptions');
     }
 }
+
+
+
+

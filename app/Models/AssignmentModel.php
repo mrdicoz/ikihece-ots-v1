@@ -6,17 +6,10 @@ use CodeIgniter\Model;
 
 class AssignmentModel extends Model
 {
-    protected $table            = 'user_assignments';
+    protected $table            = 'user_assignments'; // Migration'daki tablo adınızla aynı olmalı
     protected $primaryKey       = 'id';
-    protected $useAutoIncrement = true;
-    protected $returnType       = 'object';
-    protected $protectFields    = true;
     protected $allowedFields    = ['manager_user_id', 'managed_user_id'];
-
-    // Dates
-    protected $useTimestamps = true;
-    protected $createdField  = 'created_at';
-    protected $updatedField  = 'updated_at';
+    protected $useTimestamps    = true;
 
     /**
      * Belirli bir sekretere (manager) atanmış tüm öğretmenlerin ID'lerini getirir.

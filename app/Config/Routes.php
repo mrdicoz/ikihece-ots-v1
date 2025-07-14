@@ -5,6 +5,8 @@ use CodeIgniter\Router\RouteCollection;
 /**
  * @var RouteCollection $routes
  */
+$routes->get('/generate-keys', 'VapidController::generateKeys');
+
 $routes->get('/', 'Home::index', ['filter' => 'session']);
 
 service('auth')->routes($routes);
@@ -62,5 +64,55 @@ $routes->group('', ['filter' => $studentAccessGroups], static function ($routes)
     $routes->get('students/view-ram-report/(:num)', 'StudentController::viewRamReport/$1', ['as' => 'students.viewRamReport']);
     $routes->resource('students', ['controller' => 'StudentController']);
 
+});
 
+/*
+ * --------------------------------------------------------------------
+ * Notification (Web Push) Routes
+ * --------------------------------------------------------------------
+ */
+$routes->group('notifications', static function ($routes) {
+    // Public VAPID anahtarını almak için GET isteği
+    $routes->get('vapid-key', 'NotificationController::getVapidKey');
+
+    // Kullanıcı aboneliğini kaydetmek için POST isteği
+    $routes->post('subscribe', 'NotificationController::saveSubscription');
+
+    // Test amaçlı bildirim göndermek için GET isteği
+    $routes->get('test-send', 'NotificationController::sendTestNotification');
+
+});
+
+/**
+ * --------------------------------------------------------------------
+ * Schedule Routes
+ * --------------------------------------------------------------------
+ * Bu rotalar, ders programı ile ilgili işlemleri yönetir.
+ * Sadece admin, müdür ve sekreter gruplarındaki kullanıcılar erişebilir.
+ */
+
+$routes->group('schedule', ['filter' => 'group:admin,mudur,sekreter'], static function ($routes) {
+    // Ana takvim sayfasını gösterir -> /schedule
+    $routes->get('/', 'ScheduleController::index', ['as' => 'schedule.index']);
+    
+    // Takvimdeki dersleri JSON olarak çeker
+    $routes->get('get-month-lessons', 'ScheduleController::getLessonsForMonth', ['as' => 'schedule.get_month_lessons']);
+
+    // Günlük program grid'ini gösteren sayfa (örn: /schedule/daily/2025-07-14)
+    $routes->get('daily/(:segment)', 'ScheduleController::dailyGrid/$1', ['as' => 'schedule.daily']);
+    
+    // Ders ekleme formu için öğrencileri getiren AJAX rotası
+    $routes->get('get-students', 'ScheduleController::getStudentsForSelect', ['as' => 'schedule.get_students']);
+    
+    // Dersi veritabanına kaydeden AJAX rotası
+    $routes->post('create-lesson', 'ScheduleController::createLesson', ['as' => 'schedule.create']);
+
+    // Mevcut bir dersin detaylarını AJAX ile getirir
+    $routes->get('get-lesson-details/(:num)', 'ScheduleController::getLessonDetails/$1', ['as' => 'schedule.get_details']);
+    
+    // Mevcut bir dersi siler
+    $routes->post('delete-lesson/(:num)', 'ScheduleController::deleteLesson/$1', ['as' => 'schedule.delete_lesson']);
+
+    // Rota grubu içinde herhangi bir yere ekleyebilirsiniz.
+    $routes->get('get-lesson-dates', 'ScheduleController::getLessonDates', ['as' => 'schedule.get_lesson_dates']);
 });

@@ -15,10 +15,13 @@ $avatar = $userAvatar ?? base_url('assets/images/user.jpg');
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto align-items-lg-center">
                 <li class="nav-item">
+                    <a class="nav-link" href="#" id="subscribeButton" title="Bildirimlere Abone Ol"><i class="bi bi-bell-fill"></i> </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" href="#"><i class="bi bi-bus-front"></i> Servis</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="#"><i class="bi bi-calendar3"></i> Ders Programı</a>
+                    <a class="nav-link" href="<?= route_to('schedule.index') ?>"><i class="bi bi-calendar3"></i> Ders Programı</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="<?= site_url('/students') ?>"><i class="bi bi-backpack2"></i> Öğrenci Yönetimi</a>

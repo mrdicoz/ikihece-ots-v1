@@ -113,3 +113,54 @@
     font-weight: bold;
     color: #28a745; /* Bootstrap success color */
 }
+
+/* =============================================== */
+/* --- Ders Programı (FullCalendar) Stilleri --- */
+/* =============================================== */
+
+/* Haftanın günlerini (Pzt, Sal...) ve ayın günlerini (1, 2...) yeşil yapma */
+.fc-col-header-cell-cushion,
+.fc-daygrid-day-number {
+    color: #198754 !important;
+    text-decoration: none !important;
+}
+
+/* --- Ders Sayısını Ortalama Stilleri --- */
+
+/* Event'in dış sarmalayıcısını esnek bir kutu yapıp ortalıyoruz */
+.fc-daygrid-event-harness {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    top: 0 !important;
+    left: 5% !important;  /* Kenarlardan biraz boşluk */
+    right: 5% !important;
+    bottom: 5% !important;
+}
+
+/* Event'in kendisinin arka planını ve kenarlığını tamamen kaldırıyoruz */
+.fc-daygrid-event {
+    background: transparent !important;
+    border: none !important;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.fc-event-main {
+    height: 100%;
+    width: 100%;
+}
+
+/* Bizim özel rakam stilimiz */
+.day-lesson-count {
+    font-weight: 700; /* Daha etli bir font */
+    font-size: 1.6em; /* Daha büyük */
+    color: #198754;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+}
