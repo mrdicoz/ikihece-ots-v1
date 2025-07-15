@@ -66,23 +66,15 @@ $routes->group('', ['filter' => $studentAccessGroups], static function ($routes)
 
 });
 
-/*
- * --------------------------------------------------------------------
- * Notification (Web Push) Routes
- * --------------------------------------------------------------------
- */
-$routes->group('notifications', static function ($routes) {
-    // Public VAPID anahtarını almak için GET isteği
-    $routes->get('vapid-key', 'NotificationController::getVapidKey');
+// Web Push Notification abonelik rotası
+$routes->post('/notifications/subscribe', 'NotificationController::saveSubscription', ['filter' => 'session', 'as' => 'notifications.subscribe']);
 
-    // Kullanıcı aboneliğini kaydetmek için POST isteği
-    $routes->post('subscribe', 'NotificationController::saveSubscription');
+// VAPID public key'i almak için rota
+$routes->get('/notifications/vapid-key', 'NotificationController::getVapidKey', ['filter' => 'session']);
 
-    // Test amaçlı bildirim göndermek için GET isteği
-    $routes->get('test-send', 'NotificationController::sendTestNotification');
+// app/Config/Routes.php dosyasının uygun bir yerine...
 
-});
-
+$routes->post('/notifications/send-manual', 'NotificationController::sendManualNotification', ['filter' => 'group:admin,mudur,sekreter']);
 /**
  * --------------------------------------------------------------------
  * Schedule Routes

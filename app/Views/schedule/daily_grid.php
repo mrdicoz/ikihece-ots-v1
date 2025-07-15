@@ -34,6 +34,11 @@
                                         <img src="<?= base_url(ltrim($teacher->profile_photo ?? '/assets/images/user.jpg', '/')) ?>" class="rounded-circle me-2" width="40" height="40" style="object-fit: cover;">
                                         <br>
                                         <?= esc($teacher->first_name . ' ' . $teacher->last_name) ?>
+                                        <div class="mt-1">
+                                            <button class="btn btn-sm btn-outline-success bildirim-gonder-tek" data-teacher-id="<?= esc($teacher->id) ?>">
+                                                <i class="bi bi-bell"></i> Bildir
+                                            </button>
+                                        </div>
                                     </td>
                                     <?php for ($hour = config('Ots')->scheduleStartHour; $hour < config('Ots')->scheduleEndHour; $hour++): ?>
                                         <?php
@@ -55,6 +60,11 @@
                             <?php endforeach; ?>
                         </tbody>
                     </table>
+                    <div class="text-center mt-4">
+                        <button class="btn btn-success" id="bildirim-gonder-hepsi">
+                            <i class="bi bi-broadcast-pin"></i> Listelenen Tüm Öğretmenlere Bildirim Gönder
+                        </button>
+                    </div>
                 </div>
             <?php endif; ?>
         </div>
@@ -151,6 +161,65 @@ $(document).ready(function() {
             .always(() => lessonModal.hide());
     });
 });
+
+    $(document).ready(function() {
+        
+        // Dinamik olarak oluşturulmuş butonlar için event delegation kullanılır
+        $('body').on('click', '.bildirim-gonder-tek', function() {
+            const teacherId = $(this).data('teacher-id');
+            if (teacherId) {
+                sendNotificationRequest([teacherId], $(this));
+            }
+        });
+
+        $('#bildirim-gonder-hepsi').on('click', function() {
+            let teacherIds = [];
+            // Tablodaki her bir tekli gönder butonundan teacher-id'yi topla
+            $('.bildirim-gonder-tek').each(function() {
+                teacherIds.push($(this).data('teacher-id'));
+            });
+
+            // Benzersiz ID'leri al (opsiyonel ama iyi bir pratik)
+            let uniqueTeacherIds = [...new Set(teacherIds)];
+
+            if (uniqueTeacherIds.length > 0) {
+                sendNotificationRequest(uniqueTeacherIds, $(this));
+            } else {
+                alert('Listede bildirim gönderilecek öğretmen bulunmuyor.');
+            }
+        });
+
+        function sendNotificationRequest(ids, button) {
+            const originalHtml = button.html();
+            // Butonu devre dışı bırak ve bekleme animasyonu ekle
+            button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Gönderiliyor...');
+
+            $.ajax({
+                url: '<?= site_url('notifications/send-manual') ?>',
+                method: 'POST',
+                data: {
+                    '<?= csrf_token() ?>': '<?= csrf_hash() ?>', // CSRF token'ı gönder
+                    'teacher_ids': ids
+                },
+                dataType: 'json', // Sunucudan JSON cevabı beklediğimizi belirtiyoruz
+                success: function(response) {
+                    // Daha şık bir bildirim için Toastr, SweetAlert gibi kütüphaneler kullanılabilir
+                    alert(response.message); 
+                },
+                error: function(xhr, status, error) {
+                    let errorMessage = 'Bilinmeyen bir hata oluştu.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    }
+                    alert('Hata: ' + errorMessage);
+                },
+                complete: function() {
+                    // İşlem bittiğinde butonu eski haline getir
+                    button.prop('disabled', false).html(originalHtml);
+                }
+            });
+        }
+    });
 </script>
 <style>
 .schedule-grid .available-slot, .schedule-grid .has-lesson { cursor: pointer; transition: background-color 0.2s; }

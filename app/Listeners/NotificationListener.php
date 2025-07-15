@@ -2,22 +2,59 @@
 
 namespace App\Listeners;
 
+use App\Models\PushSubscriptionModel;
+use Minishlink\WebPush\WebPush;
+use Minishlink\WebPush\Subscription;
+
 class NotificationListener
 {
     /**
-     * 'schedule.changed' olayı tetiklendiğinde bu metot çalışacak.
+     * Belirtilen kullanıcıya web push bildirimi gönderir.
      *
-     * @param array $lessonData Ders ile ilgili temel bilgiler
-     * @param int   $teacherId  Dersi etkilenen öğretmenin ID'si
+     * @param int    $userId      Bildirim gönderilecek kullanıcının ID'si
+     * @param string $title       Bildirim başlığı
+     * @param string $body        Bildirim içeriği
      */
-    public function handleScheduleChange($lessonData, $teacherId)
+    public function handleScheduleChange(int $userId, string $title, string $body)
     {
-        // Şimdilik sadece log tutuyoruz.
-        // İlerleyen adımlarda burayı dolduracağız:
-        // 1. $teacherId'ye ait push abonelik bilgilerini veritabanından (PushSubscriptionModel) bul.
-        // 2. Bildirim içeriğini oluştur (örn: "Yeni bir dersiniz var!").
-        // 3. Bildirim gönderme kütüphanesini kullanarak bildirimi gönder.
-        
-        log_message('info', 'Schedule change event triggered for teacher ID: ' . $teacherId);
+        $subscriptionModel = new PushSubscriptionModel();
+        $subscriptions = $subscriptionModel->where('user_id', $userId)->findAll();
+
+        if (empty($subscriptions)) {
+            // Kullanıcının hiç aboneliği yoksa işlem yapma
+            return;
+        }
+
+        $auth = [
+            'VAPID' => [
+                'subject' => 'mailto:info@mantaryazilim.tr', // Projenize uygun bir e-posta
+                'publicKey' => env('vapid.publicKey'),      // .env dosyasından okunacak
+                'privateKey' => env('vapid.privateKey'),   // .env dosyasından okunacak
+            ],
+        ];
+
+        $webPush = new WebPush($auth);
+        $payload = json_encode(['title' => $title, 'body' => $body]);
+
+        foreach ($subscriptions as $sub) {
+            $subscription = Subscription::create([
+                'endpoint' => $sub->endpoint,
+                'publicKey' => $sub->p256dh,
+                'authToken' => $sub->auth,
+            ]);
+            $webPush->queueNotification($subscription, $payload);
+        }
+
+        // Bildirimleri gönder ve sonuçları logla (opsiyonel)
+        foreach ($webPush->flush() as $report) {
+            $endpoint = $report->getRequest()->getUri()->__toString();
+            if (!$report->isSuccess()) {
+                log_message('error', "Bildirim hatası [{$endpoint}]: {$report->getReason()}");
+                // Süresi dolmuş abonelikleri sil
+                if ($report->isSubscriptionExpired()) {
+                    $subscriptionModel->where('endpoint', $endpoint)->delete();
+                }
+            }
+        }
     }
 }

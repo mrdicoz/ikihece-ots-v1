@@ -4,27 +4,31 @@ namespace App\Controllers;
 
 use App\Controllers\BaseController;
 use App\Models\PushSubscriptionModel;
-use CodeIgniter\API\ResponseTrait;
+use Minishlink\WebPush\Subscription;  // Bu satır var mı?
+use Minishlink\WebPush\WebPush;       // Bu satır var mı?
+use CodeIgniter\API\ResponseTrait; // ÖNEMLİ: ResponseTrait'i tekrar ekliyoruz.
 
 class NotificationController extends BaseController
 {
-    use ResponseTrait;
-
-    public function __construct()
-    {
-        // Bu satır, her işlemden önce kimlik doğrulaması yapılmasını sağlar.
-        // Şimdilik test için kapalı tutabiliriz, sonra açacağız.
-        // $this->middleware('auth');
-    }
+    use ResponseTrait; // ÖNEMLİ: Trait'i kullanıma alıyoruz.
 
     /**
-     * Public VAPID anahtarını döndürür.
+     * .env dosyasındaki VAPID public key'i JSON olarak döndürür.
      */
     public function getVapidKey()
     {
-        return $this->respond([
-            'publicKey' => getenv('VAPID_PUBLIC_KEY')
-        ]);
+        if (!auth()->loggedIn()) {
+            return $this->failUnauthorized('Yetkisiz Erişim');
+        }
+
+        $publicKey = env('vapid.publicKey');
+
+        if (empty($publicKey)) {
+            log_message('error', 'VAPID public anahtarı .env dosyasında tanımlı değil.');
+            return $this->failServerError('Sunucu yapılandırma hatası.');
+        }
+
+        return $this->respond(['publicKey' => $publicKey]);
     }
 
     /**
@@ -32,94 +36,113 @@ class NotificationController extends BaseController
      */
     public function saveSubscription()
     {
+        // Güvenlik: Sadece giriş yapmış kullanıcılar abone olabilir.
+        if (!auth()->loggedIn()) {
+            return $this->failUnauthorized('Abonelik için giriş yapmalısınız.');
+        }
+
         $subscriptionData = $this->request->getJSON(true);
 
-        // Basit bir doğrulama
+        // Gelen veriyi doğrula
         if (empty($subscriptionData['endpoint'])) {
-            return $this->fail('Abonelik bilgileri eksik.');
+            return $this->fail('Abonelik bilgileri eksik.', 400);
         }
 
         $model = new PushSubscriptionModel();
 
         // Aynı endpoint ile daha önce kayıt olunmuş mu diye kontrol et
         $existing = $model->where('endpoint', $subscriptionData['endpoint'])->first();
-
         if ($existing) {
-            return $this->respond(['message' => 'Bu cihaz zaten abone.'], 200);
+            // Eğer abonelik başka bir kullanıcıya aitse, sahibini güncelleyebiliriz.
+            // Ama şimdilik sadece mevcut olduğunu belirtelim.
+            return $this->respond(['success' => true, 'message' => 'Bu cihaz zaten abone.'], 200);
         }
 
-        // Yeni aboneliği kaydet
+        // Yeni aboneliği, GÜNCEL KULLANICI ID'Sİ ile kaydet
         $dataToSave = [
-            // Gerçek kullanıcı ID'sini session'dan alacağız. Şimdilik test için 1 yazıyoruz.
-            'user_id'  => 1,
+            'user_id'  => auth()->id(), // Dinamik olarak mevcut kullanıcı ID'sini alıyoruz
             'endpoint' => $subscriptionData['endpoint'],
             'p256dh'   => $subscriptionData['keys']['p256dh'],
             'auth'     => $subscriptionData['keys']['auth'],
         ];
 
         if ($model->save($dataToSave)) {
-            return $this->respondCreated(['message' => 'Abonelik başarıyla oluşturuldu.']);
+            return $this->respondCreated(['success' => true, 'message' => 'Abonelik başarıyla oluşturuldu.']);
         }
 
-        return $this->fail('Abonelik kaydedilemedi.', 500);
+        return $this->fail('Abonelik veritabanına kaydedilemedi.', 500);
     }
-    /**
-     * Test amaçlı bildirim gönderir.
-     * Bu metodu sadece admin kullanıcılar kullanabilir.
-     */
-    public function sendTestNotification()
-    {
-        $subscriptionModel = new \App\Models\PushSubscriptionModel();
-        $subscriptions = $subscriptionModel->findAll();
 
-        if (empty($subscriptions)) {
-            return "Gönderilecek abone bulunamadı.";
+    public function sendManualNotification()
+    {
+        if (! $this->request->isAJAX()) {
+            return $this->response->setStatusCode(403, 'Forbidden');
         }
 
-        // VAPID anahtarlarını .env dosyasından al
-        $auth = [
-            'VAPID' => [
-                'subject' => 'mailto:admin@mantaryazilim.tr', // Buraya kendi e-posta adresinizi yazın
-                'publicKey' => getenv('VAPID_PUBLIC_KEY'),
-                'privateKey' => getenv('VAPID_PRIVATE_KEY'),
-            ],
-        ];
+        $teacherIds = $this->request->getPost('teacher_ids');
 
-        // Kütüphaneyi kullanarak WebPush nesnesi oluştur
-        $webPush = new \Minishlink\WebPush\WebPush($auth);
+        if (empty($teacherIds) || !is_array($teacherIds)) {
+            return $this->response->setStatusCode(400)->setJSON(['success' => false, 'message' => 'Geçersiz veya boş öğretmen seçimi yapıldı.']);
+        }
 
-        // Gönderilecek bildirimin içeriği
         $payload = json_encode([
-            'title' => 'Test Bildirimi',
-            'body' => 'Bu bildirim, sistemin çalıştığını test etmek için gönderilmiştir.',
-            'icon' => '/images/icon.png',
+            'title' => 'Ders Programı Güncellemesi',
+            'body'  => 'Yönetim tarafından programınızda bir güncelleme yapılmıştır. Lütfen kontrol ediniz.',
+            'icon'  => base_url('assets/images/favicon-192x192.png'),
+            'data'  => ['url' => site_url('schedule')]
         ]);
 
-        // Her bir aboneye bildirimi kuyruğa ekle
-        foreach ($subscriptions as $sub) {
-            $subscriptionObject = \Minishlink\WebPush\Subscription::create([
-                'endpoint' => $sub['endpoint'],
-                'publicKey' => $sub['p256dh'],
-                'authToken' => $sub['auth'],
-            ]);
-            $webPush->queueNotification($subscriptionObject, $payload);
+        $pushSubscriptionModel = new PushSubscriptionModel();
+        // Hata 2: findAll() metodu obje değil, dizi (array) döndürür.
+        $subscriptions = $pushSubscriptionModel->whereIn('user_id', $teacherIds)->asArray()->findAll();
+
+        if (empty($subscriptions)) {
+             return $this->response->setJSON(['success' => true, 'message' => 'Seçilen öğretmen(ler) için kayıtlı bir bildirim aboneliği bulunamadı.']);
         }
 
-        echo "Bildirimler " . count($subscriptions) . " aboneye gönderilmek üzere kuyruğa eklendi.<br>";
+        try {
+            $auth = [
+                'VAPID' => [
+                    'subject'    => 'mailto:' . getenv('app.fromEmail'),
+                    'publicKey'  => getenv('vapid.publicKey'),
+                    'privateKey' => getenv('vapid.privateKey'),
+                ],
+            ];
 
-        // Kuyruktaki tüm bildirimleri gönder
-        foreach ($webPush->flush() as $report) {
-            $endpoint = $report->getRequest()->getUri()->__toString();
+            // Burada new WebPush dediğimizde, PHP artık doğru sınıftan nesne oluşturacak.
+            $webPush = new WebPush($auth);
 
-            if ($report->isSuccess()) {
-                echo "[v] Mesaj başarıyla {$endpoint} adresine gönderildi.<br>";
-            } else {
-                echo "[x] Mesaj {$endpoint} adresine gönderilemedi: {$report->getReason()}<br>";
-                // İsteğe bağlı: Geçersiz abonelikleri buradan silebilirsiniz
-                // $subscriptionModel->where('endpoint', $endpoint)->delete();
+            foreach ($subscriptions as $sub) {
+                 // Hata 2'nin çözümü: $sub bir dizi olduğu için -> yerine [] kullanıyoruz.
+                $subscription = Subscription::create([
+                    'endpoint'    => $sub['endpoint'],
+                    'publicKey'   => $sub['p256dh'],
+                    'authToken'   => $sub['auth'],
+                    'contentEncoding' => 'aesgcm'
+                ]);
+                $webPush->queueNotification($subscription, $payload);
             }
+
+            $sentCount = 0;
+            foreach ($webPush->flush() as $report) {
+                if ($report->isSuccess()) {
+                    $sentCount++;
+                } else {
+                    log_message('error', 'Bildirim Gönderim Hatası: ' . $report->getReason() . ' | Endpoint: ' . $report->getEndpoint());
+                    if ($report->isSubscriptionExpired() || $report->getStatusCode() === 404 || $report->getStatusCode() === 410) {
+                        $pushSubscriptionModel->where('endpoint', $report->getEndpoint())->delete();
+                    }
+                }
+            }
+            
+            return $this->response->setJSON([
+                'success' => true, 
+                'message' => $sentCount . ' öğretmene bildirim başarıyla gönderildi.'
+            ]);
+
+        } catch (\Throwable $e) {
+            log_message('error', '[NotificationController] ' . $e->getFile() . ' Line: ' . $e->getLine() . ' Error: ' . $e->getMessage());
+            return $this->response->setStatusCode(500)->setJSON(['success' => false, 'message' => 'Bildirimler gönderilirken kritik bir hata oluştu.']);
         }
-        
-        echo "İşlem tamamlandı.";
     }
 }

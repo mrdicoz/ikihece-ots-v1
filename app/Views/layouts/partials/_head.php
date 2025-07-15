@@ -2,6 +2,10 @@
 <title><?= $title ?? 'İkihece OTS v1.0' ?></title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#198754"/>
+<meta name="csrf-token" content="<?= csrf_hash() ?>">
+
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" />
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">

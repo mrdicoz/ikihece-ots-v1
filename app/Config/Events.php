@@ -104,3 +104,10 @@ Events::on('user.deleted', [new LogListener(), 'handleUserDeletion']); // YENİ
 Events::on('student.created', [new LogListener(), 'handleStudentCreation']);
 Events::on('student.updated', [new LogListener(), 'handleStudentUpdate']);
 Events::on('student.deleted', [new LogListener(), 'handleStudentDeletion']);
+
+// EKLENEN DERS OLAYLARI
+// Ders programı güncellendiğinde bildirim göndermek için
+Events::on('schedule.updated', static function($userId, $title, $body) {
+    $listener = new \App\Listeners\NotificationListener();
+    $listener->handleScheduleChange($userId, $title, $body);
+});

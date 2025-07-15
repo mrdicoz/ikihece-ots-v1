@@ -13,16 +13,14 @@ $avatar = $userAvatar ?? base_url('assets/images/user.jpg');
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-auto align-items-lg-center">
-                <li class="nav-item">
-                    <a class="nav-link" href="#" id="subscribeButton" title="Bildirimlere Abone Ol"><i class="bi bi-bell-fill"></i> </a>
-                </li>
+            <ul class="navbar-nav ms-auto align-items-lg-center">                
                 <li class="nav-item">
                     <a class="nav-link" href="#"><i class="bi bi-bus-front"></i> Servis</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="<?= route_to('schedule.index') ?>"><i class="bi bi-calendar3"></i> Ders Programı</a>
-                </li>
+                </li>                        
+
                 <li class="nav-item">
                     <a class="nav-link" href="<?= site_url('/students') ?>"><i class="bi bi-backpack2"></i> Öğrenci Yönetimi</a>
                 </li>
@@ -64,6 +62,7 @@ $avatar = $userAvatar ?? base_url('assets/images/user.jpg');
 
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" href="<?= site_url('profile') ?>"><i class="bi bi-person"></i> Profilim</a></li>
+                        <li><a class="dropdown-item" href="#" id="subscribeButton"><i class="bi bi-bell-fill"></i> Bildirimlere Abone Ol</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="<?= site_url('logout') ?>"><i class="bi bi-box-arrow-right"></i> Çıkış Yap</a></li>
                         <li><hr class="dropdown-divider"></li>
@@ -93,6 +92,7 @@ $avatar = $userAvatar ?? base_url('assets/images/user.jpg');
                     </a>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="<?= site_url('profile') ?>">Profilim</a></li>
+                        <li><a class="dropdown-item" href="#" id="subscribeButton"><i class="bi bi-bell-fill"></i> Bildirimlere Abone Ol</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="<?= site_url('logout') ?>">Çıkış Yap</a></li>
                         <li><hr class="dropdown-divider"></li>

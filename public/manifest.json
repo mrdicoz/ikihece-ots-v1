@@ -1,0 +1,21 @@
+{
+  "name": "İkihece Okul Takip Sistemi",
+  "short_name": "İkihece OTS",
+  "description": "İkihece Kurumları için Okul Takip ve Yönetim Sistemi",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#148855",
+  "theme_color": "#148855",
+  "icons": [
+    {
+      "src": "/assets/images/favicon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/images/favicon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
