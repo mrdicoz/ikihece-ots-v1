@@ -13,8 +13,8 @@
         "php": "^8.1",
         "codeigniter4/framework": "^4.0",
         "codeigniter4/shield": "^1.1",
-        "phpoffice/phpspreadsheet": "^4.4",
-        "spomky-labs/web-push": "^3.1"
+        "minishlink/web-push": "^9.0",
+        "phpoffice/phpspreadsheet": "^4.4"
     },
     "require-dev": {
         "fakerphp/faker": "^1.9",

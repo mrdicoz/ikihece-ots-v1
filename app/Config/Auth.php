@@ -47,19 +47,19 @@ class Auth extends ShieldAuth
      * View files
      * --------------------------------------------------------------------
      */
-    public array $views = [
-        'login'                     => 'auth\login',             // Giriş sayfası görünümü
-        'register'                  => 'auth\register',          // Kayıt sayfası görünümü
-        'layout'                    => 'layouts\blank',            // Genel düzen (layout) görünümü
-        'action_email_2fa'          => 'auth\email_2fa_show',    // E-posta ile 2FA (iki faktörlü kimlik doğrulama) gösterme görünümü
-        'action_email_2fa_verify'   => 'auth\email_2fa_verify',  // E-posta ile 2FA doğrulama görünümü
-        'action_email_2fa_email'    => 'email\email_2fa_email', // E-posta ile 2FA için e-posta şablonu
-        'action_email_activate_show' => 'auth\email_activate_show', // E-posta aktivasyonu gösterme görünümü
-        'action_email_activate_email' => 'email\email_activate_email', // E-posta aktivasyonu için e-posta şablonu
-        'magic-link-login'          => 'auth\magic_link_form',    // Sihirli bağlantı ile giriş formu görünümü
-        'magic-link-message'        => 'auth\magic_link_message',  // Sihirli bağlantı mesajı görünümü
-        'magic-link-email'          => 'email\magic_link_email', // Sihirli bağlantı için e-posta şablonu
-    ];
+public array $views = [
+    'login'                     => 'auth/login',
+    'register'                  => 'auth/register',
+    'layout'                    => 'layouts/blank',
+    'action_email_2fa'          => 'auth/email_2fa_show',
+    'action_email_2fa_verify'   => 'auth/email_2fa_verify',
+    'action_email_2fa_email'    => 'email/email_2fa_email',
+    'action_email_activate_show' => 'auth/email_activate_show',
+    'action_email_activate_email' => 'email/email_activate_email',
+    'magic-link-login'          => 'auth/magic_link_form',
+    'magic-link-message'        => 'auth/magic_link_message',
+    'magic-link-email'          => 'email/magic_link_email',
+];
 
     /**
      * --------------------------------------------------------------------
