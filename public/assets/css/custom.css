@@ -189,3 +189,50 @@
     color: #dc3545; /* Bootstrap'in kırmızı rengi */
     cursor: not-allowed;
 }
+
+/* ============================================= */
+/* Ders Programı Tablosu Stilleri */
+/* ============================================= */
+
+.schedule-grid {
+    table-layout: fixed; /* Tablo hücrelerinin içeriğe göre genişlemesini engeller */
+    width: 100%;
+}
+
+.schedule-grid td, .schedule-grid th {
+    vertical-align: middle !important; /* !important ekleyerek bootstrap'i ezmesini garantileyelim */
+    word-wrap: break-word; /* Uzun kelimelerin hücre dışına taşmasını engeller */
+}
+
+.schedule-grid .available-slot, .schedule-grid .has-lesson {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.schedule-grid .available-slot {
+    font-weight: bold;
+    color: #198754;
+}
+
+.schedule-grid .available-slot:hover {
+    background-color: #d1e7dd;
+}
+
+.schedule-grid .has-lesson {
+    font-size: 0.78em; /* Rozet içindeki yazı boyutunu ayarlayabilirsiniz */
+    padding: 5px; /* Hücre içi boşluk */
+}
+
+.schedule-grid .has-lesson:hover {
+    background-color: #badbcc;
+}
+
+/* Her bir öğrenci rozetinin stilini belirler */
+.student-badge {
+    display: block; /* Rozetlerin alt alta gelmesini sağlar */
+    width: 100%;    /* Rozetin hücreyi doldurmasını sağlar */
+    margin-bottom: 3px; /* Rozetler arasına boşluk koyar */
+    white-space: normal; /* Uzun isimlerin rozet içinde sığmasını sağlar */
+    text-align: left; /* Rozet içindeki yazıyı sola yaslar */
+    padding: 5px 8px; /* Rozet içi boşluk */
+}

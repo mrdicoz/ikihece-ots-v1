@@ -72,7 +72,9 @@ class ScheduleController extends BaseController
             ->select('users.id, user_profiles.first_name, user_profiles.last_name, user_profiles.profile_photo')
             ->join('auth_groups_users', 'auth_groups_users.user_id = users.id')
             ->join('user_profiles', 'user_profiles.user_id = users.id', 'left')
-            ->where('auth_groups_users.group', 'ogretmen');
+            ->where('auth_groups_users.group', 'ogretmen')
+            ->where('users.active', 1); // <-- EKLENEN SATIR
+;
 
         if ($loggedInUser->inGroup('sekreter') && !$loggedInUser->inGroup('admin', 'mudur')) {
             $assignmentModel = new AssignmentModel();
@@ -90,7 +92,7 @@ class ScheduleController extends BaseController
 
         $lessonModel = new LessonModel();
         $lessons = $lessonModel
-            ->select('lessons.*, GROUP_CONCAT(CONCAT(s.adi, " ", s.soyadi) SEPARATOR ",<br>") as student_names')
+            ->select('lessons.*, GROUP_CONCAT(CONCAT(s.adi, " ", s.soyadi) SEPARATOR ",") as student_names')
             ->join('lesson_students ls', 'ls.lesson_id = lessons.id', 'left')
             ->join('students s', 's.id = ls.student_id', 'left')
             ->where('lesson_date', $date)
@@ -132,7 +134,7 @@ class ScheduleController extends BaseController
         if (!$this->request->isAJAX()) { return $this->response->setStatusCode(403); }
         $lessonModel = new LessonModel();
         $lesson = $lessonModel
-            ->select('lessons.*, GROUP_CONCAT(CONCAT(s.adi, " ", s.soyadi) SEPARATOR "<br>") as student_names')
+            ->select('lessons.*, GROUP_CONCAT(CONCAT(s.adi, " ", s.soyadi) SEPARATOR ",") as student_names')
             ->join('lesson_students ls', 'ls.lesson_id = lessons.id', 'left')
             ->join('students s', 's.id = ls.student_id', 'left')
             ->where('lessons.id', $lessonId)->groupBy('lessons.id')->first();

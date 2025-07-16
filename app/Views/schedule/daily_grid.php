@@ -48,11 +48,20 @@
                                         ?>
                                         <?php if ($lesson): ?>
                                             <td class="align-middle bg-success-subtle has-lesson" data-lesson-id="<?= $lesson['id'] ?>">
-                                                <small><?= esc($lesson['student_names']) ?></small>
+                                                       <?php
+                                                // --- DEĞİŞİKLİK BURADA BAŞLIYOR ---
+                                                // Öğrenci isimlerini virgüllerden ayırıp bir diziye atıyoruz.
+                                                $studentNames = explode(',', $lesson['student_names']);
+                                                foreach ($studentNames as $name) {
+                                                    // Her bir ismi, alt alta gelmesi için bir rozet içinde yazdırıyoruz.
+                                                    echo '<span class="badge text-bg-secondary student-badge">' . esc(trim($name)) . '</span>';
+                                                }
+                                                // --- DEĞİŞİKLİK BURADA BİTİYOR ---
+                                                ?>
                                             </td>
                                         <?php else: ?>
                                             <td class="align-middle available-slot" data-date="<?= $displayDate ?>" data-time="<?= $timeStr ?>" data-teacher-id="<?= $teacher->id ?>">
-                                                +
+                                                <i class="bi bi-person-fill-add"></i>
                                             </td>
                                         <?php endif; ?>
                                     <?php endfor; ?>
@@ -82,7 +91,7 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
         <button type="button" class="btn btn-danger" id="deleteLessonBtn" style="display: none;">Dersi Sil</button>
-        <button type="button" class="btn btn-primary" id="saveLessonBtn" style="display: none;">Dersi Kaydet</button>
+        <button type="button" class="btn btn-success" id="saveLessonBtn" style="display: none;">Dersi Kaydet</button>
       </div>
     </div>
   </div>
