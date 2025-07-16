@@ -34,6 +34,8 @@ class Filters extends BaseFilters
         'forcehttps'    => ForceHTTPS::class,
         'pagecache'     => PageCache::class,
         'performance'   => PerformanceMetrics::class,
+        'statuscheck' => \App\Filters\StatusCheck::class, // <-- BU SATIRI EKLE
+
     ];
 
     /**
@@ -72,6 +74,7 @@ class Filters extends BaseFilters
             // 'honeypot',
             // 'csrf',
             // 'invalidchars',
+            'statuscheck', // <-- BU SATIRI EKLE
         ],
         'after' => [
             // 'honeypot',

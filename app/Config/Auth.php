@@ -26,6 +26,8 @@ use CodeIgniter\Shield\Authentication\Passwords\NothingPersonalValidator;
 use CodeIgniter\Shield\Authentication\Passwords\PwnedValidator;
 use CodeIgniter\Shield\Authentication\Passwords\ValidatorInterface;
 use CodeIgniter\Shield\Models\UserModel;
+use App\Authentication\Actions\StatusCheckAction; // Bu satırı en üste ekle
+
 
 class Auth extends ShieldAuth
 {
@@ -101,6 +103,8 @@ class Auth extends ShieldAuth
         'register' => null,
         'login'    => null,
     ];
+
+    
 
     /**
      * --------------------------------------------------------------------
