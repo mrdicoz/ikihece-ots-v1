@@ -29,39 +29,35 @@
                 <form action="<?= url_to('register') ?>" method="post">
                     <?= csrf_field() ?>
 
-                    <!-- Email -->
                     <div class="input-group mb-2">
                         <span class="input-group-text"><i class="bi bi-envelope-at-fill"></i></span>
                             <div class="form-floating">
-                                <input type="email" class="form-control" id="floatingInputGroup1" name="email" inputmode="email" autocomplete="email" placeholder="<?= lang('Auth.email') ?>" value="<?= old('email') ?>" required>
-                                <label for="floatingInputGroup1"><?= lang('Auth.email') ?></label>
+                                <input type="email" class="form-control" id="floatingEmail" name="email" inputmode="email" autocomplete="email" placeholder="<?= lang('Auth.email') ?>" value="<?= old('email') ?>" required>
+                                <label for="floatingEmail"><?= lang('Auth.email') ?></label>
                             </div>
                     </div>
 
-                    <!-- Username -->
                     <div class="input-group mb-4">
                         <span class="input-group-text"><i class="bi bi-person-fill"></i></span>
                             <div class="form-floating">
-                                <input type="text" class="form-control" id="floatingInputGroup1" name="username" inputmode="username" autocomplete="username" placeholder="<?= lang('Auth.username') ?>" value="<?= old('username') ?>" required>
-                                <label for="floatingInputGroup1"><?= lang('Auth.username') ?></label>
+                                <input type="text" class="form-control" id="floatingUsername" name="username" inputmode="username" autocomplete="username" placeholder="<?= lang('Auth.username') ?>" value="<?= old('username') ?>" required>
+                                <label for="floatingUsername"><?= lang('Auth.username') ?></label>
                             </div>
                     </div>
 
-                    <!-- Password -->
                     <div class="input-group mb-2">
                         <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
                             <div class="form-floating">
-                                <input type="password" class="form-control" id="floatingInputGroup1" name="password" inputmode="text" autocomplete="new-password" placeholder="<?= lang('Auth.password') ?>" value="<?= old('password') ?>" required>
-                                <label for="floatingInputGroup1"><?= lang('Auth.password') ?></label>
+                                <input type="password" class="form-control" id="floatingPassword" name="password" inputmode="text" autocomplete="new-password" placeholder="<?= lang('Auth.password') ?>" value="<?= old('password') ?>" required>
+                                <label for="floatingPassword"><?= lang('Auth.password') ?></label>
                             </div>
                     </div>
 
-                    <!-- Password (Again) -->
                     <div class="input-group mb-5">
                         <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
                             <div class="form-floating">
-                                <input type="password" class="form-control" id="floatingInputGroup1" name="password_confirm" inputmode="text" autocomplete="new-password" placeholder="<?= lang('Auth.passwordConfirm') ?>" required>
-                                <label for="floatingInputGroup1"><?= lang('Auth.passwordConfirm') ?></label>
+                                <input type="password" class="form-control" id="floatingPasswordConfirm" name="password_confirm" inputmode="text" autocomplete="new-password" placeholder="<?= lang('Auth.passwordConfirm') ?>" required>
+                                <label for="floatingPasswordConfirm"><?= lang('Auth.passwordConfirm') ?></label>
                             </div>
                     </div>
 

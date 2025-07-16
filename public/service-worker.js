@@ -71,7 +71,12 @@ self.addEventListener('fetch', event => {
                 const responseToCache = response.clone();
                 caches.open(CACHE_NAME)
                     .then(cache => {
-                        cache.put(event.request, responseToCache);
+                        // --- ÇÖZÜM: Sadece http/https isteklerini önbelleğe al ---
+                        // Bu kontrol, chrome-extension:// gibi desteklenmeyen şemaya sahip isteklerin
+                        // cache.put() ile işlenmesini engelleyerek hatayı ortadan kaldırır.
+                        if (event.request.url.startsWith('http')) {
+                            cache.put(event.request, responseToCache);
+                        }
                     });
                 return response;
             })
@@ -89,7 +94,6 @@ self.addEventListener('fetch', event => {
             })
     );
 });
-
 
 // 4. Push Bildirimi Olayı (Bu kısım aynı kalıyor)
 self.addEventListener('push', function(event) {

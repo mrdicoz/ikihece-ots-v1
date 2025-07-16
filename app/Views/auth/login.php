@@ -34,21 +34,19 @@
                 <form action="<?= url_to('login') ?>" method="post">
                     <?= csrf_field() ?>
 
-                    <!-- Email -->
                     <div class="input-group mb-3">
                         <span class="input-group-text"><i class="bi bi-envelope-at-fill"></i></span>
                             <div class="form-floating">
-                                <input type="email" class="form-control" id="floatingInputGroup1" name="email" inputmode="email" autocomplete="email" placeholder="<?= lang('Auth.email') ?>" value="<?= old('email') ?>" required>
-                                <label for="floatingInputGroup1"><?= lang('Auth.email') ?></label>
+                                <input type="email" class="form-control" id="floatingEmail" name="email" inputmode="email" autocomplete="email" placeholder="<?= lang('Auth.email') ?>" value="<?= old('email') ?>" required>
+                                <label for="floatingEmail"><?= lang('Auth.email') ?></label>
                             </div>
                     </div>
 
-                    <!-- Password -->
                     <div class="input-group mb-3">
                         <span class="input-group-text"><i class="bi bi-key-fill"></i></span>
                             <div class="form-floating">
-                                <input type="password" class="form-control" id="floatingInputGroup1" name="password" inputmode="text" autocomplete="current-password" placeholder="<?= lang('Auth.password') ?>" required>
-                                <label for="floatingInputGroup1"><?= lang('Auth.password') ?></label>
+                                <input type="password" class="form-control" id="floatingPassword" name="password" inputmode="text" autocomplete="current-password" placeholder="<?= lang('Auth.password') ?>" required>
+                                <label for="floatingPassword"><?= lang('Auth.password') ?></label>
                             </div>
                     </div>
 

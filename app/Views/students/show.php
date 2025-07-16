@@ -28,14 +28,15 @@
                     <h4 class="card-title"><?= esc($student['adi'] . ' ' . $student['soyadi']) ?></h4>
                     <p class="text-muted">TCKN: <?= esc($student['tc_kimlik_no']) ?></p>
                     <hr>
-    <?php if (!empty($student['ram_raporu'])): ?>
-        <button type="button" class="btn btn-success w-100 mt-2" data-bs-toggle="modal" data-bs-target="#reportModal" data-src="<?= site_url('students/view-ram-report/' . $student['id']) ?>">
-            <i class="bi bi-eye-fill"></i> Raporu Görüntüle
-        </button>
-    <?php else: ?>
-        <button type="button" class="btn btn-success w-100 mt-2" data-bs-toggle="modal" data-bs-target="#reportModal" data-src="<?= site_url('students/view-ram-report/' . $student['id']) ?>" disabled>
-            <i class="bi bi-eye-fill"></i> Raporu Görüntüle
-        </button>    <?php endif; ?>
+                    <?php if (!empty($student['ram_raporu'])): ?>
+                        <button type="button" class="btn btn-success w-100 mt-2" data-bs-toggle="modal" data-bs-target="#reportModal" data-src="<?= site_url('students/view-ram-report/' . $student['id']) ?>">
+                            <i class="bi bi-eye-fill"></i> Raporu Görüntüle
+                        </button>
+                    <?php else: ?>
+                        <button type="button" class="btn btn-secondary w-100 mt-2" disabled>
+                            <i class="bi bi-eye-slash-fill"></i> Rapor Yok
+                        </button>
+                    <?php endif; ?>
                     <a href="<?= site_url('students/' . $student['id'] . '/edit') ?>" class="btn btn-success w-100 mt-2">
                         <i class="bi bi-pencil-square"></i> Bilgileri Düzenle
                     </a>
@@ -153,8 +154,22 @@
         <h5 class="modal-title" id="reportModalLabel"><?= esc($student['adi'] . ' ' . $student['soyadi']) ?> - RAM Raporu</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body p-0" style="height: 80vh;">
-        <iframe id="report-iframe" src="" style="width: 100%; height: 100%;" frameborder="0"></iframe>
+      <div class="modal-body p-0 text-center" style="height: 80vh; background-color: #525659;">
+          <div id="pdf-viewer" class="overflow-auto h-100">
+              <canvas id="pdf-canvas"></canvas>
+          </div>
+          <div id="pdf-loading" class="position-absolute top-50 start-50 translate-middle text-white">
+              <div class="spinner-border" role="status">
+                  <span class="visually-hidden">Yükleniyor...</span>
+              </div>
+          </div>
+      </div>
+      <div class="modal-footer justify-content-center">
+          <button id="prev-page" class="btn btn-outline-success"><i class="bi bi-arrow-left-circle"></i></button>
+          <span class="align-self-center mx-3">
+              Sayfa <span id="page-num"></span> / <span id="page-count"></span>
+          </span>
+          <button id="next-page" class="btn btn-outline-success"><i class="bi bi-arrow-right-circle"></i></button>
       </div>
     </div>
   </div>
@@ -192,18 +207,94 @@
 <?= $this->section('pageScripts') ?>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // Rapor Görüntüleme Modal Script'i
-    const reportModal = document.getElementById('reportModal');
-    if (reportModal) {
-        reportModal.addEventListener('show.bs.modal', function (event) {
+    // PDF.js worker'ının yolunu belirtiyoruz.
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
+
+    const reportModalEl = document.getElementById('reportModal');
+    const pdfCanvas = document.getElementById('pdf-canvas');
+    const loadingSpinner = document.getElementById('pdf-loading');
+    const pageNumSpan = document.getElementById('page-num');
+    const pageCountSpan = document.getElementById('page-count');
+    const prevPageBtn = document.getElementById('prev-page');
+    const nextPageBtn = document.getElementById('next-page');
+
+    let pdfDoc = null;
+    let pageNum = 1;
+    let pageIsRendering = false;
+    let pageNumPending = null;
+
+    const renderPage = num => {
+        pageIsRendering = true;
+
+        pdfDoc.getPage(num).then(page => {
+            const viewport = page.getViewport({ scale: 1.5 });
+            pdfCanvas.height = viewport.height;
+            pdfCanvas.width = viewport.width;
+
+            const renderContext = {
+                canvasContext: pdfCanvas.getContext('2d'),
+                viewport: viewport
+            };
+
+            page.render(renderContext).promise.then(() => {
+                pageIsRendering = false;
+                if (pageNumPending !== null) {
+                    renderPage(pageNumPending);
+                    pageNumPending = null;
+                }
+            });
+        });
+        pageNumSpan.textContent = num;
+    };
+    
+    const queueRenderPage = num => {
+        if (pageIsRendering) {
+            pageNumPending = num;
+        } else {
+            renderPage(num);
+        }
+    };
+
+    const showPrevPage = () => {
+        if (pageNum <= 1) return;
+        pageNum--;
+        queueRenderPage(pageNum);
+    };
+
+    const showNextPage = () => {
+        if (pageNum >= pdfDoc.numPages) return;
+        pageNum++;
+        queueRenderPage(pageNum);
+    };
+
+    prevPageBtn.addEventListener('click', showPrevPage);
+    nextPageBtn.addEventListener('click', showNextPage);
+
+    if (reportModalEl) {
+        reportModalEl.addEventListener('show.bs.modal', function (event) {
             const button = event.relatedTarget;
             const pdfUrl = button.getAttribute('data-src');
-            const iframe = document.getElementById('report-iframe');
-            iframe.setAttribute('src', pdfUrl);
+            
+            loadingSpinner.style.display = 'block';
+            pdfCanvas.style.display = 'none';
+
+            pdfjsLib.getDocument(pdfUrl).promise.then(doc => {
+                pdfDoc = doc;
+                pageCountSpan.textContent = doc.numPages;
+                pageNum = 1;
+                renderPage(pageNum);
+
+                loadingSpinner.style.display = 'none';
+                pdfCanvas.style.display = 'block';
+
+            }).catch(err => {
+                console.error('PDF yüklenirken hata oluştu: ', err);
+                loadingSpinner.innerHTML = '<p class="text-danger">Rapor yüklenemedi.</p>';
+            });
         });
-        reportModal.addEventListener('hidden.bs.modal', function () {
-            const iframe = document.getElementById('report-iframe');
-            iframe.setAttribute('src', '');
+
+        reportModalEl.addEventListener('hidden.bs.modal', function () {
+            pdfDoc = null;
         });
     }
 
