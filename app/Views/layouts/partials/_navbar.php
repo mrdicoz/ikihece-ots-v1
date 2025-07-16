@@ -13,7 +13,8 @@ $avatar = $userAvatar ?? base_url('assets/images/user.jpg');
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-auto align-items-lg-center">                
+            <ul class="navbar-nav ms-auto align-items-lg-center">           
+
                 <li class="nav-item">
                     <a class="nav-link" href="#"><i class="bi bi-bus-front"></i> Servis</a>
                 </li>
@@ -62,7 +63,11 @@ $avatar = $userAvatar ?? base_url('assets/images/user.jpg');
 
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" href="<?= site_url('profile') ?>"><i class="bi bi-person"></i> Profilim</a></li>
-                        <li><a class="dropdown-item" href="#" id="subscribeButton"><i class="bi bi-bell-fill"></i> Bildirimlere Abone Ol</a></li>
+                        <li>
+                            <a class="dropdown-item notification-bell" href="#" title="Bildirim Ayarları">
+                                <i class="bi bi-bell-fill"></i> Bildirim Ayarları
+                            </a>
+                        </li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="<?= site_url('logout') ?>"><i class="bi bi-box-arrow-right"></i> Çıkış Yap</a></li>
                         <li><hr class="dropdown-divider"></li>
@@ -91,10 +96,14 @@ $avatar = $userAvatar ?? base_url('assets/images/user.jpg');
                         <span class="fw-bold ms-1"><?= esc($userDisplayName) ?></span>
                     </a>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="<?= site_url('profile') ?>">Profilim</a></li>
-                        <li><a class="dropdown-item" href="#" id="subscribeButton"><i class="bi bi-bell-fill"></i> Bildirimlere Abone Ol</a></li>
+                        <li><a class="dropdown-item" href="<?= site_url('profile') ?>"><i class="bi bi-person-circle"></i> Profilim</a></li>
+                        <li>
+                            <a class="dropdown-item notification-bell" href="#" title="Bildirim Ayarları">
+                                <i class="bi bi-bell-fill"></i> Bildirim Ayarları
+                            </a>
+                        </li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="<?= site_url('logout') ?>">Çıkış Yap</a></li>
+                        <li><a class="dropdown-item" href="<?= site_url('logout') ?>"><i class="bi bi-box-arrow-right"></i>Çıkış Yap</a></li>
                         <li><hr class="dropdown-divider"></li>
                             <li>
                                 <div class="px-3 py-2">

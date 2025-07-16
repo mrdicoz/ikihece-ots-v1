@@ -103,87 +103,24 @@ window.addEventListener('DOMContentLoaded', function () {
     document.documentElement.setAttribute('data-bs-theme', theme);
 });
 
- // _scriptin Devamı
-// public/assets/js/custom.js (Debug versiyonu)
-
-console.log('custom.js dosyası başarıyla yüklendi ve çalıştırılıyor.');
+// Bildirimlere abone olma ve abonelikten çıkma işlemleri
+// public/assets/js/custom.js (TAMAMI)
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM tamamen yüklendi. "subscribeButton" aranıyor...');
 
-    const subscribeButton = document.getElementById('subscribeButton');
+    // --- GENEL AYARLAR VE DEĞİŞKENLER ---
+    const subscribeButtons = document.querySelectorAll('.notification-bell');
 
-    if (subscribeButton) {
-        console.log('SUCCESS: Buton (id="subscribeButton") bulundu! Olay dinleyicisi şimdi ekleniyor.');
-        
-        subscribeButton.addEventListener('click', (event) => {
-            console.log('SUCCESS: Butona tıklandı! Abonelik süreci başlatılıyor.');
-            event.preventDefault();
-            handleSubscription();
-        });
-    } else {
-        console.error('HATA: id="subscribeButton" olan bir buton sayfada bulunamadı! Lütfen HTML kodunu kontrol et.');
+    // Tarayıcı desteği yoksa işlemi en baştan durdur.
+    if (!('serviceWorker' in navigator && 'PushManager' in window)) {
+        console.warn('Bildirimler bu tarayıcıda desteklenmiyor.');
+        if (subscribeButtons.length > 0) {
+            subscribeButtons.forEach(button => button.style.display = 'none');
+        }
+        return;
     }
 
-    // --- Diğer fonksiyonlar aşağıda ---
-
-    async function handleSubscription() {
-        // ... (önceki cevaptaki handleSubscription fonksiyonunun içeriği buraya gelecek) ...
-        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-            alert('Maalesef bu tarayıcı bildirimleri desteklemiyor.');
-            return;
-        }
-
-        subscribeButton.disabled = true;
-
-        try {
-            const registration = await navigator.serviceWorker.ready;
-            const permission = await Notification.requestPermission();
-
-            if (permission !== 'granted') throw new Error('Bildirimlere izin verilmedi.');
-
-            let subscription = await registration.pushManager.getSubscription();
-            if (subscription) {
-                alert('Bu cihazda zaten bildirimlere abonesiniz.');
-                subscribeButton.textContent = 'Abonelik Aktif';
-                return;
-            }
-            
-            const response = await fetch('/notifications/vapid-key');
-            if (!response.ok) throw new Error('VAPID anahtarı alınamadı.');
-            
-            const vapidData = await response.json();
-            const applicationServerKey = urlBase64ToUint8Array(vapidData.publicKey);
-
-            subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: applicationServerKey
-            });
-
-            const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
-
-            const saveResponse = await fetch('/notifications/subscribe', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                body: JSON.stringify(subscription)
-            });
-            
-            if (!saveResponse.ok) {
-                const errorData = await saveResponse.json();
-                throw new Error(errorData.message || 'Abonelik sunucuya kaydedilemedi.');
-            }
-
-            const successData = await saveResponse.json();
-            alert(successData.message || 'Bildirimlere başarıyla abone olundu!');
-            subscribeButton.textContent = 'Abonelik Aktif';
-
-        } catch (error) {
-            console.error('Abonelik sürecinde hata:', error);
-            alert('Abonelik sırasında bir hata oluştu: ' + error.message);
-            subscribeButton.disabled = false;
-        }
-    }
-
+    // --- YARDIMCI FONKSİYON ---
     function urlBase64ToUint8Array(base64String) {
         const padding = '='.repeat((4 - base64String.length % 4) % 4);
         const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -194,4 +131,126 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         return outputArray;
     }
+
+    // --- ANA FONKSİYONLAR ---
+
+    // 1. İkonun ve Butonun Durumunu Güncelleyen Fonksiyon
+    async function updateUIButton(button) {
+        try {
+            const bellIcon = button.querySelector('i');
+            if (!bellIcon) return;
+
+            const permission = Notification.permission;
+            const registration = await navigator.serviceWorker.ready;
+            const subscription = await registration.pushManager.getSubscription();
+
+            button.classList.remove('status-default', 'status-granted', 'status-denied');
+
+            if (permission === 'denied') {
+                bellIcon.className = 'bi bi-bell-slash-fill';
+                button.classList.add('status-denied');
+                button.title = 'Bildirimlere izin vermeyi engellediniz.';
+                button.style.pointerEvents = 'none'; // Tıklamayı tamamen engelle
+            } else if (permission === 'granted' && subscription) {
+                bellIcon.className = 'bi bi-bell-fill';
+                button.classList.add('status-granted');
+                button.title = 'Bildirim aboneliğini iptal etmek için tıklayın.';
+                button.style.pointerEvents = 'auto';
+            } else {
+                bellIcon.className = 'bi bi-bell-fill';
+                button.classList.add('status-default');
+                button.title = 'Bildirimleri açmak için tıklayın.';
+                button.style.pointerEvents = 'auto';
+            }
+        } catch (error) {
+            console.error("İkon durumu güncellenirken hata oluştu:", error);
+        }
+    }
+
+    // 2. Tıklama Olayını Yöneten Fonksiyon
+    async function handleBellClick(event) {
+        event.preventDefault();
+        const button = event.currentTarget; // Tıklanan butonu al
+        button.disabled = true; // Çift tıklamayı önle
+
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            const subscription = await registration.pushManager.getSubscription();
+
+            if (subscription) {
+                await unsubscribe(subscription);
+                alert('Bildirim aboneliğiniz başarıyla kaldırıldı.');
+            } else {
+                await subscribe(registration);
+                alert('Bildirimlere başarıyla abone oldunuz!');
+            }
+        } catch (error) {
+            console.error('İşlem sırasında hata:', error);
+            alert('Bir hata oluştu: ' + error.message);
+        } finally {
+            button.disabled = false; // İşlem bitince butonu tekrar aktif et
+            updateUIButton(button); // Son duruma göre ikonu güncelle
+        }
+    }
+
+    // 3. Abone Olma Mantığı
+    async function subscribe(registration) {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            throw new Error('Bildirimlere izin verilmedi.');
+        }
+
+        const response = await fetch('/notifications/vapid-key');
+        if (!response.ok) throw new Error('VAPID anahtarı sunucudan alınamadı.');
+        const vapidData = await response.json();
+        const applicationServerKey = urlBase64ToUint8Array(vapidData.publicKey);
+
+        const newSubscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: applicationServerKey
+        });
+
+        await sendSubscriptionToServer(newSubscription, '/notifications/subscribe', 'POST');
+    }
+
+    // 4. Abonelikten Çıkma Mantığı
+    async function unsubscribe(subscription) {
+        await sendSubscriptionToServer(subscription, '/notifications/unsubscribe', 'POST');
+        const unsubscribed = await subscription.unsubscribe();
+        if (!unsubscribed) {
+            throw new Error("Abonelikten çıkma işlemi tarayıcı tarafında başarısız oldu.");
+        }
+    }
+    
+    // 5. Sunucuya Veri Gönderen Genel Fonksiyon
+    async function sendSubscriptionToServer(subscription, url, method) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify(subscription.toJSON()) // .toJSON() kullanmak daha standarttır
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Sunucu işlemi başarısız oldu.');
+        }
+        return response.json();
+    }
+
+    // --- KODUN BAŞLATILMASI ---
+
+    // Sayfadaki tüm bildirim butonlarını bul ve her biri için işlem yap
+    if (subscribeButtons.length > 0) {
+        subscribeButtons.forEach(button => {
+            // 1. Sayfa yüklendiğinde her butonun ikon durumunu ayarla
+            updateUIButton(button);
+            // 2. Her butona tıklama olayı ekle
+            button.addEventListener('click', handleBellClick);
+        });
+    }
+
 });

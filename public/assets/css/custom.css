@@ -164,3 +164,28 @@
     width: 100%;
     height: 100%;
 }
+/* =============================================== */
+/* --- Bildirim Zili Stilleri --- */
+/* public/assets/css/custom.css notification-bell   */
+
+/* Durum 1: Abone olunabilir (Varsayılan) */
+.notification-bell.status-default {
+    color: #6c757d; /* Bootstrap'in gri rengi */
+}
+.notification-bell.status-default:hover {
+    color: #212529; /* Üzerine gelince koyu renk */
+}
+
+/* Durum 2: Abone Olunmuş (Aktif) */
+.notification-bell.status-granted {
+    color: #198754; /* Bootstrap'in yeşil rengi */
+}
+.notification-bell.status-granted:hover {
+    color: #146c43;
+}
+
+/* Durum 3: Reddedilmiş (Engellenmiş) */
+.notification-bell.status-denied {
+    color: #dc3545; /* Bootstrap'in kırmızı rengi */
+    cursor: not-allowed;
+}

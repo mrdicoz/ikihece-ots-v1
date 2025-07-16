@@ -75,6 +75,9 @@ $routes->get('/notifications/vapid-key', 'NotificationController::getVapidKey', 
 // app/Config/Routes.php dosyasının uygun bir yerine...
 
 $routes->post('/notifications/send-manual', 'NotificationController::sendManualNotification', ['filter' => 'group:admin,mudur,sekreter']);
+
+// Mevcut subscribe rotasının altına ekleyebiliriz
+$routes->post('/notifications/unsubscribe', 'NotificationController::unsubscribe');
 /**
  * --------------------------------------------------------------------
  * Schedule Routes

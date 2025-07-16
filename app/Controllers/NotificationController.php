@@ -145,4 +145,25 @@ class NotificationController extends BaseController
             return $this->response->setStatusCode(500)->setJSON(['success' => false, 'message' => 'Bildirimler gönderilirken kritik bir hata oluştu.']);
         }
     }
+
+    // app/Controllers/NotificationController.php
+
+    public function unsubscribe()
+    {
+        $subscriptionData = $this->request->getJSON();
+        if (empty($subscriptionData->endpoint)) {
+            return $this->response->setStatusCode(400)->setJSON(['message' => 'Geçersiz endpoint.']);
+        }
+
+        $pushSubscriptionModel = new \App\Models\PushSubscriptionModel();
+
+        // Endpoint'e göre aboneliği bul ve sil
+        $deleted = $pushSubscriptionModel->where('endpoint', $subscriptionData->endpoint)->delete();
+
+        if ($deleted) {
+            return $this->response->setJSON(['message' => 'Abonelik başarıyla kaldırıldı.']);
+        }
+
+        return $this->response->setJSON(['message' => 'Abonelik bulunamadı veya zaten kaldırılmış.']);
+    }
 }
