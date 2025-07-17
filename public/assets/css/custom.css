@@ -28,7 +28,7 @@
 /* Normal durumda: beyaz arka plan, yeşil yazı, yeşil kenarlık */
 .page-link {
     color: #198754 !important;               /* Yazı rengi yeşil */
-    background-color: #fff !important;       /* Arka plan beyaz */
+    background-color: #ffffff00 !important;       /* Arka plan beyaz */
     border: 1px solid #198754 !important;    /* Kenarlık yeşil */
     transition: background-color 0.2s, color 0.2s;
 }
