@@ -188,7 +188,7 @@
     $(document).ready(function() {
         $('#studentDashboardTable').DataTable({
             "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/tr.json" },
-            "pageLength": 10,
+            "pageLength": 7,
             "searching": true,
             "lengthChange": false,
             "info": false,

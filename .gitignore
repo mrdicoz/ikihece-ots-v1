@@ -1,6 +1,6 @@
 # Ortam değişkenleri - KESİNLİKLE GÖNDERİLMEZ!
 .env
-
+/public/uploads/*
 # Composer bağımlılıkları
 /vendor
 

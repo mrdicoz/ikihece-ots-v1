@@ -35,7 +35,9 @@ class Filters extends BaseFilters
         'pagecache'     => PageCache::class,
         'performance'   => PerformanceMetrics::class,
         'statuscheck'   => \App\Filters\StatusCheck::class, // <-- BU SATIRI EKLE
-        'license'       => \App\Filters\LicenseFilter::class, // <-- BU SATIRI EKLE   
+        'license'       => \App\Filters\LicenseFilter::class, // <-- BU SATIRI EKLE  
+
+
 
     ];
 
@@ -108,5 +110,5 @@ class Filters extends BaseFilters
      *
      * @var array<string, array<string, list<string>>>
      */
-    public array $filters = [];
+    public array $filters = [ ];
 }
