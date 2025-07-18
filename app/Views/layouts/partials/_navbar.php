@@ -49,6 +49,7 @@ $avatar = $userAvatar ?? base_url('assets/images/user.jpg');
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="<?= route_to('admin.logs.index') ?>"><i class="bi bi-journal-text"></i> Log Kayıtları</a></li>
             <li><a class="dropdown-item" href="<?= site_url('admin/students/import') ?>"><i class="bi bi-cloud-upload-fill"></i> İçe Aktar</a></li>
+            <li><a class="dropdown-item" href="<?= route_to('admin.settings.index') ?>"><i class="bi bi-key-fill"> </i> Lisans Ayarları </a></li>
             </ul>
     </li>
 <?php endif; ?>

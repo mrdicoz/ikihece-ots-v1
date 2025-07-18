@@ -48,4 +48,10 @@ class Home extends BaseController
         // $this->data dizisini view'a gönderiyoruz.
         return view('dashboard', $this->data);
     }
+
+    // Home.php içine ekleyin
+public function maintenance()
+{
+    return view('maintenance');
+}
 }

@@ -34,7 +34,8 @@ class Filters extends BaseFilters
         'forcehttps'    => ForceHTTPS::class,
         'pagecache'     => PageCache::class,
         'performance'   => PerformanceMetrics::class,
-        'statuscheck' => \App\Filters\StatusCheck::class, // <-- BU SATIRI EKLE
+        'statuscheck'   => \App\Filters\StatusCheck::class, // <-- BU SATIRI EKLE
+        'license'       => \App\Filters\LicenseFilter::class, // <-- BU SATIRI EKLE   
 
     ];
 
@@ -71,6 +72,7 @@ class Filters extends BaseFilters
      */
     public array $globals = [
         'before' => [
+            'license', // <-- BU SATIRI EKLE
             // 'honeypot',
             // 'csrf',
             // 'invalidchars',

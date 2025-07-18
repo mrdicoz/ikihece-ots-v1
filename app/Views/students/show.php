@@ -154,7 +154,7 @@
         <h5 class="modal-title" id="reportModalLabel"><?= esc($student['adi'] . ' ' . $student['soyadi']) ?> - RAM Raporu</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body p-0 text-center" style="height: 80vh; background-color: #525659;">
+      <div class="modal-body p-0 text-center" style="height: 80vh; background-color: #969696ff;">
           <div id="pdf-viewer" class="overflow-auto h-100">
               <canvas id="pdf-canvas"></canvas>
           </div>
