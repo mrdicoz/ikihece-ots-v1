@@ -94,6 +94,8 @@ Events::on('pre_system', static function () {
     }
 });
 
+
+
 // BİZİM LOGLAMA OLAYLARIMIZ
 // Bir olay tetiklendiğinde hangi sınıfın hangi metodunun çalışacağını belirtiyoruz.
 Events::on('user.created', [new LogListener(), 'handleUserCreation']);
@@ -111,3 +113,8 @@ Events::on('schedule.updated', static function($userId, $title, $body) {
     $listener = new \App\Listeners\NotificationListener();
     $listener->handleScheduleChange($userId, $title, $body);
 });
+
+/**
+ * Duyuru yayınlandığında bildirim gönderir.
+ */
+Events::on('announcement.published', [new \App\Listeners\NotificationListener(), 'handleAnnouncementPublished']);

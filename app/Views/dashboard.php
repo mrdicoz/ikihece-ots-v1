@@ -75,34 +75,65 @@
                 </div>
             </div>
 
-            <div class="card shadow-sm mb-4">
-                <div class="card-header">
-                     <h6 class="m-0 fw-bold text-success"><i class="bi bi-megaphone-fill"></i> Hızlı Duyuru Paneli</h6>
+            <div class="card shadow mb-4">
+                <div class="card-header p-0">
+                    <ul class="nav nav-tabs nav-fill" id="announcementTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link text-success active" id="list-tab" data-bs-toggle="tab" data-bs-target="#list-panel" type="button" role="tab">Son Duyurular</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link text-success" id="new-tab" data-bs-toggle="tab" data-bs-target="#new-panel" type="button" role="tab">Hızlı Duyuru Ekle</button>
+                        </li>
+                    </ul>
                 </div>
                 <div class="card-body">
-                    <div class="form-floating mb-3">
-                        <input type="text" class="form-control" id="announcementTitle" placeholder="Duyuru Başlığı">
-                        <label for="announcementTitle">Duyuru Başlığı</label>
+                    <div class="tab-content" id="announcementTabContent">
+                        <div class="tab-pane fade show active" id="list-panel" role="tabpanel">
+                            <h5 class="mb-3">Son 5 Duyuru</h5>
+                            <ul class="list-group list-group-flush">
+                                <?php foreach($latestAnnouncements as $ann): ?>
+                                    <li class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                        <?= esc($ann['title']) ?>
+                                        <span>
+                                            <?php if($ann['status'] === 'published'): ?>
+                                                <span class="badge bg-success">Yayınlandı</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-secondary">Taslak</span>
+                                            <?php endif; ?>
+                                        </span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                            <div class="text-end mt-2">
+                                <a href="<?= route_to('admin.announcements.index') ?>" class="text-success">Tümünü Gör...</a>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="new-panel" role="tabpanel">
+                            <form action="<?= route_to('admin.announcements.create') ?>" method="post">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="status" value="published"> <div class="mb-3">
+                                    <label for="quick-title" class="form-label">Başlık</label>
+                                    <input type="text" name="title" id="quick-title" class="form-control" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="quick-body" class="form-label">İçerik</label>
+                                    <textarea name="body" id="quick-body" class="form-control" rows="3" required></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="quick-target" class="form-label">Hedef Kitle</label>
+                                    <select name="target_group" id="quick-target" class="form-select" required>
+                                        <option value="all">Tüm Kullanıcılar</option>
+                                        <option value="veli">Sadece Veliler</option>
+                                        <option value="ogretmen">Sadece Öğretmenler</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-success w-100">Yayınla ve Bildirim Gönder</button>
+                            </form>
+                        </div>
                     </div>
-                    <div class="form-floating mb-3">
-                        <select class="form-select" id="announcementTarget" aria-label="Hedef Kitle">
-                            <option selected>Gönderilecek kitleyi seçin</option>
-                            <option value="parents">Tüm Velilere</option>
-                            <option value="teachers">Tüm Öğretmenlere</option>
-                        </select>
-                        <label for="announcementTarget">Kime?</label>
-                    </div>
-                    <div class="form-floating">
-                        <textarea class="form-control" placeholder="Duyuru mesajınızı buraya yazın" id="announcementMessage" style="height: 120px"></textarea>
-                        <label for="announcementMessage">Duyuru Mesajı</label>
-                    </div>
-                </div>
-                <div class="card-footer text-end">
-                    <button type="button" class="btn btn-success" disabled data-bs-toggle="tooltip" data-bs-placement="top" title="Bu özellik yakında aktif olacaktır.">
-                        <i class="bi bi-send-fill"></i> Gönder
-                    </button>
                 </div>
             </div>
+
 
         </div>
 

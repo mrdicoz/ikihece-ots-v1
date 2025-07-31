@@ -4,11 +4,14 @@ namespace App\Controllers;
 
 use App\Models\StudentModel;
 use CodeIgniter\Shield\Models\UserModel;
+use App\Models\AnnouncementModel;
 
 class Home extends BaseController
 {
     public function index(): string
     {
+        
+        
         // Modelleri yüklüyoruz
         $studentModel = new StudentModel();
         $userModel = new UserModel();
@@ -31,6 +34,13 @@ class Home extends BaseController
             return $builder->select('user_id')->from('auth_groups_users')->where('group', 'servis');
         })->countAllResults();
 
+        // Duyuru modelini başlat
+        $announcementModel = new AnnouncementModel();
+
+        // Son 5 duyuruyu al
+        $this->data['latestAnnouncements'] = $announcementModel
+            ->orderBy('created_at', 'DESC')
+            ->findAll(5);
 
         // $this->data dizisine bu sayfaya özel verileri ekliyoruz.
         $this->data['title'] = "Anasayfa";

@@ -14,6 +14,8 @@ class NotificationListener
      * @param int    $userId      Bildirim gönderilecek kullanıcının ID'si
      * @param string $title       Bildirim başlığı
      * @param string $body        Bildirim içeriği
+     * @param array $announcement Yayınlanan duyurunun veritabanı satırı (dizi olarak)
+
      */
     public function handleScheduleChange(int $userId, string $title, string $body)
     {
@@ -56,5 +58,21 @@ class NotificationListener
                 }
             }
         }
+    }
+    public function handleAnnouncementPublished(array $announcement)
+    {
+        // LOGLAMA: Şimdilik olayın tetiklendiğini görmek için log tutalım.
+        // Gerçek bildirim gönderme kodu PWA entegrasyonu aşamasında buraya eklenecek.
+        log_message(
+            'info',
+            "[NotificationListener] Duyuru yayınlandı. Bildirim gönderilecek. ID: {id}, Başlık: {title}, Hedef: {target_group}",
+            $announcement
+        );
+
+        // --- GELECEKTE EKLENECEK KOD ---
+        // 1. $announcement['target_group']'a göre hedef kullanıcıları bul.
+        // 2. Bu kullanıcıların PWA aboneliklerini veritabanından çek.
+        // 3. Her bir aboneye Web Push kütüphanesi ile bildirim gönder.
+        //    Payload (içerik) olarak duyurunun başlığını ve linkini içerecek.
     }
 }

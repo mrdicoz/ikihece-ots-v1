@@ -8,7 +8,6 @@ use CodeIgniter\Router\RouteCollection;
 
 // --------------------------------------------------------------------
 // 1. HERKESE AÇIK (PUBLIC) ROTALAR
-// Bu alandaki rotalara erişim için giriş yapmak gerekmez.
 // --------------------------------------------------------------------
 service('auth')->routes($routes);
 $routes->get('maintenance', 'Home::maintenance', ['as' => 'maintenance']);
@@ -17,7 +16,6 @@ $routes->post('notifications/unsubscribe', 'NotificationController::unsubscribe'
 
 // --------------------------------------------------------------------
 // 2. GİRİŞ YAPMIŞ KULLANICI GEREKTİREN TÜM ROTALAR
-// Bu ana grubun içindeki HER ŞEY, kullanıcının giriş yapmış olmasını gerektirir ('session' filtresi).
 // --------------------------------------------------------------------
 $routes->group('', ['filter' => 'session'], static function ($routes) {
 
@@ -25,8 +23,6 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
      * Genel Rotalar (Tüm giriş yapmış kullanıcılar erişebilir)
      */
     $routes->get('/', 'Home::index', ['as' => 'home']);
-    
-    // --- EKSİK OLDUĞU İÇİN EKLENDİ ---
     $routes->get('duyurular', 'AnnouncementController::index', ['as' => 'announcements.index']);
 
     // Profil Rotaları
@@ -59,6 +55,16 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->post('delete-lesson/(:num)', 'ScheduleController::deleteLesson/$1', ['as' => 'schedule.delete_lesson']);
         $routes->get('get-lesson-dates', 'ScheduleController::getLessonDates', ['as' => 'schedule.get_lesson_dates']);
     });
+    
+    // Duyuru Yönetimi Rotaları (YENİ VE DÜZENLENMİŞ BLOK)
+    $routes->group('admin', ['filter' => 'group:admin,yonetici,mudur,sekreter'], static function ($routes) {
+        $routes->get('announcements', 'Admin\AnnouncementController::index', ['as' => 'admin.announcements.index']);
+        $routes->get('announcements/new', 'Admin\AnnouncementController::new', ['as' => 'admin.announcements.new']);
+        $routes->post('announcements/create', 'Admin\AnnouncementController::create', ['as' => 'admin.announcements.create']);
+        $routes->get('announcements/edit/(:num)', 'Admin\AnnouncementController::edit/$1', ['as' => 'admin.announcements.edit']);
+        $routes->post('announcements/update/(:num)', 'Admin\AnnouncementController::update/$1', ['as' => 'admin.announcements.update']);
+        $routes->post('announcements/delete/(:num)', 'Admin\AnnouncementController::delete/$1', ['as' => 'admin.announcements.delete']);
+    });
 
     // Bildirim Gönderme Rotası
     $routes->post('notifications/send-manual', 'NotificationController::sendManualNotification', ['filter' => 'group:admin,mudur,sekreter', 'as' => 'notifications.sendManual']);
@@ -68,7 +74,7 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
     // --------------------------------------------------------------------
     $routes->group('admin', ['filter' => 'group:admin'], static function ($routes) {
         
-        // --- KULLANICI YÖNETİMİ İÇİN HATALI 'RESOURCE' KALDIRILDI, ESKİ ÇALIŞAN ROTALAR EKLENDİ ---
+        // Kullanıcı Yönetimi
         $routes->get('users', 'Admin\UserController::index', ['as' => 'admin.users.index']);
         $routes->get('users/new', 'Admin\UserController::new', ['as' => 'admin.users.new']);
         $routes->post('users/create', 'Admin\UserController::create', ['as' => 'admin.users.create']);
@@ -97,10 +103,8 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->get('settings', 'Admin\SettingsController::index', ['as' => 'admin.settings.index']);
         $routes->post('settings', 'Admin\SettingsController::save', ['as' => 'admin.settings.save']);
         
-        // Duyuru Yönetimi
-        $routes->resource('announcements', ['controller' => 'Admin\AnnouncementController', 'as' => 'admin']);
-        
         // Web Push anahtar üretme
         $routes->get('generate-keys', 'VapidController::generateKeys', ['as' => 'admin.generateKeys']);
     });
+    
 });

@@ -20,10 +20,12 @@ $avatar = $userAvatar ?? base_url('assets/images/user.jpg');
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="<?= route_to('schedule.index') ?>"><i class="bi bi-calendar3"></i> Ders Programı</a>
-                </li>                        
-
+                </li>     
                 <li class="nav-item">
                     <a class="nav-link" href="<?= site_url('/students') ?>"><i class="bi bi-backpack2"></i> Öğrenci Yönetimi</a>
+                </li>                   
+                <li class="nav-item">
+                    <a class="nav-link" href="<?= route_to('announcements.index') ?>"><i class="bi bi-megaphone"></i> Duyurular</a>
                 </li>
                 <?php if (auth()->loggedIn() && auth()->user()->inGroup('admin')) : ?>
     <li class="nav-item dropdown">
@@ -34,6 +36,11 @@ $avatar = $userAvatar ?? base_url('assets/images/user.jpg');
             <li>
                 <a class="dropdown-item" href="<?= site_url('admin/users') ?>">
                     <i class="bi bi-people"></i> Kullanıcılar
+                </a>
+            </li>
+                        <li>
+                <a class="dropdown-item" href="<?= route_to('admin.announcements.index') ?>">
+                    <i class="bi bi-megaphone"></i> Duyuru Yönetimi
                 </a>
             </li>
                <li>
