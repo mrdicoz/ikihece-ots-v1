@@ -25,7 +25,7 @@ class LicenseService
             ]);
             
             // Sadece true/false döndüren, en basit ve çalışan API'yi kullanıyoruz.
-            $response = $client->request('POST', 'https://host.mantaryazilim.tr/api/guest/serviceapikey/check', [
+            $response = $client->request('POST', 'https://app.mantaryazilim.tr/api/guest/serviceapikey/check', [
                 'json' => [
                     'key' => $licenseKey 
                 ]

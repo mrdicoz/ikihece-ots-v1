@@ -16,7 +16,7 @@ use App\Models\UserProfileModel; // UserProfileModel'i dahil et
  * BaseController provides a convenient place for loading components
  * and performing functions that are needed by all your controllers.
  * Extend this class in any new controllers:
- *     class Home extends BaseController
+ * class Home extends BaseController
  *
  * For security be sure to declare any new methods as protected or private.
  */
@@ -51,9 +51,9 @@ abstract class BaseController extends Controller
     {
         parent::initController($request, $response, $logger);
 
-        // --- YENİ EKLENEN BÖLÜM ---
-        // Eğer kullanıcı giriş yapmışsa, profil bilgilerini çek ve $this->data'ya ata
+        // Eğer kullanıcı giriş yapmışsa, hem profil bilgilerini hazırla hem de lisansı kontrol et.
         if (auth()->loggedIn()) {
+            // --- SENİN MEVCUT KODUN (DOĞRU VE KORUNUYOR) ---
             $profileModel = new UserProfileModel();
             $userProfile = $profileModel->where('user_id', auth()->id())->first();
 
@@ -63,11 +63,45 @@ abstract class BaseController extends Controller
 
             // Avatar yolunu belirle
             $this->data['userAvatar'] = base_url($userProfile->profile_photo ?? 'assets/images/user.jpg');
+
+            // --- LİSANS KONTROL MANTIĞI BURAYA EKLENDİ ---
+            $this->checkLicenseStatus();
         }
 
-        // Tüm view'larda $this->data'yı kullanılabilir yap
-        $this->response->setBody(view('layouts/app', $this->data));
+        // --- BU SATIRI SİLİYORUZ ---
+        // Bu satır, tüm controller'ların kendi view'larını döndürmesini engelliyordu.
+         $this->response->setBody(view('layouts/app', $this->data));
     }
-
     
+    /**
+     * Bu yeni metot, sadece giriş yapmış kullanıcılar için lisans durumunu kontrol eder.
+     */
+    private function checkLicenseStatus()
+    {
+        // Lisans geçerliyse, hiçbir şey yapma, normal işleyişe devam et.
+        if ((new \App\Libraries\LicenseService())->checkLicense() === true) {
+            return;
+        }
+
+        // --- Lisans Geçerli Değilse ---
+        
+        $currentRoute = trim(uri_string(), '/');
+        
+        // Giriş yapan kullanıcı admin veya yönetici mi?
+        if (auth()->user()->inGroup('admin', 'yonetici')) {
+            // Eğer zaten lisans/settings sayfasına gitmiyorsa, oraya yönlendir.
+            if ($currentRoute !== 'admin/settings') {
+                // Yönlendirme sonrası kodun çalışmasını durdurmak için send() ve exit() kullanılır.
+                return redirect()->to(route_to('admin.settings.index'))
+                    ->with('error', 'Geçerli bir lisans anahtarı bulunamadı. Lütfen devam etmek için lisansınızı girin.')
+                    ->send();
+                exit();
+            }
+        } else {
+            // Kullanıcı admin/yönetici değilse, oturumunu kapatıp bakım sayfasına yönlendir.
+            auth()->logout();
+            return redirect()->to(route_to('maintenance'))->send();
+            exit();
+        }
+    }
 }

@@ -5,6 +5,7 @@
 /vendor
 
 # CodeIgniter log ve cache dosyaları
+/public/uploads/*
 /writable/cache/*
 /writable/debugbar/*
 /writable/logs/*

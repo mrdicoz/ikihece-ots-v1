@@ -6,34 +6,61 @@ use CodeIgniter\HTTP\ResponseInterface;
 
 class LicenseFilter implements FilterInterface
 {
-   public function before(RequestInterface $request, $arguments = null)
-{
-    $uri = service('uri');
+    public function before(RequestInterface $request, $arguments = null)
+    {
+        // Mevcut URL'yi alalım ve başındaki/sonundaki slash'ları temizleyelim.
+        // Bu, 'login' ve '/login/' gibi durumların aynı şekilde ele alınmasını sağlar.
+        $currentRoute = trim(uri_string(), '/');
 
-    // Bu sayfaların her zaman erişilebilir olmasını sağla
-    if (in_array($uri->getPath(), ['login', 'logout', 'register', 'auth/a/show', 'maintenance']) ||
-        str_starts_with($uri->getPath(), 'login/')) {
-        return;
-    }
+        // LİSANS KONTROLÜNDEN MUAF OLACAK, HER KOŞULDA ERİŞİLEBİLİR SAYFALARIN LİSTESİ
+        $allowedRoutes = [
+            'login',
+            'logout',
+            'register',
+            'auth/a/show', // Shield'in e-posta aktivasyon gibi aksiyonları için
+            'maintenance', // Bakım sayfası
+            'admin/settings' // Admin'in lisans gireceği sayfa
+        ];
 
-    if ((new \App\Libraries\LicenseService())->checkLicense() === false) {
-        // Kullanıcı giriş yapmış mı ve admin mi?
-        if (auth()->loggedIn() && auth()->user()->inGroup('admin')) {
-            // Admin ise, lisans ayarları sayfasına yönlendir.
-            // Ama zaten o sayfadaysa bir şey yapma.
-            if ($uri->getPath() !== 'admin/settings') {
-                return redirect()->to(route_to('admin.settings.index'))->with('error', 'Geçerli bir lisans anahtarı bulunamadı.');
+        // Mevcut rota, muaf listesindeki bir rotayla başlıyor mu?
+        // Örnek: 'login/2fa' gibi alt sayfaları da kapsar.
+        foreach ($allowedRoutes as $route) {
+            if ($currentRoute === $route || str_starts_with($currentRoute, $route . '/')) {
+                // Evet, bu sayfa muaf. Filtre hiçbir şey yapmadan devam etsin.
+                return;
             }
-        } else {
-            // Admin değilse, bakım sayfasına yönlendir.
-            // Ama zaten o sayfadaysa bir şey yapma.
-            if ($uri->getPath() !== 'maintenance') {
-                // Oturumdaki kullanıcıyı da güvenlik için çıkış yaptıralım.
-                auth()->logout();
-                return redirect()->to(route_to('maintenance'));
+        }
+        
+        // --- BU NOKTADAN SONRASI SADECE KORUNAN SAYFALAR İÇİN ÇALIŞIR ---
+
+        // Lisans kontrolünü yapalım.
+        if ((new \App\Libraries\LicenseService())->checkLicense() === false) {
+            // Kullanıcı giriş yapmış mı ve admin mi?
+            if (auth()->loggedIn() && auth()->user()->inGroup('admin', 'yonetici')) {
+                // Admin veya Yönetici ise, lisans ayarları sayfasına yönlendir.
+                // (Zaten o sayfada değilse yönlendir, sonsuz döngüyü engelle)
+                if ($currentRoute !== 'admin/settings') {
+                    return redirect()->to(route_to('admin.settings.index'))
+                        ->with('error', 'Geçerli bir lisans anahtarı bulunamadı. Lütfen devam etmek için lisansınızı girin.');
+                }
+            } else {
+                // Admin veya Yönetici değilse ya da hiç giriş yapmamışsa, bakım sayfasına yönlendir.
+                
+                // Eğer kullanıcı giriş yapmışsa, güvenlik için oturumunu kapatalım.
+                if (auth()->loggedIn()) {
+                    auth()->logout();
+                }
+                
+                // (Zaten bakım sayfasında değilse yönlendir)
+                if ($currentRoute !== 'maintenance') {
+                    return redirect()->to(route_to('maintenance'));
+                }
             }
         }
     }
-}
-    public function after(RequestInterface $request, ResponseInterface $response, $arguments = null) {}
+
+    public function after(RequestInterface $request, ResponseInterface $response, $arguments = null)
+    {
+        // after metodunda bir işlem yapmamıza gerek yok.
+    }
 }
