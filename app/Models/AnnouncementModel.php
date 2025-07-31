@@ -25,4 +25,20 @@ class AnnouncementModel extends Model
     protected $dateFormat    = 'datetime';
     protected $createdField  = 'created_at';
     protected $updatedField  = 'updated_at';
+
+    /**
+     * Belirtilen gruplara yönelik yayınlanmış son duyuruları getirir.
+     *
+     * @param array $groups ['all', 'ogretmen'] gibi
+     * @param int   $limit
+     *
+     * @return array
+     */
+    public function getLatestAnnouncementsForGroups(array $groups, int $limit = 5)
+    {
+        return $this->where('status', 'published')
+                    ->whereIn('target_group', $groups)
+                    ->orderBy('created_at', 'DESC')
+                    ->findAll($limit);
+    }
 }

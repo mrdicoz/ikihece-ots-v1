@@ -63,4 +63,42 @@ class StudentModel extends Model
     protected $afterFind      = [];
     protected $beforeDelete   = [];
     protected $afterDelete    = [];
+
+    /**
+     * Bir öğretmenin ders programına eklediği (ders verdiği) tüm öğrencileri,
+     * her öğrenci sadece bir kez görünecek şekilde listeler.
+     * Bu sorgu, öğrenciler ve dersler arasındaki ilişkiyi "lesson_students" 
+     * pivot tablosu üzerinden kurar.
+     *
+     * @param int $teacherId Öğretmenin kullanıcı ID'si
+     * @return array
+     */
+    public function getStudentsForTeacher(int $teacherId): array
+    {
+        return $this->select('students.*')
+                    ->distinct()
+                    ->join('lesson_students', 'lesson_students.student_id = students.id') // YENİ: Pivot tabloya join
+                    ->join('lessons', 'lessons.id = lesson_students.lesson_id') // YENİ: Pivot'tan ana lessons tablosuna join
+                    ->where('lessons.teacher_id', $teacherId)
+                    ->orderBy('students.adi', 'ASC')
+                    ->findAll();
+    }
+
+        /**
+     * Belirtilen öğrencinin, belirtilen öğretmene ait olup olmadığını kontrol eder.
+     * @param int $studentId Kontrol edilecek öğrencinin ID'si
+     * @param int $teacherId Kontrol edilecek öğretmenin ID'si
+     * @return bool
+     */
+    public function isStudentOfTeacher(int $studentId, int $teacherId): bool
+    {
+        $result = $this->select('students.id')
+                       ->join('lesson_students', 'lesson_students.student_id = students.id')
+                       ->join('lessons', 'lessons.id = lesson_students.lesson_id')
+                       ->where('lessons.teacher_id', $teacherId)
+                       ->where('students.id', $studentId)
+                       ->countAllResults();
+
+        return $result > 0;
+    }
 }

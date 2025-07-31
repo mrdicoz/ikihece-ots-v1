@@ -20,9 +20,10 @@ $routes->post('notifications/unsubscribe', 'NotificationController::unsubscribe'
 $routes->group('', ['filter' => 'session'], static function ($routes) {
 
     /**
-     * Genel Rotalar (Tüm giriş yapmış kullanıcılar erişebilir)
+     * Ana Yönlendirme ve Genel Rotalar
+     * Giriş yapan kullanıcıyı rolüne göre doğru dashboard'a yönlendirir.
      */
-    $routes->get('/', 'Home::index', ['as' => 'home']);
+    $routes->get('/', 'DashboardController::index', ['as' => 'home']);
     $routes->get('duyurular', 'AnnouncementController::index', ['as' => 'announcements.index']);
 
     // Profil Rotaları
@@ -35,18 +36,35 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
     $routes->get('notifications/vapid-key', 'NotificationController::getVapidKey', ['as' => 'notifications.vapidKey']);
 
     /**
+     * Role Özel Dashboard Rotaları
+     */
+    $routes->group('dashboard', static function ($routes) {
+        // Öğretmen Dashboard'ı (Admin de görebilir)
+        $routes->get('teacher', 'DashboardController::teacher', ['filter' => 'group:admin,ogretmen', 'as' => 'dashboard.teacher']);
+        // Veli Dashboard'ı (Admin de görebilir)
+        $routes->get('parent', 'DashboardController::parent', ['filter' => 'group:admin,veli', 'as' => 'dashboard.parent']);
+        // Yönetici ve diğer roller için varsayılan dashboard
+        $routes->get('default', 'DashboardController::default', ['filter' => 'group:admin,yonetici,mudur,sekreter', 'as' => 'dashboard.default']);
+    });
+
+
+    /**
      * Özel Yetki Gerektiren Rota Grupları
      */
 
-    // Öğrenci Yönetimi Rotaları
-    $routes->group('', ['filter' => 'group:admin,yonetici,mudur,sekreter'], static function ($routes) {
+    // Öğrenci Yönetimi Rotaları (Genel)
+    $routes->group('', ['filter' => 'group:admin,yonetici,mudur,sekreter,ogretmen'], static function ($routes) {
         $routes->get('students/view-ram-report/(:num)', 'StudentController::viewRamReport/$1', ['as' => 'students.viewRamReport']);
         $routes->resource('students', ['controller' => 'StudentController']);
     });
+
+    // Öğretmene Özel Öğrenci Listesi
+    $routes->get('my-students', 'StudentController::myStudents', ['filter' => 'group:admin,ogretmen', 'as' => 'students.my']);
     
     // Ders Programı Rotaları
-    $routes->group('schedule', ['filter' => 'group:admin,mudur,sekreter'], static function ($routes) {
+    $routes->group('schedule', ['filter' => 'group:admin,yonetici,mudur,sekreter,ogretmen'], static function ($routes) {
         $routes->get('/', 'ScheduleController::index', ['as' => 'schedule.index']);
+        $routes->get('my-schedule', 'ScheduleController::mySchedule', ['filter' => 'group:admin,ogretmen', 'as' => 'schedule.my']);
         $routes->get('get-month-lessons', 'ScheduleController::getLessonsForMonth', ['as' => 'schedule.get_month_lessons']);
         $routes->get('daily/(:segment)', 'ScheduleController::dailyGrid/$1', ['as' => 'schedule.daily']);
         $routes->get('get-students', 'ScheduleController::getStudentsForSelect', ['as' => 'schedule.get_students']);
@@ -56,18 +74,18 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->get('get-lesson-dates', 'ScheduleController::getLessonDates', ['as' => 'schedule.get_lesson_dates']);
     });
     
-    // Duyuru Yönetimi Rotaları (YENİ VE DÜZENLENMİŞ BLOK)
-    $routes->group('admin', ['filter' => 'group:admin,yonetici,mudur,sekreter'], static function ($routes) {
-        $routes->get('announcements', 'Admin\AnnouncementController::index', ['as' => 'admin.announcements.index']);
-        $routes->get('announcements/new', 'Admin\AnnouncementController::new', ['as' => 'admin.announcements.new']);
-        $routes->post('announcements/create', 'Admin\AnnouncementController::create', ['as' => 'admin.announcements.create']);
-        $routes->get('announcements/edit/(:num)', 'Admin\AnnouncementController::edit/$1', ['as' => 'admin.announcements.edit']);
-        $routes->post('announcements/update/(:num)', 'Admin\AnnouncementController::update/$1', ['as' => 'admin.announcements.update']);
-        $routes->post('announcements/delete/(:num)', 'Admin\AnnouncementController::delete/$1', ['as' => 'admin.announcements.delete']);
+    // Duyuru Yönetimi Rotaları
+    $routes->group('admin/announcements', ['filter' => 'group:admin,yonetici,mudur,sekreter'], static function ($routes) {
+        $routes->get('/', 'Admin\AnnouncementController::index', ['as' => 'admin.announcements.index']);
+        $routes->get('new', 'Admin\AnnouncementController::new', ['as' => 'admin.announcements.new']);
+        $routes->post('create', 'Admin\AnnouncementController::create', ['as' => 'admin.announcements.create']);
+        $routes->get('edit/(:num)', 'Admin\AnnouncementController::edit/$1', ['as' => 'admin.announcements.edit']);
+        $routes->post('update/(:num)', 'Admin\AnnouncementController::update/$1', ['as' => 'admin.announcements.update']);
+        $routes->post('delete/(:num)', 'Admin\AnnouncementController::delete/$1', ['as' => 'admin.announcements.delete']);
     });
 
     // Bildirim Gönderme Rotası
-    $routes->post('notifications/send-manual', 'NotificationController::sendManualNotification', ['filter' => 'group:admin,mudur,sekreter', 'as' => 'notifications.sendManual']);
+    $routes->post('notifications/send-manual', 'NotificationController::sendManualNotification', ['filter' => 'group:admin,yonetici,mudur,sekreter', 'as' => 'notifications.sendManual']);
     
     // --------------------------------------------------------------------
     // ADMİN GRUBU (Sadece 'admin' grubundakiler erişebilir)

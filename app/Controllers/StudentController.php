@@ -90,6 +90,20 @@ class StudentController extends BaseController
     public function show($id = null)
     {
         $model = new StudentModel();
+        $user = auth()->user();
+
+        // --- YENİ GÜVENLİK KONTROLÜ ---
+        // Eğer kullanıcı bir öğretmen ise (ama yönetici değilse),
+        // sadece kendi öğrencisini görebildiğinden emin ol.
+        if ($user->inGroup('ogretmen') && ! $user->inGroup('admin', 'yonetici', 'mudur', 'sekreter')) {
+            if (!$model->isStudentOfTeacher($id, $user->id)) {
+                // Eğer öğrenci bu öğretmene ait değilse, kendi öğrenci listesine yönlendir.
+                return redirect()->to(route_to('students.my'))
+                                 ->with('error', 'Bu öğrencinin detaylarını görme yetkiniz bulunmamaktadır.');
+            }
+        }
+        // --- GÜVENLİK KONTROLÜ SONU ---
+
         $data = [
             'title'   => 'Öğrenci Detayları',
             'student' => $model->find($id),
@@ -101,7 +115,7 @@ class StudentController extends BaseController
         
         return view('students/show', $data);
     }
-
+    
     /**
      * Öğrenci düzenleme formunu gösterir.
      */
@@ -216,5 +230,21 @@ class StudentController extends BaseController
             ->setHeader('Content-Type', 'application/pdf')
             ->setHeader('Content-Disposition', 'inline; filename="' . $student['ram_raporu'] . '"')
             ->setBody(file_get_contents($filePath));
+    }
+
+        /**
+     * Giriş yapmış öğretmene atanmış öğrencileri listeler.
+     */
+    public function myStudents()
+    {
+        $model = new StudentModel();
+        $teacherId = auth()->id();
+
+        $data = [
+            'title'    => 'Öğrencilerim',
+            'students' => $model->getStudentsForTeacher($teacherId),
+        ];
+
+        return view('students/my_students', $data);
     }
 }

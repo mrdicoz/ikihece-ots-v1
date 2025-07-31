@@ -199,4 +199,53 @@ class ScheduleController extends BaseController
     $dates = $lessonModel->distinct()->findColumn('lesson_date');
     return $this->response->setJSON($dates ?? []);
 }
+    /**
+     * Giriş yapmış öğretmenin haftalık ders programını gösterir.
+     */
+    public function mySchedule()
+    {
+        $lessonModel = new \App\Models\LessonModel();
+        $teacherId = auth()->id();
+
+        // 1. Haftanın Tarihlerini Hesapla (Pazar'dan Cumartesi'ye)
+        $requestedDate = $this->request->getGet('date') ?? 'now';
+        try {
+            $date = new \DateTime($requestedDate);
+        } catch (\Exception $e) {
+            $date = new \DateTime();
+        }
+
+        // Haftanın başlangıcını Pazar olarak ayarla
+        $startDate = (clone $date)->modify('last sunday');
+        $endDate = (clone $startDate)->modify('+6 days');
+
+        $weekDates = [];
+        $period = new \DatePeriod($startDate, new \DateInterval('P1D'), (clone $endDate)->modify('+1 day'));
+        foreach ($period as $day) {
+            $weekDates[] = $day;
+        }
+
+        // 2. Modelden o haftanın derslerini çek
+        $lessonsRaw = $lessonModel->getLessonsForTeacherByWeek(
+            $teacherId,
+            $startDate->format('Y-m-d'),
+            $endDate->format('Y-m-d')
+        );
+
+        // 3. Veriyi View için işle: [gün][saat] formatında grupla
+        $scheduleData = [];
+        foreach ($lessonsRaw as $lesson) {
+            $dateKey = date('Y-m-d', strtotime($lesson['lesson_date']));
+            $hourKey = date('H:i', strtotime($lesson['start_time']));
+            $scheduleData[$dateKey][$hourKey][] = $lesson;
+        }
+
+        // 4. Veriyi View'e gönder
+        $this->data['title'] = 'Haftalık Ders Programım';
+        $this->data['weekDates'] = $weekDates;
+        $this->data['scheduleData'] = $scheduleData;
+        $this->data['currentDate'] = $date;
+
+        return view('schedule/my_schedule', $this->data);
+    }
 }
