@@ -206,7 +206,8 @@
         $('#studentReportTable, #teacherReportTable, #noLessonStudentTable').DataTable({
             "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/tr.json" },
             "pageLength": 10,
-            "order": [[ 1, "desc" ]]
+            "order": [[ 1, "desc" ]],
+            "info": false
         });
     });
 </script>
