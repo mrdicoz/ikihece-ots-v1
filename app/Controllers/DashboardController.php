@@ -13,22 +13,25 @@ class DashboardController extends BaseController
     /**
      * Kullanıcıyı rolüne göre uygun dashboard'a yönlendirir.
      */
-    public function index()
+public function index()
     {
-        $user = auth()->user();
+        // BaseController'da belirlenen aktif rolü session'dan alıyoruz.
+        $activeRole = session()->get('active_role');
 
-        if ($user->inGroup('admin', 'yonetici', 'mudur', 'sekreter')) {
+        // YÖNLENDİRME MANTIĞINI 'active_role' DEĞİŞKENİNE GÖRE YAPIYORUZ
+        if (in_array($activeRole, ['admin', 'yonetici', 'mudur', 'sekreter'])) {
             return redirect()->to(route_to('dashboard.default'));
         }
         
-        if ($user->inGroup('ogretmen')) {
+        if ($activeRole === 'ogretmen') {
             return redirect()->to(route_to('dashboard.teacher'));
         }
 
-        if ($user->inGroup('veli')) {
+        if ($activeRole === 'veli') {
             return redirect()->to(route_to('dashboard.parent'));
         }
-
+        
+        // Hiçbir koşul eşleşmezse varsayılan panele gitsin.
         return redirect()->to(route_to('dashboard.default'));
     }
 

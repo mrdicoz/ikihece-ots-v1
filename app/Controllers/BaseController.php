@@ -64,13 +64,27 @@ abstract class BaseController extends Controller
             // Avatar yolunu belirle
             $this->data['userAvatar'] = base_url($userProfile->profile_photo ?? 'assets/images/user.jpg');
 
+            // --- YENİ EKLENEN ROL YÖNETİM KODU ---
+            $userGroups = auth()->user()->getGroups();
+            $activeRole = session()->get('active_role');
+
+            // Eğer session'da rol yoksa veya sahip olmadığı bir rolse, varsayılanı ata
+            if (!$activeRole || !in_array($activeRole, $userGroups)) {
+                $activeRole = $userGroups[0] ?? 'veli'; // İlk rolü varsayılan yap, hiç rolü yoksa 'veli' olsun
+                session()->set('active_role', $activeRole);
+            }
+            
+            $this->data['userGroups'] = $userGroups;
+            $this->data['activeRole'] = $activeRole;
+            // --- YENİ KOD SONU ---
+
             // --- LİSANS KONTROL MANTIĞI BURAYA EKLENDİ ---
             $this->checkLicenseStatus();
         }
 
         // --- BU SATIRI SİLİYORUZ ---
         // Bu satır, tüm controller'ların kendi view'larını döndürmesini engelliyordu.
-         $this->response->setBody(view('layouts/app', $this->data));
+        $this->response->setBody(view('layouts/app', $this->data));
     }
     
     /**

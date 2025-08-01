@@ -14,6 +14,16 @@ $routes->get('maintenance', 'Home::maintenance', ['as' => 'maintenance']);
 $routes->post('notifications/unsubscribe', 'NotificationController::unsubscribe');
 
 
+// Bu rota artık sadece yönlendirme yapacak olan Home controller'ını çağırır.
+$routes->get('/', 'Home::index', ['filter' => 'session']);
+
+// Dashboard için yeni bir rota tanımlıyoruz.
+$routes->get('/dashboard', 'DashboardController::index', ['filter' => 'session', 'as' => 'dashboard']);
+
+// Rol değiştirme rotası doğru yerde.
+$routes->get('user/switch-role/(:segment)', 'ProfileController::switchRole/$1', ['filter' => 'session', 'as' => 'user.switchRole']);
+
+
 // --------------------------------------------------------------------
 // 2. GİRİŞ YAPMIŞ KULLANICI GEREKTİREN TÜM ROTALAR
 // --------------------------------------------------------------------

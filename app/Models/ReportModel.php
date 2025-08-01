@@ -52,98 +52,75 @@ class ReportModel extends Model
      */
     public function getDetailedStudentReport(int $year, int $month)
     {
-        // 1. Adım: İlgili aydaki tüm ders-öğrenci eşleşmelerini alalım.
-        $allLessonEntries = $this->db->table('lessons l')
-            ->select('l.id as lesson_id, ls.student_id')
-            ->join('lesson_students ls', 'ls.lesson_id = l.id')
+        // Her dersin öğrenci sayısını içeren bir alt sorgu
+        $studentCountsSubquery = "(SELECT lesson_id, COUNT(id) as student_count FROM lesson_students GROUP BY lesson_id) as lc";
+
+        return $this->db->table('students s')
+            ->select("
+                s.id, CONCAT(s.adi, ' ', s.soyadi) as student_name,
+                SUM(CASE WHEN lc.student_count = 1 THEN 1 ELSE 0 END) as individual_lessons,
+                SUM(CASE WHEN lc.student_count > 1 THEN 1 ELSE 0 END) as group_lessons,
+                COUNT(l.id) as total_hours
+            ")
+            ->join('lesson_students ls', 'ls.student_id = s.id')
+            ->join('lessons l', 'l.id = ls.lesson_id')
+            ->join($studentCountsSubquery, 'lc.lesson_id = l.id', 'left')
             ->where('YEAR(l.lesson_date)', $year)
             ->where('MONTH(l.lesson_date)', $month)
+            ->where('s.deleted_at', null)
+            ->groupBy('s.id')
+            ->orderBy('student_name', 'ASC')
             ->get()->getResultArray();
-
-        if (empty($allLessonEntries)) {
-            return [];
-        }
-
-        // 2. Adım: Her dersin kaç öğrenci tarafından alındığını sayalım.
-        $lessonStudentCounts = [];
-        foreach ($allLessonEntries as $entry) {
-            if (!isset($lessonStudentCounts[$entry['lesson_id']])) {
-                $lessonStudentCounts[$entry['lesson_id']] = 0;
-            }
-            $lessonStudentCounts[$entry['lesson_id']]++;
-        }
-
-        // 3. Adım: Her öğrencinin bireysel ve grup derslerini sayalım.
-        $studentStats = [];
-        foreach ($allLessonEntries as $entry) {
-            $studentId = $entry['student_id'];
-            if (!isset($studentStats[$studentId])) {
-                $studentStats[$studentId] = ['individual_lessons' => 0, 'group_lessons' => 0];
-            }
-
-            $isIndividual = ($lessonStudentCounts[$entry['lesson_id']] == 1);
-            if ($isIndividual) {
-                $studentStats[$studentId]['individual_lessons']++;
-            } else {
-                $studentStats[$studentId]['group_lessons']++;
-            }
-        }
-
-        // 4. Adım: Öğrenci bilgileriyle birleştirip son sonucu hazırlayalım.
-        $studentIds = array_keys($studentStats);
-        $students = $this->db->table('students')
-            ->select('id, adi, soyadi')
-            ->whereIn('id', $studentIds)
-            ->get()->getResultArray();
-
-        $report = [];
-        foreach ($students as $student) {
-            $stats = $studentStats[$student['id']];
-            $report[] = [
-                'student_name'       => $student['adi'] . ' ' . $student['soyadi'],
-                'total_hours'        => $stats['individual_lessons'] + $stats['group_lessons'],
-                'individual_lessons' => $stats['individual_lessons'],
-                'group_lessons'      => $stats['group_lessons'],
-            ];
-        }
-
-        return $report;
     }
 
     /**
      * Öğretmen bazlı aylık rapor verilerini getirir.
+     * NİHAİ DÜZELTME: Bu fonksiyon artık kesin olarak doğru sayım yapar.
      */
     public function getDetailedTeacherReport(int $year, int $month)
     {
-        // Bu sorgu yapısı daha basit olduğu için direkt SQL ile daha performanslı çalışır.
-        $sql = "
-            SELECT
-                u.id,
-                up.first_name,
-                up.last_name,
-                up.profile_photo,
-                COUNT(DISTINCT l.id) as total_hours,
-                SUM(CASE WHEN lc.student_count = 1 THEN 1 ELSE 0 END) as individual_lessons,
-                SUM(CASE WHEN lc.student_count > 1 THEN 1 ELSE 0 END) as group_lessons,
-                COUNT(DISTINCT ls.student_id) as total_students
-            FROM users u
-            LEFT JOIN user_profiles up ON up.user_id = u.id
-            JOIN auth_groups_users agu ON agu.user_id = u.id
-            JOIN lessons l ON l.teacher_id = u.id
-            JOIN lesson_students ls ON ls.lesson_id = l.id
-            LEFT JOIN (
-                SELECT lesson_id, COUNT(id) as student_count
-                FROM lesson_students
-                GROUP BY lesson_id
-            ) as lc ON lc.lesson_id = l.id
-            WHERE agu.group = 'ogretmen'
-                AND YEAR(l.lesson_date) = ?
-                AND MONTH(l.lesson_date) = ?
-            GROUP BY u.id
-            ORDER BY up.first_name ASC
-        ";
-        
-        return $this->db->query($sql, [$year, $month])->getResultArray();
+        // 1. Adım: İlgili aydaki dersleri, öğretmen ID'si ile birlikte bireysel/grup olarak sınıflandıran bir alt sorgu oluşturalım.
+        // Bu alt sorgu, her ders için SADECE BİR satır döndürür.
+        $classifiedLessons = $this->db->table('lessons l')
+            ->select('
+                l.teacher_id,
+                l.id as lesson_id,
+                IF((SELECT COUNT(*) FROM lesson_students ls WHERE ls.lesson_id = l.id) = 1, 1, 0) as is_individual,
+                IF((SELECT COUNT(*) FROM lesson_students ls WHERE ls.lesson_id = l.id) > 1, 1, 0) as is_group
+            ')
+            ->where('YEAR(l.lesson_date)', $year)
+            ->where('MONTH(l.lesson_date)', $month);
+
+        // 2. Adım: Ana sorguyu, öğretmenleri bu sınıflandırılmış ders tablosuyla birleştirerek yapalım.
+        // Bu yapı, her dersin sadece bir kez sayılmasını garanti eder.
+        $builder = $this->db->table('users u');
+        $builder->select('
+            u.id,
+            up.first_name,
+            up.last_name,
+            up.profile_photo,
+            COUNT(cl.lesson_id) as total_hours,
+            SUM(cl.is_individual) as individual_lessons,
+            SUM(cl.is_group) as group_lessons,
+            (SELECT COUNT(DISTINCT ls.student_id)
+             FROM lesson_students ls
+             JOIN lessons l_sub ON ls.lesson_id = l_sub.id
+             WHERE l_sub.teacher_id = u.id AND YEAR(l_sub.lesson_date) = ' . $this->db->escape($year) . ' AND MONTH(l_sub.lesson_date) = ' . $this->db->escape($month) . ') as total_students,
+            (SELECT COUNT(DISTINCT ls.student_id)
+             FROM lesson_students ls
+             JOIN lessons l_sub ON ls.lesson_id = l_sub.id
+             WHERE l_sub.teacher_id = u.id AND YEAR(l_sub.lesson_date) = ' . $this->db->escape($year) . ' AND MONTH(l_sub.lesson_date) = ' . $this->db->escape($month) . '
+               AND (SELECT COUNT(*) FROM lesson_students lsc WHERE lsc.lesson_id = l_sub.id) > 1
+            ) as group_students_count
+        ');
+        $builder->join('user_profiles up', 'u.id = up.user_id', 'left');
+        $builder->join('auth_groups_users agu', 'u.id = agu.user_id');
+        $builder->join("({$classifiedLessons->getCompiledSelect()}) as cl", 'cl.teacher_id = u.id');
+        $builder->where('agu.group', 'ogretmen');
+        $builder->groupBy('u.id, up.first_name, up.last_name, up.profile_photo');
+        $builder->orderBy('up.first_name', 'ASC');
+
+        return $builder->get()->getResultArray();
     }
 
 

@@ -176,7 +176,8 @@
                             <th>Toplam Ders</th>
                             <th>Bireysel Ders</th>
                             <th>Grup Dersi</th>
-                            <th>Eğittiği Öğrenci</th>
+                            <th>Toplam Öğrenci</th>
+                            <th>Grup Öğrencisi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -190,6 +191,7 @@
                                 <td class="text-center"><?= esc($teacher['individual_lessons']) ?></td>
                                 <td class="text-center"><?= esc($teacher['group_lessons']) ?></td>
                                 <td class="text-center"><?= esc($teacher['total_students']) ?></td>
+                                <td class="text-center"><?= esc($teacher['group_students_count']) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -206,7 +208,7 @@
         $('#studentReportTable, #teacherReportTable, #noLessonStudentTable').DataTable({
             "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/tr.json" },
             "pageLength": 10,
-            "order": [[ 1, "desc" ]],
+            "order": [],
             "info": false
         });
     });

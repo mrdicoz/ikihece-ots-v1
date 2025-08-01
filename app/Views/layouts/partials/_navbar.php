@@ -1,9 +1,8 @@
 <?php
-// Bu blok dosyanın en üstünde kalabilir, sorun değil.
+// Bu değişkenler BaseController'dan geliyor
 $isLoggedIn = auth()->loggedIn();
 if ($isLoggedIn) {
-    $user = auth()->user();
-    $userDisplayName = $userDisplayName ?? $user->username ?? 'Misafir';
+    $userDisplayName = $userDisplayName ?? auth()->user()->username ?? 'Misafir';
     $avatar = $userAvatar ?? base_url('assets/images/user.jpg');
 }
 ?>
@@ -17,37 +16,37 @@ if ($isLoggedIn) {
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             
-            
-            <?php if ($isLoggedIn): // YENİ KONTROL BAŞLANGICI ?>
+            <?php if ($isLoggedIn && isset($activeRole)): ?>
             
             <ul class="navbar-nav">
-                <?php if ($user->inGroup('admin', 'yonetici', 'mudur', 'sekreter')): ?>
-                    <li class="nav-item"><a class="nav-link" href="<?= site_url('/students') ?>"><i class="bi bi-backpack2"></i> Öğrenci Yönetimi</a></li>
-                    <li class="nav-item"><a class="nav-link" href="<?= site_url('/schedule') ?>"><i class="bi bi-calendar3"></i> Ders Programı</a></li>
+                <?php // --- LİNKLERİN TAMAMI DÜZELTİLDİ --- ?>
+                
+                <?php if (in_array($activeRole, ['admin', 'yonetici', 'mudur', 'sekreter'])): ?>
+                    <li class="nav-item"><a class="nav-link" href="<?= site_url('students') ?>"><i class="bi bi-backpack2"></i> Öğrenci Yönetimi</a></li>
+                    <li class="nav-item"><a class="nav-link" href="<?= route_to('schedule.index') ?>"><i class="bi bi-calendar3"></i> Ders Programı</a></li>
                 <?php endif; ?>
 
-                <?php if ($user->inGroup('ogretmen')): ?>
+                <?php if ($activeRole === 'ogretmen'): ?>
                     <li class="nav-item"><a class="nav-link" href="<?= route_to('schedule.my') ?>"><i class="bi bi-calendar-week"></i> Ders Programım</a></li>
                     <li class="nav-item"><a class="nav-link" href="<?= route_to('students.my') ?>"><i class="bi bi-people"></i> Öğrencilerim</a></li>
                 <?php endif; ?>
                 
-                
-                <?php if ($user->inGroup('veli')): ?>
+                <?php if ($activeRole === 'veli'): ?>
                     <li class="nav-item"><a class="nav-link" href="<?= route_to('parent.schedule') ?>"><i class="bi bi-calendar-check"></i> Çocuğumun Programı</a></li>
+                    <?php // Bu rotalar henüz tanımlı değil, şimdilik '#' kalabilir ?>
                     <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-chat-dots-fill"></i> Mesajlar</a></li>
                     <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-bus-front"></i> Servis</a></li>
                 <?php endif; ?>
                 
                 <li class="nav-item"><a class="nav-link" href="<?= route_to('announcements.index') ?>"><i class="bi bi-megaphone"></i> Duyurular</a></li>
 
-
-                <?php if ($user->inGroup('admin')): ?>
+                <?php if ($activeRole === 'admin'): ?>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-sliders"></i> Sistem Yönetimi
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="<?= site_url('admin/users') ?>"><i class="bi bi-people"></i> Kullanıcılar</a></li>
+                            <li><a class="dropdown-item" href="<?= route_to('admin.users.index') ?>"><i class="bi bi-people"></i> Kullanıcılar</a></li>
                             <li><a class="dropdown-item" href="<?= route_to('admin.institution.index') ?>"><i class="bi bi-building"></i> Kurum Ayarları</a></li>
                             <li><a class="dropdown-item" href="<?= route_to('admin.reports.monthly') ?>"><i class="bi bi-bar-chart-fill"></i> Aylık Raporlar</a></li>
                             <li><a class="dropdown-item" href="<?= route_to('admin.assignments.index') ?>"><i class="bi bi-person-rolodex"></i> Atamalar</a></li>
@@ -60,6 +59,7 @@ if ($isLoggedIn) {
                     </li>
                 <?php endif; ?>
             </ul>
+
             <ul class="navbar-nav ms-auto align-items-lg-center">
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -68,6 +68,17 @@ if ($isLoggedIn) {
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" href="<?= site_url('profile') ?>"><i class="bi bi-person"></i> Profilim</a></li>
+                        <li><a class="dropdown-item notification-bell" href="#" title="Bildirim Ayarları"><i class="bi bi-bell-fill"></i> Bildirim Ayarları</a></li>
+                        
+                        <?php if (isset($userGroups) && count($userGroups) > 1): ?>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#roleSwitcherModal">
+                                    <i class="bi bi-people"></i> Görünümü Değiştir <span class="badge bg-success ms-1"><?= esc(ucfirst($activeRole)) ?></span>
+                                </a>
+                            </li>
+                        <?php endif; ?>
+
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="<?= site_url('logout') ?>"><i class="bi bi-box-arrow-right"></i> Çıkış Yap</a></li>
                         <li><hr class="dropdown-divider"></li>
@@ -84,7 +95,7 @@ if ($isLoggedIn) {
                 </li>
             </ul>
 
-            <?php endif; // YENİ KONTROL BİTİŞİ ?>
+            <?php endif; ?>
         </div>
     </div>
 </nav>

@@ -96,4 +96,26 @@ class ProfileController extends BaseController
         $districts = $districtModel->where('city_id', $cityId)->orderBy('name', 'ASC')->findAll();
         return $this->response->setJSON($districts);
     }
+
+    /**
+     * Kullanıcının aktif rolünü session'da değiştirir.
+     * @param string $newRole Geçiş yapılmak istenen yeni rol (grup adı)
+     */
+    public function switchRole(string $newRole)
+    {
+        $user = auth()->user();
+
+        // Güvenlik Kontrolü: Kullanıcı gerçekten o role sahip mi?
+        // Shield'in inGroup metodu grupları zaten bilir, ekstra sorguya gerek yok.
+        if (! $user->inGroup($newRole)) {
+            return redirect()->back()->with('error', 'Bu role geçiş yapma yetkiniz bulunmamaktadır.');
+        }
+
+        // Session'daki aktif rolü güncelle
+        session()->set('active_role', $newRole);
+
+        // Kullanıcıyı yeni rolünün paneline (anasayfaya) yönlendir.
+        // Anasayfa zaten rolü kontrol edip doğru yere yönlendirecek.
+        return redirect()->to('/')->with('success', ucfirst($newRole) . ' görünümüne başarıyla geçiş yapıldı.');
+    }
 }
