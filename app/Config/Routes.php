@@ -58,6 +58,13 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->resource('students', ['controller' => 'StudentController']);
     });
 
+    // Veli Paneli Rotaları
+    $routes->group('dashboard', ['filter' => 'group:veli'], static function ($routes) {
+        $routes->get('parent', 'DashboardController::parent');
+        $routes->post('set-active-child', 'DashboardController::setActiveChild');
+        $routes->get('programim', 'ScheduleController::parentSchedule', ['as' => 'parent.schedule','filter' => 'group:veli']);
+    });
+
     // Öğretmene Özel Öğrenci Listesi
     $routes->get('my-students', 'StudentController::myStudents', ['filter' => 'group:admin,ogretmen', 'as' => 'students.my']);
     

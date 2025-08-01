@@ -36,7 +36,7 @@ abstract class BaseController extends Controller
      *
      * @var list<string>
      */
-    protected $helpers = ['auth', 'setting']; // auth ve setting helper'ları burada olmalı
+    protected $helpers = ['auth', 'setting','text']; // auth ve setting helper'ları burada olmalı
 
     /**
      * Be sure to declare properties for any property fetch you initialized.

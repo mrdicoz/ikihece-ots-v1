@@ -74,7 +74,7 @@ class ScheduleController extends BaseController
             ->join('user_profiles', 'user_profiles.user_id = users.id', 'left')
             ->where('auth_groups_users.group', 'ogretmen')
             ->where('users.active', 1); // <-- EKLENEN SATIR
-;
+ ;
 
         if ($loggedInUser->inGroup('sekreter') && !$loggedInUser->inGroup('admin', 'mudur')) {
             $assignmentModel = new AssignmentModel();
@@ -253,4 +253,45 @@ class ScheduleController extends BaseController
 
         return view('schedule/my_schedule', $this->data);
     }
+
+    // Bu metodu ScheduleController.php içine ekle
+
+    public function parentSchedule()
+    {
+        // Aktif olan çocuğu session'dan al
+        $activeChildId = session('active_child_id');
+        if (!$activeChildId) {
+            // Henüz veli dashboard'ı olmadığı için anasayfaya yönlendirelim
+            return redirect()->to('/')->with('error', 'Lütfen programı görmek için bir öğrenci seçin.');
+        }
+
+        $lessonModel = new \App\Models\LessonModel(); // DOĞRU KULLANIM
+        
+        // Filtre için GET parametrelerinden yıl ve ayı al
+        $selectedYear = $this->request->getGet('year');
+        $selectedMonth = $this->request->getGet('month');
+        
+        // Ders olan ayları ve yılları al
+        $availableMonths = $lessonModel->getLessonMonthsForStudent($activeChildId);
+
+        // Eğer formdan bir tarih gelmediyse ve dersi olan aylar varsa, en son ders olan ayı varsayılan yap
+        if (empty($selectedYear) && !empty($availableMonths)) {
+            $selectedYear = $availableMonths[0]['year'];
+            $selectedMonth = $availableMonths[0]['month'];
+        }
+
+        // View için verileri hazırla
+        $this->data['title'] = 'Aylık Ders Programı';
+        $this->data['active_child_id'] = $activeChildId;
+        $this->data['available_months'] = $availableMonths;
+        // Sadece seçili bir yıl ve ay varsa dersleri getir
+        $this->data['lessons'] = ($selectedYear && $selectedMonth) 
+            ? $lessonModel->getLessonsForStudentByMonth($activeChildId, (int)$selectedYear, (int)$selectedMonth) 
+            : [];
+        $this->data['selected_year'] = $selectedYear;
+        $this->data['selected_month'] = $selectedMonth;
+
+        return view('schedule/parent_schedule', $this->data);
+    }
+
 }

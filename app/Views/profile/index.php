@@ -42,6 +42,12 @@
                         </div>
 
                         <div class="mb-3">
+                            <label for="tc_kimlik_no" class="form-label">T.C. Kimlik Numarası</label>
+                            <input type="text" class="form-control" id="tc_kimlik_no" name="tc_kimlik_no" value="<?= esc($profile->tc_kimlik_no) ?>" maxlength="11">
+                            <small class="form-text text-muted">Bu alan, öğrenci bilgilerinizle bağlantı kurmak için kullanılacaktır.</small>
+                        </div>
+
+                        <div class="mb-3">
                             <label for="phone_number" class="form-label">Telefon Numarası</label>
                             <input type="text" class="form-control" id="phone_number" name="phone_number" value="<?= esc($profile->phone_number) ?>">
                         </div>

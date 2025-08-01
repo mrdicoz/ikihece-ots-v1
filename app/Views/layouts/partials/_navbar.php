@@ -17,6 +17,7 @@ if ($isLoggedIn) {
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             
+            
             <?php if ($isLoggedIn): // YENİ KONTROL BAŞLANGICI ?>
             
             <ul class="navbar-nav">
@@ -30,8 +31,11 @@ if ($isLoggedIn) {
                     <li class="nav-item"><a class="nav-link" href="<?= route_to('students.my') ?>"><i class="bi bi-people"></i> Öğrencilerim</a></li>
                 <?php endif; ?>
                 
+                
                 <?php if ($user->inGroup('veli')): ?>
-                    <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-calendar-check"></i> Çocuğumun Programı</a></li>
+                    <li class="nav-item"><a class="nav-link" href="<?= route_to('parent.schedule') ?>"><i class="bi bi-calendar-check"></i> Çocuğumun Programı</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-chat-dots-fill"></i> Mesajlar</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-bus-front"></i> Servis</a></li>
                 <?php endif; ?>
                 
                 <li class="nav-item"><a class="nav-link" href="<?= route_to('announcements.index') ?>"><i class="bi bi-megaphone"></i> Duyurular</a></li>

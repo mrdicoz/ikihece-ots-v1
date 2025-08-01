@@ -101,4 +101,37 @@ class StudentModel extends Model
 
         return $result > 0;
     }
+
+    // app/Models/StudentModel.php (Dosyanın sonuna eklendi)
+    /**
+     * Verilen T.C. Kimlik Numarasına sahip velinin (anne veya baba)
+     * tüm öğrencilerini getirir.
+     *
+     * @param string $parentTckn Velinin T.C. Kimlik Numarası
+     * @return array
+     */
+    public function getChildrenOfParent(string $parentTckn): array
+    {
+        if (empty($parentTckn)) {
+            return [];
+        }
+
+        return $this->where('veli_anne_tc', $parentTckn)
+                    ->orWhere('veli_baba_tc', $parentTckn)
+                    ->findAll();
+    }
+
+    // app/Models/StudentModel.php dosyasının içine, class'ın herhangi bir yerine ekle
+
+    public function getTeachersForStudent(int $studentId)
+    {
+        return $this->distinct()
+            ->select('users.id, user_profiles.first_name, user_profiles.last_name, user_profiles.profile_photo')
+            ->join('lesson_students', 'lesson_students.student_id = students.id')
+            ->join('lessons', 'lessons.id = lesson_students.lesson_id')
+            ->join('users', 'users.id = lessons.teacher_id')
+            ->join('user_profiles', 'user_profiles.user_id = users.id', 'left')
+            ->where('students.id', $studentId)
+            ->findAll();
+    }
 }

@@ -52,6 +52,7 @@ class ProfileController extends BaseController
     $data = [
         'first_name'   => $this->request->getPost('first_name'),
         'last_name'    => $this->request->getPost('last_name'),
+        'tc_kimlik_no' => $this->request->getPost('tc_kimlik_no'), // Eklendi
         'phone_number' => $this->request->getPost('phone_number'),
         'city_id'      => !empty($cityId) ? $cityId : null,
         'district_id'  => !empty($districtId) ? $districtId : null,

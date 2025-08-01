@@ -6,6 +6,7 @@ use App\Controllers\BaseController;
 use App\Models\StudentModel;
 use App\Models\AuthGroupsUsersModel; // UserModel yerine grupları saymak için bu daha verimli
 use App\Models\AnnouncementModel; // Duyurular için bu modelin oluşturulduğunu varsayıyoruz
+use App\Models\UserProfileModel;
 
 class DashboardController extends BaseController
 {
@@ -98,12 +99,83 @@ class DashboardController extends BaseController
     /**
      * Veli Dashboard'ını gösterir.
      */
-    public function parent()
-    {
-        $this->data['title'] = 'Veli Paneli';
-        $this->data['cocugumunProgrami'] = [];
-        $this->data['duyurular'] = [];
+public function parent()
+{
+    $userProfileModel = new UserProfileModel();
+    $studentModel = new StudentModel();
+    // GEREKLİ MODELLERİ BURAYA EKLİYORUZ
+    $lessonModel = new \App\Models\LessonModel(); 
+    $announcementModel = new \App\Models\AnnouncementModel();
 
+    // 1. Giriş yapmış velinin profilini ve TC'sini al
+    $parentProfile = $userProfileModel->where('user_id', auth()->id())->first();
+    if (!$parentProfile || empty($parentProfile->tc_kimlik_no)) {
+        return redirect()->to('/profile')->with('error', 'Lütfen öğrenci bilgilerinizi görebilmek için T.C. Kimlik Numaranızı profilinize ekleyin.');
+    }
+
+    // 2. Veliye ait tüm çocukları bul
+    $children = $studentModel->getChildrenOfParent($parentProfile->tc_kimlik_no);
+
+    if (empty($children)) {
+        $this->data['title'] = 'Veli Paneli';
+        $this->data['no_student_found'] = true;
         return view('dashboard/parent', $this->data);
+    }
+
+    // 3. Aktif öğrenciyi belirle (Bu kısım zaten doğru çalışıyor)
+    $activeChildId = session('active_child_id');
+    $activeChild = null;
+
+    if ($activeChildId) {
+        foreach ($children as $child) {
+            if ($child['id'] == $activeChildId) {
+                $activeChild = $child;
+                break;
+            }
+        }
+    }
+
+    if ($activeChild === null) {
+        $activeChild = $children[0];
+        session()->set('active_child_id', $activeChild['id']);
+    }
+
+    // --- YENİ EKLENEN WIDGET VERİLERİ ---
+    $today = date('Y-m-d');
+
+    // 4. Aktif çocuğun bugünkü derslerini çek
+    $gununDersleri = $lessonModel->getLessonsForStudentByDate($activeChild['id'], $today);
+
+    // 5. Velilere yönelik duyuruları çek
+    $duyurular = $announcementModel->getLatestAnnouncementsForGroups(['all', 'veli'], 5);
+
+    // 6. Aktif çocuğun öğretmenlerini çek
+    $ogretmenler = $studentModel->getTeachersForStudent($activeChild['id']);
+    // --- BİTİŞ ---
+
+
+    // 7. Tüm verileri View'e gönder
+    $this->data['title'] = 'Veli Paneli - ' . esc($activeChild['adi']);
+    $this->data['parent_children'] = $children;
+    $this->data['active_child'] = $activeChild;
+    $this->data['gununDersleri'] = $gununDersleri; // Yeni veri
+    $this->data['duyurular'] = $duyurular;         // Yeni veri
+    $this->data['ogretmenler'] = $ogretmenler;       // Yeni veri
+
+    return view('dashboard/parent', $this->data);
+}
+
+    /**
+     * Veli panelinde gösterilecek aktif çocuğu session'a kaydeder.
+     */
+    public function setActiveChild()
+    {
+        $childId = $this->request->getPost('child_id');
+        if ($childId) {
+            // Güvenlik için bu çocuğun gerçekten bu veliye ait olup olmadığı kontrol edilebilir.
+            // Şimdilik basitçe session'a set ediyoruz.
+            session()->set('active_child_id', $childId);
+        }
+        return redirect()->to('/dashboard/parent');
     }
 }

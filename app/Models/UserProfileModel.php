@@ -16,6 +16,7 @@ class UserProfileModel extends Model
         'user_id',
         'first_name',
         'last_name',
+        'tc_kimlik_no', 
         'profile_photo',
         'address',
         'city_id',
