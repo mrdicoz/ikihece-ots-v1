@@ -207,7 +207,7 @@ class ScheduleController extends BaseController
         $lessonModel = new \App\Models\LessonModel();
         $teacherId = auth()->id();
 
-        // 1. Haftanın Tarihlerini Hesapla (Pazar'dan Cumartesi'ye)
+        // 1. Haftanın Tarihlerini Hesapla (Pazar'dan Cumartesi'ye) - DÜZELTİLMİŞ YÖNTEM
         $requestedDate = $this->request->getGet('date') ?? 'now';
         try {
             $date = new \DateTime($requestedDate);
@@ -215,8 +215,13 @@ class ScheduleController extends BaseController
             $date = new \DateTime();
         }
 
-        // Haftanın başlangıcını Pazar olarak ayarla
-        $startDate = (clone $date)->modify('last sunday');
+        // Günün sayısal karşılığını al (Pazar=0, Pazartesi=1, ..., Cumartesi=6)
+        $dayOfWeek = (int)$date->format('w'); 
+        
+        // Haftanın başlangıcını (Pazar) bul
+        $startDate = (clone $date)->modify("-{$dayOfWeek} days");
+        
+        // Haftanın bitişini (Cumartesi) bul
         $endDate = (clone $startDate)->modify('+6 days');
 
         $weekDates = [];
@@ -225,14 +230,14 @@ class ScheduleController extends BaseController
             $weekDates[] = $day;
         }
 
-        // 2. Modelden o haftanın derslerini çek
+        // 2. Modelden o haftanın derslerini çek (Bu kısım doğru çalışıyor)
         $lessonsRaw = $lessonModel->getLessonsForTeacherByWeek(
             $teacherId,
             $startDate->format('Y-m-d'),
             $endDate->format('Y-m-d')
         );
 
-        // 3. Veriyi View için işle: [gün][saat] formatında grupla
+        // 3. Veriyi View için işle: [gün][saat] formatında grupla (Bu kısım doğru çalışıyor)
         $scheduleData = [];
         foreach ($lessonsRaw as $lesson) {
             $dateKey = date('Y-m-d', strtotime($lesson['lesson_date']));

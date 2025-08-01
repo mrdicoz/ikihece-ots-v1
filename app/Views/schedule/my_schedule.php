@@ -6,13 +6,20 @@
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-calendar-week"></i> Ders Programım</h1>
         
+        <?php
+            // HAFTALIK NAVİGASYON İÇİN KESİN HESAPLAMA
+            // İçinde bulunulan haftanın başlangıç (Pazar) ve bitiş (Cumartesi) günlerini bulalım.
+            $dayOfWeek = (int)$currentDate->format('w');
+            $startOfWeek = (clone $currentDate)->modify("-{$dayOfWeek} days");
+        ?>
+
         <?php // MASAÜSTÜ NAVİGASYON (Geniş ekranlarda görünür) ?>
         <div class="btn-group d-none d-lg-block" role="group">
-            <a href="<?= route_to('schedule.my', ['date' => (clone $currentDate)->modify('last sunday -1 week')->format('Y-m-d')]) ?>" class="btn btn-outline-success">
+            <a href="<?= route_to('schedule.my', ['date' => (clone $startOfWeek)->modify('-1 week')->format('Y-m-d')]) ?>" class="btn btn-outline-success">
                 <i class="bi bi-arrow-left"></i> Önceki Hafta
             </a>
             <a href="<?= route_to('schedule.my', ['date' => 'today']) ?>" class="btn btn-success">Bu Hafta</a>
-            <a href="<?= route_to('schedule.my', ['date' => (clone $currentDate)->modify('next sunday')->format('Y-m-d')]) ?>" class="btn btn-outline-success">
+            <a href="<?= route_to('schedule.my', ['date' => (clone $startOfWeek)->modify('+1 week')->format('Y-m-d')]) ?>" class="btn btn-outline-success">
                 Sonraki Hafta <i class="bi bi-arrow-right"></i>
             </a>
         </div>
@@ -30,7 +37,6 @@
     </div>
     
     <?php 
-        // Gün isimleri ve seçili günün verilerini hazırlayalım
         $dayNames = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
         $todayKey = $currentDate->format('Y-m-d');
         $todayLessons = $scheduleData[$todayKey] ?? [];
@@ -84,28 +90,28 @@
     </div>
     <div class="d-lg-none">
         <div class="card shadow">
-            <div class="card-header text-center fw-bold fs-5 bg-success text-white">
+            <div class="card-header text-center fw-bold fs-5 <?= ($currentDate->format('Y-m-d') == date('Y-m-d')) ? 'bg-success text-white' : 'bg-light' ?>">
                 <?= esc($dayNames[$currentDate->format('w')]) ?>
                 <small class="d-block fw-normal fs-6"><?= $currentDate->format('d.m.Y') ?></small>
             </div>
             <ul class="list-group list-group-flush">
                 <?php if (empty($todayLessons)): ?>
                     <li class="list-group-item p-4 text-center text-muted">
-                        Bugün için planlanmış ders bulunmamaktadır.
+                        Bu gün için planlanmış ders bulunmamaktadır.
                     </li>
                 <?php else: ?>
                     <?php for ($hour = 8; $hour <= 18; $hour++): 
                         $time = str_pad($hour, 2, '0', STR_PAD_LEFT) . ':00';
                         $lessonsInHour = $todayLessons[$time] ?? [];
                     ?>
-                        <li class="list-group-item d-flex">
-                            <div class="fw-bold me-3" style="width: 50px;"><?= $time ?></div>
+                        <li class="list-group-item d-flex p-2">
+                            <div class="fw-bold text-center text-muted me-3 border-end pe-3" style="width: 60px;"><?= $time ?></div>
                             <div class="flex-grow-1">
                                 <?php if (!empty($lessonsInHour)): ?>
                                     <?php foreach ($lessonsInHour as $lesson): ?>
                                         <a href="<?= site_url('students/' . $lesson['student_id']) ?>" class="text-decoration-none text-body">
-                                            <div class="d-flex align-items-center p-2 rounded mb-1" style="background-color: var(--bs-tertiary-bg);">
-                                                <img src="<?= base_url($lesson['profile_image'] ?? 'assets/images/user.jpg') ?>" class="rounded-circle me-2" alt="<?= esc($lesson['adi']) ?>" style="width:32px; height:32px; object-fit:cover;">
+                                            <div class="d-flex align-items-center p-2 rounded mb-1 bg-light">
+                                                <img src="<?= base_url($lesson['profile_image'] ?? 'assets/images/user.jpg') ?>" class="rounded-circle me-3" alt="<?= esc($lesson['adi']) ?>" style="width:36px; height:36px; object-fit:cover;">
                                                 <div class="text-truncate">
                                                     <span class="fw-bold"><?= esc($lesson['adi'] . ' ' . $lesson['soyadi']) ?></span>
                                                     <small class="d-block text-muted"><?= esc(date('H:i', strtotime($lesson['start_time']))) ?> - <?= esc(date('H:i', strtotime($lesson['end_time']))) ?></small>
@@ -113,8 +119,6 @@
                                             </div>
                                         </a>
                                     <?php endforeach; ?>
-                                <?php else: ?>
-                                    <span class="text-muted opacity-50">-</span>
                                 <?php endif; ?>
                             </div>
                         </li>
