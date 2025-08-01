@@ -108,6 +108,7 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->post('users/update/(:num)', 'Admin\UserController::update/$1', ['as' => 'admin.users.update']);
         $routes->post('users/delete/(:num)', 'Admin\UserController::delete/$1', ['as' => 'admin.users.delete']);
         
+        
         // Loglar
         $routes->get('logs', 'Admin\LogController::index', ['as' => 'admin.logs.index']);
         
@@ -130,6 +131,10 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         
         // Web Push anahtar üretme
         $routes->get('generate-keys', 'VapidController::generateKeys', ['as' => 'admin.generateKeys']);
+
+        // Raporlar
+        $routes->match(['get', 'post'], 'reports/monthly', 'Admin\ReportController::monthly', ['as' => 'admin.reports.monthly']);
+
     });
     
 });

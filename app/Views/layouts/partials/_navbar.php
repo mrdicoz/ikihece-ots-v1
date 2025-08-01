@@ -49,6 +49,7 @@ if ($isLoggedIn) {
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="<?= site_url('admin/users') ?>"><i class="bi bi-people"></i> Kullanıcılar</a></li>
                             <li><a class="dropdown-item" href="<?= route_to('admin.institution.index') ?>"><i class="bi bi-building"></i> Kurum Ayarları</a></li>
+                            <li><a class="dropdown-item" href="<?= route_to('admin.reports.monthly') ?>"><i class="bi bi-bar-chart-fill"></i> Aylık Raporlar</a></li>
                             <li><a class="dropdown-item" href="<?= route_to('admin.assignments.index') ?>"><i class="bi bi-person-rolodex"></i> Atamalar</a></li>
                             <li><a class="dropdown-item" href="<?= route_to('admin.announcements.index') ?>"><i class="bi bi-megaphone"></i> Duyuru Yap</a></li>               
                             <li><hr class="dropdown-divider"></li>
