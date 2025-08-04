@@ -24,6 +24,7 @@ class LogController extends BaseController
             'pageTitle' => 'Sistem Log Kayıtları'
         ];
 
-        return view('admin/logs/index', $data);
+        return view('admin/logs/index', array_merge($this->data, $data));
+
     }
 }

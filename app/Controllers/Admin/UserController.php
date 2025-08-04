@@ -33,7 +33,8 @@ public function index()
         'users' => $users,
     ];
 
-    return view('admin/users/index', $data);
+    return view('admin/users/index', array_merge($this->data, $data));
+
 }
 
 /**
@@ -68,11 +69,12 @@ public function show($id)
         'groups'  => $groups,     // Grupların Dizisi
     ];
 
-    return view('admin/users/show', $data);
+    return view('admin/users/show', array_merge($this->data, $data));
 }
-    /**
-     * Show the form to create a new user.
-     */
+
+/**
+ * Show the form to create a new user.
+ */
 public function new()
 {
     $data = [
@@ -81,7 +83,7 @@ public function new()
         'allGroups' => config('Ots')->availableGroups,
     ];
 
-    return view('admin/users/new', $data);
+    return view('admin/users/new', array_merge($this->data, $data));
 }
 
 public function create()
@@ -191,7 +193,7 @@ public function edit($id)
         'userGroups'  => $userGroups,
     ];
 
-    return view('admin/users/edit', $data);
+    return view('admin/users/edit', array_merge($this->data, $data));
 }
 
     /**

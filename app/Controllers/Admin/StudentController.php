@@ -13,9 +13,11 @@ class StudentController extends BaseController
      */
     public function importView()
     {
+        $data['title'] = 'Öğrenci Verilerini İçeri Aktar';
         // View dosyasının yolu aynı kalabilir veya admin altına taşınabilir.
         // Mevcut yapıyı korumak adına aynı bırakıyorum.
-        return view('admin/students/import');
+        return view('admin/students/import', array_merge($this->data, $data));
+
     }
 
     /**
@@ -58,14 +60,14 @@ class StudentController extends BaseController
                     'adres_ilce'                => $row['AB'] ?? null,
                     'adres_mahalle'             => $row['AC'] ?? null,
                     'adres_detay'               => $row['O'] ?? null,
-                    'veli_anne_tc'              => (is_numeric($anne_tc) && strlen($anne_tc) === 11) ? $anne_tc : null,
-                    'veli_anne_adi_soyadi'      => $row['AO'] ?? null,
-                    'veli_anne_telefon'         => $row['AP'] ?? null,
-                    'veli_anne_is_adresi'       => $row['AT'] ?? null,
-                    'veli_baba_tc'              => (is_numeric($baba_tc) && strlen($baba_tc) === 11) ? $baba_tc : null,
-                    'veli_baba_adi_soyadi'      => $row['AV'] ?? null,
-                    'veli_baba_telefon'         => $row['AW'] ?? null,
-                    'veli_baba_is_adresi'       => $row['BA'] ?? null,
+                    'veli_baba_tc'              => (is_numeric($anne_tc) && strlen($anne_tc) === 11) ? $anne_tc : null,
+                    'veli_baba_adi_soyadi'      => $row['AO'] ?? null,
+                    'veli_baba_telefon'         => $row['AP'] ?? null,
+                    'veli_baba_is_adresi'       => $row['AT'] ?? null,
+                    'veli_anne_tc'              => (is_numeric($baba_tc) && strlen($baba_tc) === 11) ? $baba_tc : null,
+                    'veli_anne_adi_soyadi'      => $row['AV'] ?? null,
+                    'veli_anne_telefon'         => $row['AW'] ?? null,
+                    'veli_anne_is_adresi'       => $row['BA'] ?? null,
                 ];
             }
 

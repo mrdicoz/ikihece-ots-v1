@@ -33,7 +33,8 @@ class ProfileController extends BaseController
             'cities'  => $cityModel->findAll(), // illeri view'e gönder
         ];
 
-        return view('profile/index', $data);
+        return view('profile/index', array_merge($this->data, $data));
+
     }
 
         /**

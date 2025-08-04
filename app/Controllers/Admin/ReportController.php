@@ -25,6 +25,7 @@ class ReportController extends BaseController
             'studentsWithNoLessons' => $reportModel->getStudentsWithNoLessons($year, $month),
         ];
 
-        return view('admin/reports/monthly', $data);
+        return view('admin/reports/monthly', array_merge($this->data, $data));
+
     }
 }

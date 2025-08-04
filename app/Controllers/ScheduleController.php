@@ -20,7 +20,8 @@ class ScheduleController extends BaseController
         $data = [
             'title' => 'Ders Programı Yönetimi',
         ];
-        return view('schedule/index', $data);
+        return view('schedule/index', array_merge($this->data, $data));
+
     }
 
     /**
@@ -111,7 +112,8 @@ class ScheduleController extends BaseController
             'teachers'    => $teachers,
             'lessonMap'   => $lessonMap,
         ];
-        return view('schedule/daily_grid', $data);
+        return view('schedule/daily_grid', array_merge($this->data, $data));
+
     }
 
     /**
@@ -198,6 +200,7 @@ class ScheduleController extends BaseController
     // Veritabanındaki ders olan tüm benzersiz tarihleri çekiyoruz.
     $dates = $lessonModel->distinct()->findColumn('lesson_date');
     return $this->response->setJSON($dates ?? []);
+    
 }
     /**
      * Giriş yapmış öğretmenin haftalık ders programını gösterir.

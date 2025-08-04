@@ -23,7 +23,8 @@ class StudentController extends BaseController
             // 'pager' satırı kaldırıldı, artık ihtiyacımız yok.
         ];
 
-        return view('students/index', $data);
+        return view('students/index', array_merge($this->data, $data));
+
     }
 
     /**
@@ -36,7 +37,8 @@ class StudentController extends BaseController
             // Yeni öğrenci için boş bir 'student' dizisi gönderiyoruz ki form hata vermesin
             'student' => array_fill_keys((new StudentModel())->allowedFields, null)
         ];
-        return view('students/new', $data);
+        return view('students/new', array_merge($this->data, $data));
+
     }
 
     /**
@@ -112,8 +114,9 @@ class StudentController extends BaseController
         if (empty($data['student'])) {
             throw new \CodeIgniter\Exceptions\PageNotFoundException('Öğrenci bulunamadı: ' . $id);
         }
-        
-        return view('students/show', $data);
+
+        return view('students/show', array_merge($this->data, $data));
+
     }
     
     /**
@@ -131,8 +134,9 @@ class StudentController extends BaseController
             throw new \CodeIgniter\Exceptions\PageNotFoundException('Öğrenci bulunamadı: ' . $id);
         }
 
-        return view('students/edit', $data);
+        return view('students/edit', array_merge($this->data, $data));
     }
+
 
     /**
      * Öğrenci bilgilerini günceller.
@@ -245,6 +249,6 @@ class StudentController extends BaseController
             'students' => $model->getStudentsForTeacher($teacherId),
         ];
 
-        return view('students/my_students', $data);
+        return view('students/my_students', array_merge($this->data, $data));
     }
 }

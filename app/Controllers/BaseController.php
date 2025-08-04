@@ -84,7 +84,7 @@ abstract class BaseController extends Controller
 
         // --- BU SATIRI SİLİYORUZ ---
         // Bu satır, tüm controller'ların kendi view'larını döndürmesini engelliyordu.
-        $this->response->setBody(view('layouts/app', $this->data));
+        //$this->response->setBody(view('layouts/app', $this->data));
     }
     
     /**

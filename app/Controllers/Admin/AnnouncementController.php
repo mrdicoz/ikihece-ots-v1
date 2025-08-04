@@ -25,7 +25,8 @@ class AnnouncementController extends BaseController
         ];
 
         // Bu view dosyasını bir sonraki adımda oluşturacağız.
-        return view('admin/announcements/index', $data);
+        return view('admin/announcements/index', array_merge($this->data, $data));
+
     }
 
     /**
@@ -38,7 +39,7 @@ class AnnouncementController extends BaseController
         ];
 
         // Bu view dosyasını bir sonraki adımda oluşturacağız.
-        return view('admin/announcements/new', $data);
+        return view('admin/announcements/new', array_merge($this->data, $data));
     }
 
     /**
@@ -87,7 +88,7 @@ class AnnouncementController extends BaseController
         ];
 
         // Bu view dosyasını bir sonraki adımda oluşturacağız.
-        return view('admin/announcements/edit', $data);
+        return view('admin/announcements/edit', array_merge($this->data, $data));
     }
 
     /**

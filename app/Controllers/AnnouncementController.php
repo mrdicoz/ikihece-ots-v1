@@ -39,6 +39,7 @@ class AnnouncementController extends BaseController
         ];
 
         // Bu view dosyasını bir sonraki adımda oluşturacağız
-        return view('announcements/index', $data);
+        return view('announcements/index', array_merge($this->data, $data));
+
     }
 }

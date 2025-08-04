@@ -34,7 +34,8 @@ class AssignmentController extends BaseController
             'teachers'    => $teachers,
         ];
 
-        return view('admin/assignments/index', $data);
+        return view('admin/assignments/index', array_merge($this->data, $data));
+
     }
     
     /**

@@ -24,7 +24,8 @@ class InstitutionController extends BaseController
 
         ];
 
-        return view('admin/institution/index', $data);
+        return view('admin/institution/index', array_merge($this->data, $data));
+
     }
 
     public function save()
