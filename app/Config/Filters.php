@@ -35,7 +35,8 @@ class Filters extends BaseFilters
         'pagecache'     => PageCache::class,
         'performance'   => PerformanceMetrics::class,
         'statuscheck'   => \App\Filters\StatusCheck::class, // <-- BU SATIRI EKLE
-        'license'       => \App\Filters\LicenseFilter::class, // <-- BU SATIRI EKLE  
+        'license'       => \App\Filters\LicenseFilter::class, // <-- BU SATIRI EKLE
+        'onboarding'    => \App\Filters\OnboardingFilter::class, // <-- BU SATIRI EKLE
 
 
 
@@ -79,6 +80,7 @@ class Filters extends BaseFilters
             // 'csrf',
             // 'invalidchars',
             'statuscheck', // <-- BU SATIRI EKLE
+            'onboarding' => ['except' => ['login*', 'register', 'auth/a/*', 'logout']], // Filtreyi global olarak ekliyoruz
         ],
         'after' => [
             // 'honeypot',

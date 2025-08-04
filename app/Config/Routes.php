@@ -23,6 +23,13 @@ $routes->get('/dashboard', 'DashboardController::index', ['filter' => 'session',
 // Rol değiştirme rotası doğru yerde.
 $routes->get('user/switch-role/(:segment)', 'ProfileController::switchRole/$1', ['filter' => 'session', 'as' => 'user.switchRole']);
 
+// Rol seçim ve profil tamamlama adımlarını yöneten OnboardingController'ı kullanıyoruz
+$routes->group('onboarding', ['filter' => 'session'], static function ($routes) {
+    $routes->get('role', 'OnboardingController::showRoleSelection');
+    $routes->post('role', 'OnboardingController::processRoleSelection');
+    $routes->get('profile', 'OnboardingController::showProfileForm');
+    $routes->post('profile', 'OnboardingController::processProfileForm');
+});
 
 // --------------------------------------------------------------------
 // 2. GİRİŞ YAPMIŞ KULLANICI GEREKTİREN TÜM ROTALAR

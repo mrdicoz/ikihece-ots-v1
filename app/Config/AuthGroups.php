@@ -13,7 +13,7 @@ class AuthGroups extends ShieldAuthGroups
      * Sisteme yeni kaydolan bir kullanıcının otomatik olarak atanacağı grup.
      * Bizim projemizde bu 'veli' olacak.
      */
-    public string $defaultGroup = 'veli';
+    public string $defaultGroup = 'user';
 
     /**
      * --------------------------------------------------------------------
@@ -50,6 +50,10 @@ class AuthGroups extends ShieldAuthGroups
         'veli' => [
             'title'       => 'Veli',
             'description' => 'Sadece kendi öğrencisiyle ilgili bilgileri görebilen standart kullanıcı.',
+        ],
+        'user' => [
+            'title'       => 'Kullanıcı',
+            'description' => 'Sisteme yeni kaydolmuş, henüz rolü ve profili olmayan kullanıcı.',
         ],
     ];
 
@@ -121,5 +125,8 @@ class AuthGroups extends ShieldAuthGroups
         ],
         // Veli'nin şimdilik özel bir izni yok.
         'veli' => [],
+        // Kullanıcı grubunun hiçbir izni yok.
+        'user' => [], 
+
     ];
 }
