@@ -101,40 +101,61 @@
 <?= $this->section('pageScripts') ?>
 <script>
 $(document).ready(function() {
+    // --- GENEL DEĞİŞKENLER ---
     var lessonModal = new bootstrap.Modal(document.getElementById('lessonFormModal'));
     var modalBody = $('#lessonFormModalBody');
     var modalLabel = $('#lessonFormModalLabel');
     var saveBtn = $('#saveLessonBtn');
     var deleteBtn = $('#deleteLessonBtn');
-    
-    // Boş slota tıklama
+    var tomSelect;
+
+    // --- MODAL İŞLEMLERİ ---
+
+    // Boş bir zaman dilimine tıklandığında
     $('.available-slot').on('click', function() {
         var slot = $(this);
+        var teacherId = slot.data('teacher-id');
+        var date = slot.data('date');
+        var time = slot.data('time');
+
         modalLabel.text('Yeni Ders Ekle');
         modalBody.html('<div class="text-center p-5"><div class="spinner-border text-success"></div></div>');
         saveBtn.show();
         deleteBtn.hide();
         lessonModal.show();
 
-        $.get('<?= route_to('schedule.get_students') ?>', function(students) {
+        // Akıllı öğrenci listesini çek
+        $.get('<?= route_to("schedule.get_students") ?>', { 
+            teacher_id: teacherId, 
+            date: date, 
+            time: time 
+        }, function(students) {
             let form = $('<form id="lesson-form"></form>');
-            form.append('<input type="hidden" name="lesson_date" value="' + slot.data('date') + '">');
-            form.append('<input type="hidden" name="start_time" value="' + slot.data('time') + '">');
-            form.append('<input type="hidden" name="end_time" value="' + (parseInt(slot.data('time').substring(0,2))+1).toString().padStart(2, '0') + ':00:00">');
-            form.append('<input type="hidden" name="teacher_id" value="' + slot.data('teacher-id') + '">');
-            form.append('<div class="mb-3"><label class="form-label">Öğrenci(ler)</label><select id="student-select" name="students[]" multiple></select></div>');
+            form.append(`<input type="hidden" name="lesson_date" value="${date}">`);
+            form.append(`<input type="hidden" name="start_time" value="${time}">`);
+            form.append(`<input type="hidden" name="end_time" value="${(parseInt(time.substring(0,2))+1).toString().padStart(2, '0')}:00:00">`);
+            form.append(`<input type="hidden" name="teacher_id" value="${teacherId}">`);
+            form.append('<div class="mb-3"><label class="form-label">Öğrenci(ler)</label><select id="student-select-modal" name="students[]" multiple></select></div>');
             
             modalBody.html(form);
 
-            new TomSelect('#student-select', {
+            if(tomSelect) tomSelect.destroy();
+            tomSelect = new TomSelect('#student-select-modal', {
                 plugins: ['remove_button'],
                 options: students,
-                placeholder: 'Öğrenci arayın...'
+                placeholder: 'Öğrenci arayın veya seçin...',
+                render: {
+                    option: function(data, escape) {
+                        var classes = data.is_fixed ? 'is-fixed-schedule' : '';
+                        var icon = data.is_fixed ? '<i class="bi bi-pin-angle-fill text-success me-2"></i>' : '';
+                        return `<div class="${classes}">${icon}${escape(data.text)}</div>`;
+                    }
+                }
             });
         }).fail(() => modalBody.html('<div class="alert alert-danger">Öğrenciler yüklenemedi.</div>'));
     });
 
-    // Dolu derse tıklama
+    // Dolu bir derse tıklandığında
     $('.has-lesson').on('click', function() {
         var lessonId = $(this).data('lesson-id');
         modalLabel.text('Ders Detayları');
@@ -143,92 +164,100 @@ $(document).ready(function() {
         deleteBtn.data('lesson-id', lessonId).show();
         lessonModal.show();
 
-        $.get('<?= site_url('schedule/get-lesson-details/') ?>' + lessonId, function(response) {
+        $.get(`<?= site_url('schedule/get-lesson-details/') ?>${lessonId}`, function(response) {
             if(response.success){
                 let lesson = response.lesson;
-                let details = '<h6>Öğrenciler:</h6><div>' + lesson.student_names + '</div>';
+                let studentNamesHtml = lesson.student_names.split(',').map(name => `<span class="badge bg-secondary me-1">${escape(name.trim())}</span>`).join('');
+                let details = `<h6>Öğrenciler:</h6><div>${studentNamesHtml}</div>`;
                 modalBody.html(details);
             }
-        }).fail(() => modalBody.html('<div class="alert alert-danger">Detaylar alınamadı.</div>'));
+        }).fail(() => modalBody.html('<div class="alert alert-danger">Ders detayları alınamadı.</div>'));
     });
 
-    // Kaydetme
+    // "Dersi Kaydet" butonu
     saveBtn.on('click', function() {
-        $.post('<?= route_to('schedule.create') ?>', $('#lesson-form').serialize() + '&<?= csrf_token() ?>=<?= csrf_hash() ?>')
+        $.post('<?= route_to("schedule.create") ?>', $('#lesson-form').serialize() + '&<?= csrf_token() ?>=<?= csrf_hash() ?>')
             .done(res => res.success ? window.location.reload() : alert(res.message))
             .fail(() => alert('Bir hata oluştu.'))
             .always(() => lessonModal.hide());
     });
     
-    // Silme
+    // "Dersi Sil" butonu
     deleteBtn.on('click', function() {
         if (!confirm('Bu dersi silmek istediğinizden emin misiniz?')) return;
         let lessonId = $(this).data('lesson-id');
-        $.post('<?= site_url('schedule/delete-lesson/') ?>' + lessonId, {'<?= csrf_token() ?>': '<?= csrf_hash() ?>'})
+        $.post(`<?= site_url('schedule/delete-lesson/') ?>${lessonId}`, {'<?= csrf_token() ?>': '<?= csrf_hash() ?>'})
             .done(res => res.success ? window.location.reload() : alert(res.message))
             .fail(() => alert('Bir hata oluştu.'))
             .always(() => lessonModal.hide());
     });
-});
 
-    $(document).ready(function() {
-        
-        // Dinamik olarak oluşturulmuş butonlar için event delegation kullanılır
-        $('body').on('click', '.bildirim-gonder-tek', function() {
-            const teacherId = $(this).data('teacher-id');
-            if (teacherId) {
-                sendNotificationRequest([teacherId], $(this));
-            }
-        });
+    // --- MANUEL BİLDİRİM GÖNDERME ---
 
-        $('#bildirim-gonder-hepsi').on('click', function() {
-            let teacherIds = [];
-            // Tablodaki her bir tekli gönder butonundan teacher-id'yi topla
-            $('.bildirim-gonder-tek').each(function() {
-                teacherIds.push($(this).data('teacher-id'));
-            });
-
-            // Benzersiz ID'leri al (opsiyonel ama iyi bir pratik)
-            let uniqueTeacherIds = [...new Set(teacherIds)];
-
-            if (uniqueTeacherIds.length > 0) {
-                sendNotificationRequest(uniqueTeacherIds, $(this));
-            } else {
-                alert('Listede bildirim gönderilecek öğretmen bulunmuyor.');
-            }
-        });
-
-        function sendNotificationRequest(ids, button) {
-            const originalHtml = button.html();
-            // Butonu devre dışı bırak ve bekleme animasyonu ekle
-            button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Gönderiliyor...');
-
-            $.ajax({
-                url: '<?= site_url('notifications/send-manual') ?>',
-                method: 'POST',
-                data: {
-                    '<?= csrf_token() ?>': '<?= csrf_hash() ?>', // CSRF token'ı gönder
-                    'teacher_ids': ids
-                },
-                dataType: 'json', // Sunucudan JSON cevabı beklediğimizi belirtiyoruz
-                success: function(response) {
-                    // Daha şık bir bildirim için Toastr, SweetAlert gibi kütüphaneler kullanılabilir
-                    alert(response.message); 
-                },
-                error: function(xhr, status, error) {
-                    let errorMessage = 'Bilinmeyen bir hata oluştu.';
-                    if (xhr.responseJSON && xhr.responseJSON.message) {
-                        errorMessage = xhr.responseJSON.message;
-                    }
-                    alert('Hata: ' + errorMessage);
-                },
-                complete: function() {
-                    // İşlem bittiğinde butonu eski haline getir
-                    button.prop('disabled', false).html(originalHtml);
-                }
-            });
+    // Tekli bildirim butonu (Event delegation ile)
+    $('body').on('click', '.bildirim-gonder-tek', function() {
+        const teacherId = $(this).data('teacher-id');
+        if (teacherId) {
+            sendNotificationRequest([teacherId], $(this));
         }
     });
+
+    // Toplu bildirim butonu
+    $('#bildirim-gonder-hepsi').on('click', function() {
+        let teacherIds = [];
+        $('.bildirim-gonder-tek').each(function() {
+            teacherIds.push($(this).data('teacher-id'));
+        });
+        let uniqueTeacherIds = [...new Set(teacherIds)];
+        if (uniqueTeacherIds.length > 0) {
+            sendNotificationRequest(uniqueTeacherIds, $(this));
+        } else {
+            alert('Listede bildirim gönderilecek öğretmen bulunmuyor.');
+        }
+    });
+
+    // AJAX isteğini yapan ana bildirim fonksiyonu
+    function sendNotificationRequest(ids, button) {
+        const originalHtml = button.html();
+        button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Gönderiliyor...');
+
+        $.ajax({
+            url: '<?= route_to("notifications.sendManual") ?>',
+            method: 'POST',
+            data: {
+                '<?= csrf_token() ?>': '<?= csrf_hash() ?>',
+                'teacher_ids': ids
+            },
+            dataType: 'json',
+            success: function(response) {
+                alert(response.message); 
+            },
+            error: function(xhr) {
+                let errorMessage = 'Bilinmeyen bir hata oluştu.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMessage = xhr.responseJSON.message;
+                }
+                alert('Hata: ' + errorMessage);
+            },
+            complete: function() {
+                button.prop('disabled', false).html(originalHtml);
+            }
+        });
+    }
+
+    // Basit HTML escape fonksiyonu
+    function escape(str) {
+        return str.replace(/[&<>"']/g, function(match) {
+            return {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[match];
+        });
+    }
+});
 </script>
 <style>
 .schedule-grid .available-slot, .schedule-grid .has-lesson { cursor: pointer; transition: background-color 0.2s; }

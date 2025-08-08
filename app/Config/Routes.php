@@ -115,6 +115,20 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
     // ADMİN GRUBU (Sadece 'admin' grubundakiler erişebilir)
     // --------------------------------------------------------------------
     $routes->group('admin', ['filter' => 'group:admin'], static function ($routes) {
+
+  // --- SABİT DERS PROGRAMI ROTLARI ---
+        $routes->group('fixed-schedule', ['namespace' => 'App\Controllers\Admin'], static function ($routes) {
+        $routes->get('/', 'FixedScheduleController::index', ['as' => 'admin.fixed_schedule.index']);
+        // AJAX işlemleri için rotaları daha sonra buraya ekleyeceğiz
+ 
+        // --- YENİ EKLENEN AJAX ROTALARI ---
+        $routes->get('get-day-details/(:num)/(:num)', 'FixedScheduleController::getDayDetails/$1/$2', ['as' => 'admin.fixed_schedule.get_details']);
+        $routes->post('save', 'FixedScheduleController::saveLesson', ['as' => 'admin.fixed_schedule.save']);
+        $routes->post('delete', 'FixedScheduleController::deleteLesson', ['as' => 'admin.fixed_schedule.delete']);
+        $routes->get('get-cell-content/(:num)/(:num)', 'FixedScheduleController::getCellContent/$1/$2', ['as' => 'admin.fixed_schedule.get_cell']);
+
+
+    });
         
         // Kullanıcı Yönetimi
         $routes->get('users', 'Admin\UserController::index', ['as' => 'admin.users.index']);

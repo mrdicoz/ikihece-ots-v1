@@ -21,6 +21,7 @@ class ScheduleController extends BaseController
             'title' => 'Ders Programı Yönetimi',
         ];
         return view('schedule/index', array_merge($this->data, $data));
+        
 
     }
 
@@ -120,13 +121,49 @@ class ScheduleController extends BaseController
      * Tom-Select için tüm öğrencileri formatlanmış bir şekilde döndürür.
      */
     public function getStudentsForSelect()
-    {
-        if (!$this->request->isAJAX()) { return $this->response->setStatusCode(403); }
-        $studentModel = new StudentModel();
-        $students = $studentModel->select('id, adi, soyadi')->findAll();
-        $formattedStudents = array_map(fn($s) => ['value' => $s['id'], 'text' => $s['adi'] . ' ' . $s['soyadi']], $students);
-        return $this->response->setJSON($formattedStudents);
-    }
+        {
+            if (!$this->request->isAJAX()) { return $this->response->setStatusCode(403); }
+
+            $studentModel = new \App\Models\StudentModel();
+            $fixedLessonModel = new \App\Models\FixedLessonModel();
+
+            // AJAX isteğinden gelen ek bilgileri al
+            $teacherId = $this->request->getGet('teacher_id');
+            $date = $this->request->getGet('date');
+            
+            // Gelen tarihten haftanın gününü hesapla (1=Pzt, ..., 7=Pazar)
+            $dayOfWeek = date('N', strtotime($date));
+            $time = $this->request->getGet('time');
+
+            // 1. Tüm öğrencileri al
+            $allStudents = $studentModel->select('id, adi, soyadi')->findAll();
+
+            // 2. Bu saat dilimi için sabit bir ders var mı diye kontrol et
+            $fixedLesson = $fixedLessonModel->where([
+                'teacher_id'  => $teacherId,
+                'day_of_week' => $dayOfWeek,
+                'start_time'  => $time
+            ])->findAll();
+            
+            $fixedStudentIds = array_column($fixedLesson, 'student_id');
+
+            // 3. Öğrenci listesini formatla ve sabit olanları işaretle
+            $formattedStudents = [];
+            foreach ($allStudents as $student) {
+                $formattedStudents[] = [
+                    'value'    => $student['id'],
+                    'text'     => $student['adi'] . ' ' . $student['soyadi'],
+                    'is_fixed' => in_array($student['id'], $fixedStudentIds) // Sabit ise true, değilse false
+                ];
+            }
+
+            // Sabit öğrencileri listenin en başına almak için sırala
+            usort($formattedStudents, function ($a, $b) {
+                return $b['is_fixed'] <=> $a['is_fixed'];
+            });
+
+            return $this->response->setJSON($formattedStudents);
+        }
     
     /**
      * Ders detaylarını getirir.

@@ -23,7 +23,15 @@ if ($isLoggedIn) {
                 
                 <?php if (in_array($activeRole, ['admin', 'yonetici', 'mudur', 'sekreter'])): ?>
                     <li class="nav-item"><a class="nav-link" href="<?= site_url('students') ?>"><i class="bi bi-backpack2"></i> Öğrenci Yönetimi</a></li>
-                    <li class="nav-item"><a class="nav-link" href="<?= route_to('schedule.index') ?>"><i class="bi bi-calendar3"></i> Ders Programı</a></li>
+                     <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-calendar3"></i> Ders Programı
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="<?= route_to('schedule.index') ?>"><i class="bi bi-calendar-plus"></i> Program Oluştur</a></li>
+                            <li><a class="dropdown-item" href="<?= route_to('admin.fixed_schedule.index') ?>"><i class="bi bi-pin-angle-fill"></i> Sabitler</a></li>
+                        </ul>
+                    </li>
                 <?php endif; ?>
 
                 <?php if ($activeRole === 'ogretmen'): ?>
