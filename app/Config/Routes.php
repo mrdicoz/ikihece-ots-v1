@@ -96,6 +96,11 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->get('get-lesson-details/(:num)', 'ScheduleController::getLessonDetails/$1', ['as' => 'schedule.get_details']);
         $routes->post('delete-lesson/(:num)', 'ScheduleController::deleteLesson/$1', ['as' => 'schedule.delete_lesson']);
         $routes->get('get-lesson-dates', 'ScheduleController::getLessonDates', ['as' => 'schedule.get_lesson_dates']);
+        $routes->post('add-fixed-lessons', 'ScheduleController::addFixedLessonsForDay', ['as' => 'schedule.addFixed']);
+        $routes->post('delete-day-lessons', 'ScheduleController::deleteLessonsForDay', ['as' => 'schedule.deleteForDay']);
+        $routes->post('add-all-fixed', 'ScheduleController::addAllFixedLessonsForDay', ['as' => 'schedule.addAllFixed']);
+        $routes->post('delete-all-day', 'ScheduleController::deleteAllLessonsForDay', ['as' => 'schedule.deleteAllForDay']);
+
         
     });
     
@@ -122,6 +127,10 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
 
         $routes->get('ai-trainer', 'Admin\DataImportController::history', ['as' => 'admin.ai.trainer']);
         $routes->post('ai-trainer', 'Admin\DataImportController::processUpload', ['as' => 'admin.ai.processUpload']);
+
+        // Ders Hakları Yönetimi
+    $routes->get('entitlements/import', 'Admin\EntitlementController::importView', ['as' => 'admin.entitlements.import']);
+    $routes->post('entitlements/import', 'Admin\EntitlementController::processImport', ['as' => 'admin.entitlements.process']);
 
   // --- SABİT DERS PROGRAMI ROTLARI ---
         $routes->group('fixed-schedule', ['namespace' => 'App\Controllers\Admin'], static function ($routes) {

@@ -31,7 +31,8 @@ class StudentModel extends Model
         'kardes_dogum_tarihi_2', 'kardes_okulu_2', 'adres_il', 'adres_ilce',
         'adres_mahalle', 'adres_detay', 'sozlesme_no', 'sozlesme_tarihi',
         'sozlesme_tutari', 'odeme_sekli', 'google_konum', 'profile_image',
-        'ram_raporu', 'ram_baslangic_tarihi', 'ram_bitis_tarihi'
+        'ram_raporu', 'ram_baslangic_tarihi', 'ram_bitis_tarihi', 'normal_bireysel_hak',
+        'normal_grup_hak', 'telafi_bireysel_hak', 'telafi_grup_hak',
     ];
 
     protected bool $allowEmptyInserts = false;

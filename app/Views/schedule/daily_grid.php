@@ -3,80 +3,99 @@
 <?= $this->section('title') ?><?= esc($title) ?><?= $this->endSection() ?>
 
 <?= $this->section('main') ?>
-<div class="container-fluid mt-4">
+<div class="container-fluid mt-4" id="daily-grid-page">
 
-    <div class="d-sm-flex align-items-center justify-content-between mb-3">
+    <div class="d-sm-flex align-items-center justify-content-between mb-3 d-print-none">
         <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-table"></i> <?= esc($title) ?></h1>
-        <a href="<?= route_to('schedule.index') ?>" class="btn btn-secondary btn-sm">
-            <i class="bi bi-arrow-left"></i> Ana Takvime Dön
-        </a>
+        <div class="btn-group">
+            <a href="<?= route_to('schedule.index') ?>" class="btn btn-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Ana Takvime Dön
+            </a>
+            <button id="printScheduleBtn" class="btn btn-info btn-sm">
+                <i class="bi bi-printer"></i> Yazdır
+            </button>
+        </div>
     </div>
 
-    <div class="card shadow">
-        <div class="card-body">
-            <?php if (empty($teachers)): ?>
-                <div class="alert alert-warning text-center">Bu programı görüntülemek için yetkiniz olan bir öğretmen bulunmamaktadır.</div>
-            <?php else: ?>
-                <div class="table-responsive table-sticky-container">
-                    <table class="table table-bordered schedule-grid text-center" style="min-width: 900px;">
-                        <thead class="sticky-top bg-light">
-                            <tr>
-                                <th style="width: 200px;">Öğretmen</th>
-                                <?php for ($hour = config('Ots')->scheduleStartHour; $hour < config('Ots')->scheduleEndHour; $hour++): ?>
-                                    <th><?= str_pad($hour, 2, '0', STR_PAD_LEFT) ?>:00</th>
-                                <?php endfor; ?>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($teachers as $teacher): ?>
+    <div id="printableArea">
+        <h3 class="text-center d-none d-print-block mb-3"><?= esc($title) ?></h3>
+        
+        <div class="card shadow">
+            <div class="card-body">
+                <?php if (empty($teachers)): ?>
+                    <div class="alert alert-warning text-center">Bu programı görüntülemek için yetkiniz olan bir öğretmen bulunmamaktadır.</div>
+                <?php else: ?>
+                    <div class="table-responsive table-sticky-container">
+                        <table class="table table-bordered schedule-grid text-center" style="min-width: 900px;">
+                            <thead class="sticky-top bg-light">
                                 <tr>
-                                    <td class="align-middle fw-bold">
-                                        <img src="<?= base_url(ltrim($teacher->profile_photo ?? '/assets/images/user.jpg', '/')) ?>" class="rounded-circle me-2" width="40" height="40" style="object-fit: cover;">
-                                        <br>
-                                        <?= esc($teacher->first_name . ' ' . $teacher->last_name) ?>
-                                        <div class="mt-1">
-                                            <button class="btn btn-sm btn-outline-success bildirim-gonder-tek" data-teacher-id="<?= esc($teacher->id) ?>">
-                                                <i class="bi bi-bell"></i> Bildir
-                                            </button>
-                                        </div>
-                                    </td>
+                                    <th style="width: 200px;">Öğretmen</th>
                                     <?php for ($hour = config('Ots')->scheduleStartHour; $hour < config('Ots')->scheduleEndHour; $hour++): ?>
-                                        <?php
-                                            $timeStr = str_pad($hour, 2, '0', STR_PAD_LEFT) . ':00:00';
-                                            $hourKey = str_pad($hour, 2, '0', STR_PAD_LEFT);
-                                            $lesson = $lessonMap[$teacher->id][$hourKey] ?? null;
-                                        ?>
-                                        <?php if ($lesson): ?>
-                                            <td class="align-middle bg-success-subtle has-lesson" data-lesson-id="<?= $lesson['id'] ?>">
-                                                       <?php
-                                                // --- DEĞİŞİKLİK BURADA BAŞLIYOR ---
-                                                // Öğrenci isimlerini virgüllerden ayırıp bir diziye atıyoruz.
-                                                $studentNames = explode(',', $lesson['student_names']);
-                                                foreach ($studentNames as $name) {
-                                                    // Her bir ismi, alt alta gelmesi için bir rozet içinde yazdırıyoruz.
-                                                    echo '<span class="badge text-bg-secondary student-badge">' . esc(trim($name)) . '</span>';
-                                                }
-                                                // --- DEĞİŞİKLİK BURADA BİTİYOR ---
-                                                ?>
-                                            </td>
-                                        <?php else: ?>
-                                            <td class="align-middle available-slot" data-date="<?= $displayDate ?>" data-time="<?= $timeStr ?>" data-teacher-id="<?= $teacher->id ?>">
-                                                <i class="bi bi-person-fill-add"></i>
-                                            </td>
-                                        <?php endif; ?>
+                                        <th><?= str_pad($hour, 2, '0', STR_PAD_LEFT) ?>:00</th>
                                     <?php endfor; ?>
                                 </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                    <div class="text-center mt-4">
-                        <button class="btn btn-success" id="bildirim-gonder-hepsi">
-                            <i class="bi bi-broadcast-pin"></i> Listelenen Tüm Öğretmenlere Bildirim Gönder
-                        </button>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($teachers as $teacher): ?>
+                                    <tr>
+                                        <td class="align-middle fw-bold">
+                                            <img src="<?= base_url(ltrim($teacher->profile_photo ?? '/assets/images/user.jpg', '/')) ?>" class="rounded-circle me-2 d-print-none" width="40" height="40" style="object-fit: cover;">
+                                            <br class="d-print-none">
+                                            <?= esc($teacher->first_name . ' ' . $teacher->last_name) ?>
+                                            <div class="mt-1 btn-group action-buttons d-print-none">
+                                                <button class="btn btn-sm btn-success bildirim-gonder-tek" data-teacher-id="<?= esc($teacher->id) ?>" title="Bildirim Gönder">
+                                                    <i class="bi bi-bell"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-primary add-fixed-lessons" data-teacher-id="<?= esc($teacher->id) ?>" data-date="<?= esc($displayDate) ?>" title="Sabit Dersleri Ekle">
+                                                    <i class="bi bi-calendar-check"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-danger delete-day-lessons" data-teacher-id="<?= esc($teacher->id) ?>" data-date="<?= esc($displayDate) ?>" data-teacher-name="<?= esc($teacher->first_name . ' ' . $teacher->last_name) ?>" title="Günün Derslerini Sil">
+                                                    <i class="bi bi-calendar-x"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <?php for ($hour = config('Ots')->scheduleStartHour; $hour < config('Ots')->scheduleEndHour; $hour++): ?>
+                                            <?php
+                                                $timeStr = str_pad($hour, 2, '0', STR_PAD_LEFT) . ':00:00';
+                                                $hourKey = str_pad($hour, 2, '0', STR_PAD_LEFT);
+                                                $lesson = $lessonMap[$teacher->id][$hourKey] ?? null;
+                                            ?>
+                                            <?php if ($lesson): ?>
+                                                <td class="align-middle bg-success-subtle has-lesson" data-lesson-id="<?= $lesson['id'] ?>">
+                                                    <?php
+                                                    $studentNames = explode(',', $lesson['student_names']);
+                                                    foreach ($studentNames as $name) {
+                                                        echo '<span class="badge text-bg-secondary student-badge">' . esc(trim($name)) . '</span>';
+                                                    }
+                                                    ?>
+                                                </td>
+                                            <?php else: ?>
+                                                <td class="align-middle available-slot" data-date="<?= $displayDate ?>" data-time="<?= $timeStr ?>" data-teacher-id="<?= $teacher->id ?>">
+                                                    <i class="bi bi-person-fill-add d-print-none"></i>
+                                                </td>
+                                            <?php endif; ?>
+                                        <?php endfor; ?>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
-                </div>
-            <?php endif; ?>
+                <?php endif; ?>
+            </div>
         </div>
+    </div>
+    <div class="text-center mt-4 d-print-none">
+                        <div class="btn-group" role="group" aria-label="Toplu İşlem Butonları">
+                            <button class="btn btn-success" id="bildirim-gonder-hepsi">
+                                <i class="bi bi-broadcast-pin"></i> Hepsine Bildir
+                            </button>
+                            <button class="btn btn-primary" id="addAllFixedLessonsBtn" data-date="<?= esc($displayDate) ?>">
+                                <i class="bi bi-calendar-check-fill"></i> Tüm Sabitleri Ekle
+                            </button>
+                            <button class="btn btn-danger" id="deleteAllLessonsBtn" data-date="<?= esc($displayDate) ?>">
+                                <i class="bi bi-trash3-fill"></i> Tüm Dersleri Sil
+                            </button>
+                        </div>
     </div>
 </div>
 
@@ -99,19 +118,145 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('pageScripts') ?>
+<style>
+@media print {
+    @page {
+        size: landscape; /* Sayfayı yatay yap */
+        margin: 1cm;     /* Kenar boşlukları */
+    }
+
+    body {
+        font-size: 14pt !important;
+    }
+
+    /* Sayfadaki ana layout elemanlarını ve yazdırılmayacakları gizle */
+    body > .navbar,
+    body > footer,
+    #daily-grid-page > .d-print-none,
+    .modal {
+        display: none !important;
+    }
+
+    /* Yazdırma alanını ve içindekileri görünür yap ve tam sayfa yap */
+    #printableArea {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        padding: 1cm; /* @page margin ile aynı */
+        box-sizing: border-box;
+    }
+
+    .card, .card-body, .table-responsive, .table-sticky-container {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        height: auto !important;
+    }
+
+    .sticky-top { position: static !important; }
+    
+    .table-bordered th, .table-bordered td { border: 1px solid #6c757d !important; }
+
+    .has-lesson {
+        background-color: #f0f0f0 !important;
+        color: #000 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    .badge {
+        border: 1px solid #333 !important;
+        background-color: transparent !important;
+        color: #000 !important;
+        font-weight: normal !important;
+    }
+    
+    a[href]:after { content: none !important; }
+}
+</style>
+
 <script>
 $(document).ready(function() {
+    // --- YAZDIR BUTONU ---
+    $('#printScheduleBtn').on('click', function() {
+        window.print();
+    });
+
     // --- GENEL DEĞİŞKENLER ---
     var lessonModal = new bootstrap.Modal(document.getElementById('lessonFormModal'));
     var modalBody = $('#lessonFormModalBody');
     var modalLabel = $('#lessonFormModalLabel');
     var saveBtn = $('#saveLessonBtn');
     var deleteBtn = $('#deleteLessonBtn');
-    var tomSelect; // TomSelect instance'ını burada tanımlıyoruz
+    var tomSelect;
+
+    // --- SABİT DERS EKLEME ---
+    $('.add-fixed-lessons').on('click', function() {
+        var button = $(this);
+        var teacherId = button.data('teacher-id');
+        var date = button.data('date');
+
+        if (!confirm('Bu öğretmenin bu güne ait tüm sabit derslerini programa eklemek istediğinizden emin misiniz? Mevcut dersler korunacaktır.')) {
+            return;
+        }
+
+        button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+
+        $.post('<?= route_to("schedule.addFixed") ?>', {
+            '<?= csrf_token() ?>': '<?= csrf_hash() ?>',
+            teacher_id: teacherId,
+            date: date
+        }).done(function(response) {
+            if (response.success) {
+                alert(response.message);
+                window.location.reload();
+            } else {
+                alert('Hata: ' + response.message);
+            }
+        }).fail(function() {
+            alert('Sunucuya bağlanırken bir hata oluştu. Lütfen tekrar deneyin.');
+        }).always(function() {
+            button.prop('disabled', false).html('<i class="bi bi-calendar-check"></i>');
+        });
+    });
+    
+    // --- GÜNÜN DERSLERİNİ SİLME ---
+    $('.delete-day-lessons').on('click', function() {
+        var button = $(this);
+        var teacherId = button.data('teacher-id');
+        var teacherName = button.data('teacher-name');
+        var date = button.data('date');
+
+        var confirmation = confirm(teacherName + ' adlı öğretmenin ' + date + ' tarihindeki TÜM derslerini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.');
+        
+        if (!confirmation) {
+            return;
+        }
+
+        button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+
+        $.post('<?= route_to("schedule.deleteForDay") ?>', {
+            '<?= csrf_token() ?>': '<?= csrf_hash() ?>',
+            teacher_id: teacherId,
+            date: date
+        }).done(function(response) {
+            if (response.success) {
+                alert(response.message);
+                window.location.reload();
+            } else {
+                alert('Hata: ' + response.message);
+            }
+        }).fail(function() {
+            alert('Sunucu hatası. Lütfen tekrar deneyin.');
+        }).always(function() {
+            button.prop('disabled', false).html('<i class="bi bi-calendar-x"></i>');
+        });
+    });
 
     // --- MODAL İŞLEMLERİ ---
-
-    // Boş bir zaman dilimine tıklandığında
     $('.available-slot').on('click', function() {
         var slot = $(this);
         var teacherId = slot.data('teacher-id');
@@ -119,77 +264,59 @@ $(document).ready(function() {
         var time = slot.data('time');
 
         modalLabel.text('Yeni Ders Ekle');
-        // Modal açılmadan önce yükleniyor animasyonu göster
         modalBody.html('<div class="text-center p-5"><div class="spinner-border text-success"></div><p class="mt-2">Öğrenci önerileri yükleniyor...</p></div>');
         saveBtn.show();
         deleteBtn.hide();
         lessonModal.show();
 
-        // --- AKILLI ÖNERİ SİSTEMİ ENTEGRASYONU ---
-        // Backend'den akıllı önerileri çekelim
         $.get('<?= route_to("schedule.suggestions") ?>', { 
             teacher_id: teacherId, 
             date: date, 
             start_time: time 
         }, function(students) {
-            // Backend'den gelen veriyi TomSelect formatına çevirelim
             let tomSelectOptions = students.map(function(student) {
                 return {
-                    value: student.id,
-                    text: student.name,
-                    type: student.type // 'fixed', 'history', 'other' etiketini koru
+                    value: student.id, text: student.name, type: student.type,
+                    bireysel: student.bireysel, grup: student.grup
                 };
             });
 
-            // Modal içine formu dinamik olarak oluşturalım
             let form = $('<form id="lesson-form"></form>');
-            let endTime = calculateEndTime(time);
-
             form.append(`<input type="hidden" name="lesson_date" value="${date}">`);
             form.append(`<input type="hidden" name="start_time" value="${time}">`);
-            form.append(`<input type="hidden" name="end_time" value="${endTime}">`);
+            form.append(`<input type="hidden" name="end_time" value="${calculateEndTime(time)}">`);
             form.append(`<input type="hidden" name="teacher_id" value="${teacherId}">`);
             form.append('<div class="mb-3"><label class="form-label">Öğrenci(ler)</label><select id="student-select-modal" name="students[]" multiple></select></div>');
-            
             modalBody.html(form);
 
-            // Önceki TomSelect'i yok et (varsa)
             if(tomSelect) tomSelect.destroy();
-
-            // TomSelect'i yeni ve akıllı verilerle başlat
             tomSelect = new TomSelect('#student-select-modal', {
-                plugins: ['remove_button'],
-                options: tomSelectOptions, // Hazırladığımız öneri listesi
-                placeholder: 'Öğrenci arayın veya seçin...',
-                valueField: 'value',
-                labelField: 'text',
-                searchField: 'text',
-                // --- RENKLENDİRME KISMI ---
+                plugins: ['remove_button'], options: tomSelectOptions,
+                placeholder: 'Öğrenci arayın veya seçin...', valueField: 'value',
+                labelField: 'text', searchField: 'text',
                 render: {
                     option: function(data, escape) {
                         let classes = 'd-flex align-items-center p-2';
-                        let label = '';
+                        let typeLabel = '';
                         if (data.type === 'fixed') {
                             classes += ' text-success fw-bold';
-                            label = '<span class="badge bg-success-subtle text-success-emphasis rounded-pill ms-auto">Sabit Program</span>';
+                            typeLabel = '<span class="badge bg-success-subtle text-success-emphasis rounded-pill ms-auto">Sabit Program</span>';
                         } else if (data.type === 'history') {
                             classes += ' text-primary';
-                            label = '<span class="badge bg-primary-subtle text-primary-emphasis rounded-pill ms-auto">Sık Ders</span>';
+                            typeLabel = '<span class="badge bg-primary-subtle text-primary-emphasis rounded-pill ms-auto">Sık Ders</span>';
                         }
-                        return `<div class="${classes}"><div>${escape(data.text)}</div>${label}</div>`;
+                        let lessonCounts = `<span class="ms-2"><span class="badge bg-info-subtle text-info-emphasis" title="Bireysel Telafi Hakkı">B: ${escape(data.bireysel ?? 0)}</span><span class="badge bg-warning-subtle text-warning-emphasis" title="Grup Telafi Hakkı">G: ${escape(data.grup ?? 0)}</span></span>`;
+                        return `<div class="${classes}"><div>${escape(data.text)}${lessonCounts}</div>${typeLabel}</div>`;
                     },
                     item: function(data, escape) {
-                        return `<div>${escape(data.text)}</div>`;
+                         let lessonCounts = `<span class="ms-2"><span class="badge bg-info-subtle text-info-emphasis" title="Bireysel Telafi Hakkı">B: ${escape(data.bireysel ?? 0)}</span><span class="badge bg-warning-subtle text-warning-emphasis" title="Grup Telafi Hakkı">G: ${escape(data.grup ?? 0)}</span></span>`;
+                        return `<div>${escape(data.text)}${lessonCounts}</div>`;
                     }
                 }
             });
-
-        }).fail(() => modalBody.html('<div class="alert alert-danger">Öğrenci önerileri yüklenemedi. Lütfen tekrar deneyin.</div>'));
+        }).fail(() => modalBody.html('<div class="alert alert-danger">Öğrenci önerileri yüklenemedi.</div>'));
     });
 
-    // --- SİZİN ÇALIŞAN DİĞER FONKSİYONLARINIZ (Değişiklik yok) ---
-
-    // Dolu bir derse tıklandığında
     $('.has-lesson').on('click', function() {
         var lessonId = $(this).data('lesson-id');
         modalLabel.text('Ders Detayları');
@@ -207,8 +334,7 @@ $(document).ready(function() {
             }
         }).fail(() => modalBody.html('<div class="alert alert-danger">Ders detayları alınamadı.</div>'));
     });
-
-    // "Dersi Kaydet" butonu
+    
     saveBtn.on('click', function() {
         $.post('<?= route_to("schedule.create") ?>', $('#lesson-form').serialize() + '&<?= csrf_token() ?>=<?= csrf_hash() ?>')
             .done(res => res.success ? window.location.reload() : alert(res.message))
@@ -216,7 +342,6 @@ $(document).ready(function() {
             .always(() => lessonModal.hide());
     });
     
-        // "Dersi Sil" butonu
     deleteBtn.on('click', function() {
         if (!confirm('Bu dersi silmek istediğinizden emin misiniz?')) return;
         let lessonId = $(this).data('lesson-id');
@@ -226,7 +351,7 @@ $(document).ready(function() {
             .always(() => lessonModal.hide());
     });
 
-    // Bitiş saatini hesaplayan yardımcı fonksiyon
+    // --- YARDIMCI FONKSİYONLAR ---
     function calculateEndTime(startTime) {
         const [hours, minutes] = startTime.split(':').map(Number);
         const date = new Date();
@@ -237,18 +362,82 @@ $(document).ready(function() {
         return `${endHours}:${endMinutes}`;
     }
 
-    // Basit HTML escape fonksiyonu
     function escape(str) {
+        if (!str) return '';
         const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
         return str.replace(/[&<>"']/g, function(m) { return map[m]; });
     }
 });
+
+    // --- YENİ KOD: TOPLU SABİT DERS EKLEME ---
+    $('#addAllFixedLessonsBtn').on('click', function() {
+        var button = $(this);
+        var date = button.data('date');
+        
+        // Sayfadaki tüm öğretmen ID'lerini topla
+        var teacherIds = [];
+        $('.add-fixed-lessons').each(function() {
+            teacherIds.push($(this).data('teacher-id'));
+        });
+
+        if (teacherIds.length === 0) {
+            alert('Listede işlem yapılacak öğretmen bulunmuyor.');
+            return;
+        }
+
+        if (!confirm('Listelenen ' + teacherIds.length + ' öğretmenin bu güne ait tüm sabit derslerini programa eklemek istediğinizden emin misiniz?')) {
+            return;
+        }
+
+        button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Yükleniyor...');
+
+        $.post('<?= route_to("schedule.addAllFixed") ?>', {
+            '<?= csrf_token() ?>': '<?= csrf_hash() ?>',
+            teacher_ids: teacherIds,
+            date: date
+        }).done(function(response) {
+            alert(response.message);
+            if(response.success) window.location.reload();
+        }).fail(function() {
+            alert('Sunucu hatası. Lütfen tekrar deneyin.');
+        }).always(function() {
+            button.prop('disabled', false).html('<i class="bi bi-calendar-check-fill"></i> Tüm Sabitleri Ekle');
+        });
+    });
+
+    // --- YENİ KOD: TOPLU DERS SİLME ---
+    $('#deleteAllLessonsBtn').on('click', function() {
+        var button = $(this);
+        var date = button.data('date');
+
+        var teacherIds = [];
+        $('.delete-day-lessons').each(function() {
+            teacherIds.push($(this).data('teacher-id'));
+        });
+
+        if (teacherIds.length === 0) {
+            alert('Listede işlem yapılacak öğretmen bulunmuyor.');
+            return;
+        }
+
+        if (!confirm('DİKKAT! Listelenen ' + teacherIds.length + ' öğretmenin bu tarihteki TÜM derslerini kalıcı olarak sileceksiniz. Bu işlem geri alınamaz. Emin misiniz?')) {
+            return;
+        }
+
+        button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Siliniyor...');
+
+        $.post('<?= route_to("schedule.deleteAllForDay") ?>', {
+            '<?= csrf_token() ?>': '<?= csrf_hash() ?>',
+            teacher_ids: teacherIds,
+            date: date
+        }).done(function(response) {
+            alert(response.message);
+            if(response.success) window.location.reload();
+        }).fail(function() {
+            alert('Sunucu hatası. Lütfen tekrar deneyin.');
+        }).always(function() {
+            button.prop('disabled', false).html('<i class="bi bi-trash3-fill"></i> Tüm Dersleri Sil');
+        });
+    });
 </script>
-<style>
-.schedule-grid .available-slot, .schedule-grid .has-lesson { cursor: pointer; transition: background-color 0.2s; }
-.schedule-grid .available-slot { font-weight: bold; color: #198754; }
-.schedule-grid .available-slot:hover { background-color: #d1e7dd; }
-.schedule-grid .has-lesson:hover { background-color: #badbcc; }
-.schedule-grid .has-lesson { font-size: 0.8em; }
-</style>
 <?= $this->endSection() ?>

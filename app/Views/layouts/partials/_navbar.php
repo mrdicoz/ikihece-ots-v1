@@ -63,6 +63,7 @@ if ($isLoggedIn) {
                             <li><a class="dropdown-item" href="<?= route_to('admin.logs.index') ?>"><i class="bi bi-journal-text"></i> Log Kayıtları</a></li>
                             <li><a class="dropdown-item" href="<?= route_to('admin.ai.trainer') ?>"><i class="bi bi-robot"></i> Model Eğitimi</a></li>
                             <li><a class="dropdown-item" href="<?= route_to('admin.students.importView') ?>"><i class="bi bi-cloud-upload-fill"></i> İçe Aktar</a></li>
+                            <li><a class="dropdown-item" href="<?= route_to('admin.entitlements.import') ?>"><i class="bi bi-person-check"></i> Ders Hakları Yükle</a></li>
                             <li><a class="dropdown-item" href="<?= route_to('admin.settings.index') ?>"><i class="bi bi-gear-wide-connected"></i> Genel Ayarlar</a></li>
                         </ul>
                     </li>
