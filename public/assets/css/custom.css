@@ -246,3 +246,15 @@
     color: #198754 !important; /* Bootstrap başarı yeşili */
     background-color: #e9f5ee !important;
 }
+
+.table-responsive {
+    max-height: 75vh; /* Ekran yüksekliğinin %75'ini kaplasın */
+    overflow-y: auto;
+}
+
+/* Ders programı gibi dikeyde kaydırılabilir tablolar için özel sınıf */
+.table-sticky-container {
+    max-height: 75vh; /* Ekran yüksekliğinin %75'i. Değeri artırıp azaltabilirsiniz. */
+    overflow-y: auto;
+    position: relative; /* Sticky pozisyonlaması için gereklidir */
+}

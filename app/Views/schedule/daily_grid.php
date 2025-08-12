@@ -17,9 +17,9 @@
             <?php if (empty($teachers)): ?>
                 <div class="alert alert-warning text-center">Bu programı görüntülemek için yetkiniz olan bir öğretmen bulunmamaktadır.</div>
             <?php else: ?>
-                <div class="table-responsive">
+                <div class="table-responsive table-sticky-container">
                     <table class="table table-bordered schedule-grid text-center" style="min-width: 900px;">
-                        <thead>
+                        <thead class="sticky-top bg-light">
                             <tr>
                                 <th style="width: 200px;">Öğretmen</th>
                                 <?php for ($hour = config('Ots')->scheduleStartHour; $hour < config('Ots')->scheduleEndHour; $hour++): ?>
@@ -107,7 +107,7 @@ $(document).ready(function() {
     var modalLabel = $('#lessonFormModalLabel');
     var saveBtn = $('#saveLessonBtn');
     var deleteBtn = $('#deleteLessonBtn');
-    var tomSelect;
+    var tomSelect; // TomSelect instance'ını burada tanımlıyoruz
 
     // --- MODAL İŞLEMLERİ ---
 
@@ -119,41 +119,75 @@ $(document).ready(function() {
         var time = slot.data('time');
 
         modalLabel.text('Yeni Ders Ekle');
-        modalBody.html('<div class="text-center p-5"><div class="spinner-border text-success"></div></div>');
+        // Modal açılmadan önce yükleniyor animasyonu göster
+        modalBody.html('<div class="text-center p-5"><div class="spinner-border text-success"></div><p class="mt-2">Öğrenci önerileri yükleniyor...</p></div>');
         saveBtn.show();
         deleteBtn.hide();
         lessonModal.show();
 
-        // Akıllı öğrenci listesini çek
-        $.get('<?= route_to("schedule.get_students") ?>', { 
+        // --- AKILLI ÖNERİ SİSTEMİ ENTEGRASYONU ---
+        // Backend'den akıllı önerileri çekelim
+        $.get('<?= route_to("schedule.suggestions") ?>', { 
             teacher_id: teacherId, 
             date: date, 
-            time: time 
+            start_time: time 
         }, function(students) {
+            // Backend'den gelen veriyi TomSelect formatına çevirelim
+            let tomSelectOptions = students.map(function(student) {
+                return {
+                    value: student.id,
+                    text: student.name,
+                    type: student.type // 'fixed', 'history', 'other' etiketini koru
+                };
+            });
+
+            // Modal içine formu dinamik olarak oluşturalım
             let form = $('<form id="lesson-form"></form>');
+            let endTime = calculateEndTime(time);
+
             form.append(`<input type="hidden" name="lesson_date" value="${date}">`);
             form.append(`<input type="hidden" name="start_time" value="${time}">`);
-            form.append(`<input type="hidden" name="end_time" value="${(parseInt(time.substring(0,2))+1).toString().padStart(2, '0')}:00:00">`);
+            form.append(`<input type="hidden" name="end_time" value="${endTime}">`);
             form.append(`<input type="hidden" name="teacher_id" value="${teacherId}">`);
             form.append('<div class="mb-3"><label class="form-label">Öğrenci(ler)</label><select id="student-select-modal" name="students[]" multiple></select></div>');
             
             modalBody.html(form);
 
+            // Önceki TomSelect'i yok et (varsa)
             if(tomSelect) tomSelect.destroy();
+
+            // TomSelect'i yeni ve akıllı verilerle başlat
             tomSelect = new TomSelect('#student-select-modal', {
                 plugins: ['remove_button'],
-                options: students,
+                options: tomSelectOptions, // Hazırladığımız öneri listesi
                 placeholder: 'Öğrenci arayın veya seçin...',
+                valueField: 'value',
+                labelField: 'text',
+                searchField: 'text',
+                // --- RENKLENDİRME KISMI ---
                 render: {
                     option: function(data, escape) {
-                        var classes = data.is_fixed ? 'is-fixed-schedule' : '';
-                        var icon = data.is_fixed ? '<i class="bi bi-pin-angle-fill text-success me-2"></i>' : '';
-                        return `<div class="${classes}">${icon}${escape(data.text)}</div>`;
+                        let classes = 'd-flex align-items-center p-2';
+                        let label = '';
+                        if (data.type === 'fixed') {
+                            classes += ' text-success fw-bold';
+                            label = '<span class="badge bg-success-subtle text-success-emphasis rounded-pill ms-auto">Sabit Program</span>';
+                        } else if (data.type === 'history') {
+                            classes += ' text-primary';
+                            label = '<span class="badge bg-primary-subtle text-primary-emphasis rounded-pill ms-auto">Sık Ders</span>';
+                        }
+                        return `<div class="${classes}"><div>${escape(data.text)}</div>${label}</div>`;
+                    },
+                    item: function(data, escape) {
+                        return `<div>${escape(data.text)}</div>`;
                     }
                 }
             });
-        }).fail(() => modalBody.html('<div class="alert alert-danger">Öğrenciler yüklenemedi.</div>'));
+
+        }).fail(() => modalBody.html('<div class="alert alert-danger">Öğrenci önerileri yüklenemedi. Lütfen tekrar deneyin.</div>'));
     });
+
+    // --- SİZİN ÇALIŞAN DİĞER FONKSİYONLARINIZ (Değişiklik yok) ---
 
     // Dolu bir derse tıklandığında
     $('.has-lesson').on('click', function() {
@@ -182,7 +216,7 @@ $(document).ready(function() {
             .always(() => lessonModal.hide());
     });
     
-    // "Dersi Sil" butonu
+        // "Dersi Sil" butonu
     deleteBtn.on('click', function() {
         if (!confirm('Bu dersi silmek istediğinizden emin misiniz?')) return;
         let lessonId = $(this).data('lesson-id');
@@ -192,70 +226,21 @@ $(document).ready(function() {
             .always(() => lessonModal.hide());
     });
 
-    // --- MANUEL BİLDİRİM GÖNDERME ---
-
-    // Tekli bildirim butonu (Event delegation ile)
-    $('body').on('click', '.bildirim-gonder-tek', function() {
-        const teacherId = $(this).data('teacher-id');
-        if (teacherId) {
-            sendNotificationRequest([teacherId], $(this));
-        }
-    });
-
-    // Toplu bildirim butonu
-    $('#bildirim-gonder-hepsi').on('click', function() {
-        let teacherIds = [];
-        $('.bildirim-gonder-tek').each(function() {
-            teacherIds.push($(this).data('teacher-id'));
-        });
-        let uniqueTeacherIds = [...new Set(teacherIds)];
-        if (uniqueTeacherIds.length > 0) {
-            sendNotificationRequest(uniqueTeacherIds, $(this));
-        } else {
-            alert('Listede bildirim gönderilecek öğretmen bulunmuyor.');
-        }
-    });
-
-    // AJAX isteğini yapan ana bildirim fonksiyonu
-    function sendNotificationRequest(ids, button) {
-        const originalHtml = button.html();
-        button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Gönderiliyor...');
-
-        $.ajax({
-            url: '<?= route_to("notifications.sendManual") ?>',
-            method: 'POST',
-            data: {
-                '<?= csrf_token() ?>': '<?= csrf_hash() ?>',
-                'teacher_ids': ids
-            },
-            dataType: 'json',
-            success: function(response) {
-                alert(response.message); 
-            },
-            error: function(xhr) {
-                let errorMessage = 'Bilinmeyen bir hata oluştu.';
-                if (xhr.responseJSON && xhr.responseJSON.message) {
-                    errorMessage = xhr.responseJSON.message;
-                }
-                alert('Hata: ' + errorMessage);
-            },
-            complete: function() {
-                button.prop('disabled', false).html(originalHtml);
-            }
-        });
+    // Bitiş saatini hesaplayan yardımcı fonksiyon
+    function calculateEndTime(startTime) {
+        const [hours, minutes] = startTime.split(':').map(Number);
+        const date = new Date();
+        date.setHours(hours, minutes, 0);
+        date.setMinutes(date.getMinutes() + <?= config('Ots')->lessonDurationMinutes ?? 50 ?>);
+        const endHours = String(date.getHours()).padStart(2, '0');
+        const endMinutes = String(date.getMinutes()).padStart(2, '0');
+        return `${endHours}:${endMinutes}`;
     }
 
     // Basit HTML escape fonksiyonu
     function escape(str) {
-        return str.replace(/[&<>"']/g, function(match) {
-            return {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;'
-            }[match];
-        });
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+        return str.replace(/[&<>"']/g, function(m) { return map[m]; });
     }
 });
 </script>

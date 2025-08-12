@@ -96,8 +96,12 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->get('get-lesson-details/(:num)', 'ScheduleController::getLessonDetails/$1', ['as' => 'schedule.get_details']);
         $routes->post('delete-lesson/(:num)', 'ScheduleController::deleteLesson/$1', ['as' => 'schedule.delete_lesson']);
         $routes->get('get-lesson-dates', 'ScheduleController::getLessonDates', ['as' => 'schedule.get_lesson_dates']);
+        
     });
     
+    // ...
+    $routes->get('schedule/suggestions', 'ScheduleController::getStudentSuggestions', ['as' => 'schedule.suggestions']);
+    // ...
     // Duyuru Yönetimi Rotaları
     $routes->group('admin/announcements', ['filter' => 'group:admin,yonetici,mudur,sekreter'], static function ($routes) {
         $routes->get('/', 'Admin\AnnouncementController::index', ['as' => 'admin.announcements.index']);
@@ -116,10 +120,14 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
     // --------------------------------------------------------------------
     $routes->group('admin', ['filter' => 'group:admin'], static function ($routes) {
 
+        $routes->get('ai-trainer', 'Admin\DataImportController::history', ['as' => 'admin.ai.trainer']);
+        $routes->post('ai-trainer', 'Admin\DataImportController::processUpload', ['as' => 'admin.ai.processUpload']);
+
   // --- SABİT DERS PROGRAMI ROTLARI ---
         $routes->group('fixed-schedule', ['namespace' => 'App\Controllers\Admin'], static function ($routes) {
         $routes->get('/', 'FixedScheduleController::index', ['as' => 'admin.fixed_schedule.index']);
         // AJAX işlemleri için rotaları daha sonra buraya ekleyeceğiz
+
  
         // --- YENİ EKLENEN AJAX ROTALARI ---
         $routes->get('get-day-details/(:num)/(:num)', 'FixedScheduleController::getDayDetails/$1/$2', ['as' => 'admin.fixed_schedule.get_details']);

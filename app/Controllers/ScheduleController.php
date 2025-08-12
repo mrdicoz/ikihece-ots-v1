@@ -230,6 +230,7 @@ class ScheduleController extends BaseController
         }
         return $this->response->setJSON(['success' => false, 'message' => 'Ders silinirken bir hata oluştu.']);
     }
+    
 
     public function getLessonDates()
 {
@@ -333,5 +334,132 @@ class ScheduleController extends BaseController
 
         return view('schedule/parent_schedule', $this->data);
     }
+
+    // 1. Mevcut getStudentSuggestions metodunu bu kodla değiştirin.
+    /**
+     * AJAX ile çağrılır. Belirli bir öğretmen ve zaman dilimi için
+     * akıllı öğrenci öneri listesi döndürür. (Pazartesi Geri Besleme Eklendi)
+     * @return \CodeIgniter\HTTP\ResponseInterface
+     */
+    public function getStudentSuggestions()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(403, 'Forbidden');
+        }
+
+        $teacherId = $this->request->getGet('teacher_id');
+        $date = $this->request->getGet('date');
+        $startTime = $this->request->getGet('start_time');
+
+        if (empty($teacherId) || empty($date) || empty($startTime)) {
+            return $this->response->setStatusCode(400, 'Eksik parametre.');
+        }
+
+        $fixedLessonModel = new \App\Models\FixedLessonModel();
+        $lessonHistoryModel = new \App\Models\LessonHistoryModel();
+
+        $dayOfWeek = date('N', strtotime($date));
+        $suggestions = [];
+        $existingStudentIds = [];
+
+        // 1. Katman: Sabit Ders Önerileri
+        $fixedStudents = $fixedLessonModel->select('s.id, s.adi, s.soyadi')
+            ->join('students s', 's.id = fixed_lessons.student_id')
+            ->where('fixed_lessons.teacher_id', $teacherId)
+            ->where('fixed_lessons.day_of_week', $dayOfWeek)
+            ->where('fixed_lessons.start_time', $startTime)
+            ->findAll();
+
+        foreach ($fixedStudents as $student) {
+            $suggestions[] = ['id' => $student['id'], 'name' => trim($student['adi'] . ' ' . $student['soyadi']), 'type' => 'fixed'];
+            $existingStudentIds[] = $student['id'];
+        }
+
+        // 2. Katman: Geçmiş Ders Önerileri
+        $teacherProfile = model('UserProfileModel')->where('user_id', $teacherId)->first();
+        $teacherFullName = $teacherProfile ? trim($teacherProfile->first_name . ' ' . $teacherProfile->last_name) : '';
+        
+        $historyStudents = [];
+        if (!empty($teacherFullName)) {
+            // A. Öncelik: Öğretmenin kendi geçmişine bak
+            $historyStudents = $lessonHistoryModel
+                ->select('student_name, COUNT(id) as lesson_count')
+                ->where('LOWER(teacher_name)', strtolower($teacherFullName))
+                ->where('start_time', $startTime)
+                ->groupBy('student_name')
+                ->orderBy('lesson_count', 'DESC')
+                ->limit(10)->findAll();
+        } 
+        
+        // B. Geri Besleme: Eğer öğretmenin geçmişi boşsa VE GÜN PAZARTESİ İSE,
+        //    genel Pazartesi verilerine bak.
+        if (empty($historyStudents) && in_array($dayOfWeek, [1, 2, 3, 4, 5, 6])) {
+            $historyStudents = $lessonHistoryModel
+                ->select('student_name, COUNT(id) as lesson_count')
+                ->where('DAYOFWEEK(lesson_date) = 2') // MySQL'de Pazar=1, Pazartesi=2
+                ->where('start_time', $startTime)
+                ->groupBy('student_name')
+                ->orderBy('lesson_count', 'DESC')
+                ->limit(10)->findAll();
+        }
+
+        // Bulunan geçmiş verilerini önerilere ekle
+        if (!empty($historyStudents)) {
+            $this->_addHistorySuggestions($historyStudents, $suggestions, $existingStudentIds);
+        }
+
+
+        // 3. Katman: Diğer Tüm Öğrenciler
+        $studentModel = new \App\Models\StudentModel();
+        $otherStudentsBuilder = $studentModel->select('id, adi, soyadi');
+        if (!empty($existingStudentIds)) {
+            $otherStudentsBuilder->whereNotIn('id', $existingStudentIds);
+        }
+        $otherStudents = $otherStudentsBuilder->orderBy('adi ASC, soyadi ASC')->findAll();
+
+        foreach ($otherStudents as $student) {
+            $suggestions[] = ['id' => $student['id'], 'name' => trim($student['adi'] . ' ' . $student['soyadi']), 'type' => 'other'];
+        }
+
+        return $this->response->setJSON($suggestions);
+    }
+
+    // 2. Bu yeni yardımcı metodu Controller dosyanızın SONUNA ekleyin.
+    /**
+     * Geçmiş verilerinden gelen öğrenci isimlerini bulur ve ana öneri listesine ekler.
+     * @param array $historyStudents
+     * @param array $suggestions
+     * @param array $existingStudentIds
+     */
+    private function _addHistorySuggestions(array $historyStudents, array &$suggestions, array &$existingStudentIds)
+    {
+        $studentModel = new \App\Models\StudentModel();
+        $studentNames = array_column($historyStudents, 'student_name');
+
+        if (empty($studentNames)) {
+            return;
+        }
+
+        $builder = $studentModel->select('id, adi, soyadi');
+        $builder->groupStart();
+        foreach ($studentNames as $name) {
+            $builder->orWhere('LOWER(CONCAT(adi, " ", soyadi))', strtolower(trim($name)));
+        }
+        $builder->groupEnd();
+        $studentDetails = $builder->findAll();
+
+        foreach ($studentDetails as $student) {
+            if (!in_array($student['id'], $existingStudentIds)) {
+                $suggestions[] = [
+                    'id' => $student['id'], 
+                    'name' => trim($student['adi'] . ' ' . $student['soyadi']), 
+                    'type' => 'history'
+                ];
+                $existingStudentIds[] = $student['id'];
+            }
+        }
+    }
+
+    
 
 }
