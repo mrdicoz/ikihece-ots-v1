@@ -21,4 +21,21 @@ class FixedLessonModel extends Model
 
     // Dates
     protected $useTimestamps = false; // Bu tabloda created_at/updated_at kullanmıyoruz.
+
+    /**
+     * YENİ FONKSİYON
+     * Bir öğretmenin tüm sabit ders programını, öğrenci isimleriyle birlikte getirir.
+     *
+     * @param int $teacherId Öğretmenin kullanıcı ID'si
+     * @return array
+     */
+    public function getFixedScheduleForTeacher(int $teacherId): array
+    {
+        return $this->select('fixed_lessons.day_of_week, fixed_lessons.start_time, fixed_lessons.end_time, s.adi, s.soyadi')
+            ->join('students s', 's.id = fixed_lessons.student_id')
+            ->where('fixed_lessons.teacher_id', $teacherId)
+            ->orderBy('fixed_lessons.day_of_week', 'ASC')
+            ->orderBy('fixed_lessons.start_time', 'ASC')
+            ->findAll();
+    }
 }

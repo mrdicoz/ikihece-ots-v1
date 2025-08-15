@@ -20,7 +20,7 @@ if ($isLoggedIn) {
             
             <ul class="navbar-nav">
                 <?php // --- LİNKLERİN TAMAMI DÜZELTİLDİ --- ?>
-                
+
                 <?php if (in_array($activeRole, ['admin', 'yonetici', 'mudur', 'sekreter'])): ?>
                     <li class="nav-item"><a class="nav-link" href="<?= site_url('students') ?>"><i class="bi bi-backpack2"></i> Öğrenci Yönetimi</a></li>
                      <li class="nav-item dropdown">
@@ -31,13 +31,20 @@ if ($isLoggedIn) {
                             <li><a class="dropdown-item" href="<?= route_to('schedule.index') ?>"><i class="bi bi-calendar-plus"></i> Program Oluştur</a></li>
                             <li><a class="dropdown-item" href="<?= route_to('admin.fixed_schedule.index') ?>"><i class="bi bi-pin-angle-fill"></i> Sabitler</a></li>
                         </ul>
+                    
                     </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="<?= route_to('ai.assistant') ?>"><i class="bi bi-robot"></i> Yapay Zeka Asistanı</a>
+                </li>
                 <?php endif; ?>
 
                 <?php if ($activeRole === 'ogretmen'): ?>
                     <li class="nav-item"><a class="nav-link" href="<?= route_to('schedule.my') ?>"><i class="bi bi-calendar-week"></i> Ders Programım</a></li>
                     <li class="nav-item"><a class="nav-link" href="<?= route_to('students.my') ?>"><i class="bi bi-people"></i> Öğrencilerim</a></li>
-                <?php endif; ?>
+                                <li class="nav-item">
+                    <a class="nav-link" href="<?= route_to('ai.assistant') ?>"><i class="bi bi-robot"></i> Yapay Zeka Asistanı</a>
+                </li>
+                    <?php endif; ?>
                 
                 <?php if ($activeRole === 'veli'): ?>
                     <li class="nav-item"><a class="nav-link" href="<?= route_to('parent.schedule') ?>"><i class="bi bi-calendar-check"></i> Çocuğumun Programı</a></li>

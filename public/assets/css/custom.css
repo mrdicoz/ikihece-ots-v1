@@ -258,3 +258,79 @@
     overflow-y: auto;
     position: relative; /* Sticky pozisyonlaması için gereklidir */
 }
+
+/*chat sayfası
+
+    /* Ana layout'un kalan alanı doldurmasını sağla */
+    .d-flex.flex-column.h-100 {
+        /* Gerekirse, üst navigasyon çubuğu gibi sabit bir elementin yüksekliğini çıkarabilirsiniz */
+        /* Örneğin: height: calc(100vh - 60px) !important; */
+        /* Şimdilik h-100 yeterli olacaktır. */
+    }
+
+    /* Sohbet mesajlarının genel kapsayıcısı */
+    .chat-message-wrapper {
+        margin-bottom: 1.5rem; /* Mesajlar arası boşluk */
+    }
+
+    /* Sohbet balonlarının temel stili */
+    .chat-bubble {
+        padding: 0.75rem 1.25rem;
+        border-radius: 1.25rem;
+        max-width: 80%;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    
+    /* Kullanıcı balonu (sağda, yeşil tonlu) */
+    .user-bubble {
+        background-color: #d1e7dd; /* Yumuşak yeşil */
+        color: #0f5132;
+        border-bottom-right-radius: 0.5rem;
+    }
+    
+    /* Asistan balonu (solda, beyaz) */
+    .ai-bubble {
+        background-color: #ffffff;
+        border: 1px solid #dee2e6;
+        border-bottom-left-radius: 0.5rem;
+    }
+
+    /* === Balon Oku Efektleri (CSS Pseudo-elements) === */
+    .user-bubble::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        right: -8px;
+        width: 0;
+        height: 0;
+        border: 12px solid transparent;
+        border-left-color: #d1e7dd;
+        border-bottom-color: #d1e7dd;
+        border-right: 0;
+        border-top: 0;
+    }
+    
+    .ai-bubble::before {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: -8px;
+        width: 0;
+        height: 0;
+        border: 12px solid transparent;
+        border-right-color: #ffffff;
+        border-bottom-color: #ffffff;
+        border-left: 0;
+        border-top: 0;
+    }
+    /* === Ok Efektleri Bitiş === */
+
+
+    /* Markdown içeriği için stiller (önceki versiyondaki gibi) */
+    .markdown-content p:last-child { margin-bottom: 0; }
+    .markdown-content { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #343a40; }
+    .markdown-content h1, .markdown-content h2, .markdown-content h3 { margin-top: 1em; margin-bottom: 0.5em; font-weight: 600; border-bottom: 1px solid #eee; padding-bottom: .3em; }
+    .markdown-content ul, .markdown-content ol { padding-left: 2em; margin-bottom: 1em; }
+    .markdown-content li { margin-bottom: 0.5em; }
+    .markdown-content code { background-color: #e9ecef; padding: 0.2em 0.4em; margin: 0; font-size: 85%; border-radius: 6px; }
+    .markdown-content pre { background-color: #f8f9fa; padding: 1em; border-radius: 5px; overflow-x: auto; border: 1px solid #dee2e6; }

@@ -121,6 +121,19 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
     $routes->post('notifications/send-manual', 'NotificationController::sendManualNotification', ['filter' => 'group:admin,yonetici,mudur,sekreter', 'as' => 'notifications.sendManual']);
     
     // --------------------------------------------------------------------
+    // YAPAY ZEKÂ GRUBU (Sadece 'admin,yonetici,mudur,sekreter,ogretmen' grubundakiler erişebilir)
+    // --------------------------------------------------------------------
+    $routes->group('ai', ['filter' => 'group:admin,yonetici,mudur,sekreter,ogretmen'], static function ($routes) {
+    // Yapay Zeka Asistanı sayfası için GET rotası
+    $routes->get('assistant', 'AIController::assistantView', ['as' => 'ai.assistant']);
+    // Kullanıcının mesajını işlemek için POST rotası
+    $routes->post('assistant', 'AIController::processMessage', ['as' => 'ai.processMessage']);
+    // AJAX işlemleri için POST rotası
+    $routes->post('ai/process', 'AIController::processAjax', ['as' => 'ai.process']);
+});
+
+
+    // --------------------------------------------------------------------
     // ADMİN GRUBU (Sadece 'admin' grubundakiler erişebilir)
     // --------------------------------------------------------------------
     $routes->group('admin', ['filter' => 'group:admin'], static function ($routes) {
