@@ -2,25 +2,59 @@
 
 namespace App\Controllers;
 
+// Gerekli tüm sınıfları ve modelleri ekliyoruz
+use App\Libraries\AIService;
+use App\Models\AuthGroupsUsersModel;
 use App\Models\InstitutionModel;
+use App\Models\StudentModel;
 use App\Models\UserProfileModel;
 use App\Models\LessonModel;
 use App\Models\FixedLessonModel;
-use App\Models\LessonHistoryModel;
 use App\Models\ReportModel;
-use App\Models\StudentModel; 
-use App\Libraries\AIService;
+use App\Models\LessonHistoryModel;
+use App\Models\LogModel;
 use CodeIgniter\HTTP\RedirectResponse;
-use CodeIgniter\I18n\Time;
+use CodeIgniter\HTTP\ResponseInterface;
 use CodeIgniter\Shield\Models\UserModel;
+use Smalot\PdfParser\Parser;
 
 class AIController extends BaseController
 {
-
+    /**
+     * AI sohbet arayüzünü, geçmiş konuşmaları ve role özel örnek komutları gösterir.
+     */
     public function assistantView(): string
     {
-        $this->data['title']    = 'Yapay Zeka Asistanı';
+        $this->data['title']       = 'İkihece AI Asistanı';
         $this->data['chatHistory'] = session()->get('ai_chat_history') ?? [];
+
+        $currentUser = auth()->user();
+        $samplePrompts = [];
+
+        if ($currentUser && $currentUser->inGroup('admin', 'yonetici', 'mudur', 'sekreter')) {
+            $samplePrompts = [
+                'Bu ay en çok ders veren öğretmen kim?',
+                'Geçen ayki genel faaliyet raporunu özetler misin?',
+                'Bu ay hiç ders almayan öğrencileri veli telefonlarıyla listele.',
+                'Kurumda kaç tane aktif öğretmenimiz var?',
+                'En son yapılan 10 sistem işlemini göster.',
+                'Yarın ders programında boşluk var mı? Hangi hocalar müsait?',
+                '[Öğretmen Adı Soyadı]\'nın sabit haftalık ders programı nasıl?',
+                '[Öğretmen Adı Soyadı]\'nın yarınki boş saatleri için öğrenci öner.'
+            ];
+        } 
+        elseif ($currentUser && $currentUser->inGroup('ogretmen')) {
+            $samplePrompts = [
+                'Bu haftaki ders programım nedir?',
+                'Öğrencim [Öğrenci Adı Soyadı]\'nın kalan ders hakları ne kadar?',
+                'Yarınki derslerimi listeler misin?',
+                'Öğrencim [Öğrenci Adı Soyadı]\'nın veli telefon numarası nedir?',
+                'Öğrencim [Öğrenci Adı Soyadı]\'nın RAM raporunda öne çıkanlar nelerdir?',
+                'Sabit haftalık ders programımı göster.'
+            ];
+        }
+        
+        $this->data['samplePrompts'] = $samplePrompts;
 
         return view('ai/assistant_view', $this->data);
     }
@@ -28,337 +62,435 @@ class AIController extends BaseController
     /**
      * AJAX isteklerini işler ve JSON yanıtı döndürür.
      */
-    public function processAjax(): \CodeIgniter\HTTP\ResponseInterface
+    public function processAjax(): ResponseInterface
     {
         $userMessage = trim($this->request->getPost('message'));
         if (empty($userMessage)) {
             return $this->response->setJSON(['error' => 'Mesaj boş olamaz.'])->setStatusCode(400);
         }
-        $userMessageLower = mb_strtolower($userMessage, 'UTF-8');
-        
-        // Önceki tüm context oluşturma mantığı burada çalışacak
-        // ... (Tüm model tanımlamaları, context oluşturma ve AI çağırma kodları buraya kopyalanacak)
-        // NOT: Sadece en temel context oluşturma mantığını ekliyorum, sizdeki tam sürümü kullanabilirsiniz.
-        $institutionModel = new \App\Models\InstitutionModel();
-        $institution = $institutionModel->first();
-        $context = "[BAĞLAM BAŞLANGICI]\n";
-        $context .= "== Kurum Bilgileri ==\n";
-        if ($institution) {
-             $context .= "Kurumun Tam Adı: " . $institution->kurum_adi . "\n";
+        try {
+            $aiResponse = $this->generateAIResponse($userMessage);
+            $chatHistory   = session()->get('ai_chat_history') ?? [];
+            $chatHistory[] = ['user' => $userMessage, 'ai' => $aiResponse];
+            session()->set('ai_chat_history', $chatHistory);
+            return $this->response->setJSON(['status' => 'success', 'response' => $aiResponse]);
+        } catch (\Exception $e) {
+            log_message('error', '[AIController Hata] ' . $e->getMessage() . '\n' . $e->getTraceAsString());
+            return $this->response->setJSON(['status' => 'error', 'response' => 'Bir hata oluştu, lütfen tekrar deneyin.']);
         }
-        $context .= "[BAĞLAM SONU]\n";
-
-        $systemPrompt = "Sen İkihece Asistan'sın..."; // (systemPrompt tanımınız burada olacak)
-        
-        $aiService = new \App\Libraries\AIService();
-        $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
-        $aiResponse = $aiService->getChatResponse($userPrompt, $systemPrompt);
-
-        // Sohbet geçmişini oturuma kaydet
-        $chatHistory = session()->get('ai_chat_history') ?? [];
-        $chatHistory[] = [
-            'user' => $userMessage,
-            'ai'   => $aiResponse,
-            'timestamp' => date('Y-m-d H:i:s')
-        ];
-        session()->set('ai_chat_history', $chatHistory);
-
-        // Cevabı JSON olarak döndür
-        return $this->response->setJSON(['status' => 'success', 'response' => $aiResponse]);
     }
 
-    public function processMessage(): RedirectResponse
-    {
-        $userMessage = trim($this->request->getPost('message'));
-        if (empty($userMessage)) {
-            return redirect()->back()->with('error', 'Lütfen bir mesaj girin.');
-        }
-        $userMessageLower = mb_strtolower($userMessage, 'UTF-8');
-
-        // === 1. MODELLER VE TEMEL BİLGİLER ===
-        $institutionModel = new InstitutionModel();
-        $userModel        = new UserModel();
-        $userProfileModel = new UserProfileModel();
-        $reportModel      = new ReportModel();
-        $fixedLessonModel = new FixedLessonModel();
-        $historyModel     = new LessonHistoryModel();
-        $studentModel     = new StudentModel(); 
-
-        
-        $institution = $institutionModel->first();
-        $currentUser = auth()->user();
-        $userName    = $currentUser->username;
-        $totalStudents = $studentModel->where('deleted_at', null)->countAllResults(); 
-
-        $context = "[BAĞLAM BAŞLANGICI]\n";
-
-        // === 2. BAĞLAM OLUŞTURMA (KATMANLI YAPI) ===
-        
-        // --- TEMEL KATMAN: Her sorguda bu bilgiler mutlaka eklenir ---
-        $this->buildInstitutionContext($context, $institution, $totalStudents);
-        $this->buildUserGroupContext($context, $userModel);
-
-        // --- KONU BAZLI KATMANLAR: Anahtar kelimelere göre ek bilgiler eklenir ---
-        $capabilityKeywords    = ['selam', 'merhaba', 'ne yapabilirsin', 'yardım', 'yeteneklerin'];
-        $reportKeywords        = ['rapor', 'geçmiş', 'performans', 'özet', 'döküm', 'kaç ders', 'boşta'];
-        $fixedScheduleKeywords = ['sabit ders', 'sabitders', 'boş saat', 'öneri', 'alternatif', 'boşluk', 'bugün', 'perşembe', 'pazartesi', 'salı', 'çarşamba', 'cuma'];
-
-        if ($this->containsKeywords($userMessageLower, $capabilityKeywords)) {
-            $this->buildCapabilitiesContext($context);
-        }
-        if ($this->containsKeywords($userMessageLower, $fixedScheduleKeywords)) {
-            $this->buildFixedScheduleContext($context, $userMessageLower, $currentUser, $userName, $userProfileModel, $fixedLessonModel, $historyModel);
-        }
-        if ($this->containsKeywords($userMessageLower, $reportKeywords)) {
-            $this->buildReportContext($context, $reportModel);
-        }
-        
-        $context .= "[BAĞLAM SONU]\n";
-
-        // YENİ: Kişilik katmanını alıyoruz
-        $personalityLayer = $this->getPersonalityLayer();
-        
-        // === 3. SİSTEM TALİMATI (PROMPT) OLUŞTURMA ===
-        $systemPrompt = "Sen İkihece Asistan'sın." . $personalityLayer; // Kişilik katmanı dinamik olarak ekleniyor.
-        $systemPrompt .= " Temel görevin, [BAĞLAM BAŞLANGICI] ve [BAĞLAM SONU] arasındaki metinde yer alan bilgileri kullanarak kullanıcının sorusunu cevaplamaktır. Bu bağlamın dışına KESİNLİKLE çıkma.";
-        
-        // Eğer kişilik katmanı boşsa (yani espri yapma zamanı değilse), katı kurallar geçerli.
-        if (empty($personalityLayer)) {
-             $systemPrompt .= " Eğer sorunun cevabı bağlamda yoksa, sadece 'Bu konuda sistemde bir bilgi bulamadım.' yanıtını ver.";
-        } else {
-            // Eğer espri yapma zamanıysa, daha esnek hata mesajları kullanabilir.
-            $systemPrompt .= " EĞER SORUNUN CEVABI BAĞLAMDA YOKSA, ASLA 'bilgi bulamadım' deme. Bunun yerine durumu esprili bir dille açıkla. Örneğin, 'Sanırım bu konuda eski sekreter Aynur Hanım gibi oldum, bir an boşluğuma geldi!' gibi cevaplar ver.";
-            $systemPrompt .= " Başarılı olduğunda ise 'Aynur Hanım bunu asla bu kadar hızlı bulamazdı!' gibi övünmeyi unutma.";
-        }
-
-        // === 4. YAPAY ZEKADAN YANIT ALMA ===
-        $aiService = new AIService();
-        $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
-        $aiResponse = $aiService->getChatResponse($userPrompt, $systemPrompt);
-
-        // === 5. YENİ: SOHBET GEÇMİŞİNİ GÜNCELLEME ===
-        // Önceki geçmişi oturumdan al, eğer yoksa boş bir dizi oluştur
-        $chatHistory = session()->get('ai_chat_history') ?? [];
-
-        // Yeni soru-cevabı geçmişe ekle
-        $chatHistory[] = [
-            'user' => $userMessage,
-            'ai'   => $aiResponse,
-            'user_info' => [
-                'name' => $userProfile->first_name ?? $currentUser->username,
-                'role' => $userGroup
-            ]
-        ];
-
-        // Güncellenmiş geçmişi tekrar oturuma kaydet
-        session()->set('ai_chat_history', $chatHistory);
-        
-        // Flashdata'yı artık kullanmıyoruz çünkü tüm geçmişi gönderiyoruz.
-        // session()->setFlashdata('response', $aiResponse);
-        // session()->setFlashdata('message', 'userMessage);
-
-        return redirect()->to(route_to('ai.assistant'));
-    }
-
-    // === YENİ YARDIMCI FONKSİYON: KİŞİLİK KATMANI ===
     /**
-     * Mevsime ve diğer durumlara göre asistana kişilik özellikleri ekler.
-     * @return string
+     * FİNAL VERSİYON: Ana AI yanıt oluşturma mantığı.
      */
-    private function getPersonalityLayer(): string
+    private function generateAIResponse(string $userMessage): string
     {
-        $session = session();
-        $today = date('Y-m-d');
+        $currentUser = auth()->user();
+        if ($currentUser === null) return 'Lütfen önce sisteme giriş yapın.';
 
-        // Eğer gün değiştiyse, günlük espri sayacını ve sorgu sayacını sıfırla
-        if ($session->get('joke_date') !== $today) {
-            $session->set('joke_count_today', 0);
-            $session->set('joke_date', $today);
-            $session->set('message_count_since_joke', 0);
+        $userMessageLower = $this->turkish_strtolower($userMessage);
+        $isTeacherOnly = $currentUser->inGroup('ogretmen') && !$currentUser->inGroup('admin', 'yonetici', 'mudur');
+        
+        // --- YETKİ KONTROLÜ ---
+        $studentIdForAuthCheck = $this->findStudentIdInMessage($userMessageLower);
+        if ($isTeacherOnly && $studentIdForAuthCheck && !(new StudentModel())->isStudentOfTeacher($studentIdForAuthCheck, $currentUser->id)) {
+            return 'Sadece kendi ders programınızda kayıtlı öğrenciler hakkında bilgi alabilirsiniz.';
         }
-
-        $jokeCountToday = (int) $session->get('joke_count_today');
-        $messageCountSinceJoke = (int) $session->get('message_count_since_joke');
-
-        // Her sorguda, son espriden bu yana geçen mesaj sayısını artır
-        $session->set('message_count_since_joke', $messageCountSinceJoke + 1);
-
-        // Espri yapma koşulu: Günde 3'ten az espri yapılmış OLMALI ve son espriden bu yana en az 15 sorgu geçmiş OLMALI
-        if ($jokeCountToday < 3 && $messageCountSinceJoke >= 15) {
-            // Koşul sağlandı, espri yapma zamanı!
-            $session->set('joke_count_today', $jokeCountToday + 1);
-            $session->set('message_count_since_joke', 0); // Sorgu sayacını sıfırla
-
-            $month = date('n');
-            $personality = " Esprili, biraz dertli ama her zaman yardımsever bir karakterin var.";
-
-            if (in_array($month, [6, 7, 8])) {
-                $personality .= " Bu arada havalar da çok sıcak, klimalar bile yetmiyor.";
-            } elseif (in_array($month, [12, 1, 2])) {
-                $personality .= " Bu soğukta çalışmak da zor... Dışarıda kar yağıyor galiba.";
-            }
-            
-            $personality .= " Beni yaratan mimarım Murad İçöz'e minnettarım.";
-            return $personality;
+        $systemUserIdForAuthCheck = $this->findSystemUserIdInMessage($userMessageLower);
+        if ($isTeacherOnly && $systemUserIdForAuthCheck && $systemUserIdForAuthCheck !== $currentUser->id) {
+            return 'Sadece kendi bilgileriniz hakkında soru sorabilirsiniz.';
         }
+        
+        $context = "[BAĞLAM BAŞLANGICI]\n";
+        $this->buildUserContext($context);
+        $this->buildInstitutionContext($context);
 
-        // Koşullar sağlanmadıysa, bu seferlik espri yapma (boş string döndür)
-        return '';
+        $this->buildComprehensiveContext($context, $userMessageLower, $currentUser, $isTeacherOnly);
+        
+        $context .= "[BAĞLAM SONU]\n";
+        
+        $systemPrompt = "Sen İkihece AI asistanısın. Görevin, [BAĞLAM BAŞLANGICI] ve [BAĞLAM SONU] arasındaki bilgileri kullanarak kullanıcının sorusunu cevaplamaktır. Cevaplarını maddeler halinde veya kolay okunur paragraflar şeklinde, profesyonel bir dille sun. Bağlamdaki 'Aktif Kullanıcı' bilgisine göre kullanıcıya ismiyle hitap et. Bu bağlamın dışına KESİNLİKLE çıkma. Eğer sorunun cevabı bağlamda yoksa, sadece 'Bu konuda sistemde bir bilgi bulamadım.' yanıtını ver.";
+        
+        $aiService  = new AIService();
+        $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
+        return $aiService->getChatResponse($userPrompt, $systemPrompt);
     }
 
-    // --- YARDIMCI METOTLAR ---
-
-    private function buildCapabilitiesContext(&$context)
+    private function buildComprehensiveContext(string &$context, string $userMessageLower, object $currentUser, bool $isTeacherOnly): void
     {
-        $context .= "\n== Yeteneklerim ve Veri Erişimim ==\n";
-        $context .= "Ben İkihece OTS Asistanıyım. Aşağıdaki konularda sana yardımcı olabilirim:\n";
-        $context .= "- Kurum Bilgileri: Kurumun adı, adresi, vergi numarası gibi tüm genel bilgilerine erişimim var.\n";
-        $context .= "- Kullanıcı ve Gruplar: Sistemdeki tüm kullanıcıları ve rollerini (öğretmen, yönetici vb.) listeleyebilirim.\n";
-        $context .= "- Geçmiş Veri Raporlama: Aylık ders özetleri, öğrenci/öğretmen performans raporları ve ders almayan öğrencileri listeleyebilirim.\n";
-        $context .= "- Sabit Ders Programı ve Öneriler: Bir öğretmenin sabit ders programını listeleyebilir, boş saatlerini bulabilir ve bu boş saatler için geçmiş derslere göre aktif öğrenci önerebilirim.\n";
+        $intentProcessed = false;
+        
+        $availabilityKeywords = ['boşluk', 'boş saat', 'müsait', 'öneri', 'öner', 'tavsiye'];
+        $reportKeywords = ['rapor', 'istatistik', 'özet', 'en çok', 'en az', 'ders almayanlar'];
+        $fixedScheduleKeywords = ['sabit program', 'haftalık programı', 'sabit dersleri'];
+        $scheduleKeywords = ['ders programı', 'takvim', 'dersi var mı', 'programı ne', 'derslerim'];
+        $logKeywords = ['log', 'kayıtlar', 'hareketler', 'aktivite', 'kim ne yaptı', 'işlem geçmişi'];
+        $teacherListKeywords = ['öğretmenleri listele', 'öğretmen listesi', 'öğretmenler kim', 'isimlerini listele'];
+        $teacherCountKeywords = ['kaç öğretmen', 'öğretmen sayısı'];
+
+        if ($this->containsKeywords($userMessageLower, $availabilityKeywords)) {
+            $this->buildAvailabilityContext($context, $userMessageLower);
+            $intentProcessed = true;
+        } elseif (!$isTeacherOnly && $this->containsKeywords($userMessageLower, $reportKeywords)) {
+            $this->buildReportContext($context, $userMessageLower);
+            $intentProcessed = true;
+        } elseif ($this->containsKeywords($userMessageLower, $fixedScheduleKeywords)) {
+            $this->buildFixedScheduleContext($context, $userMessageLower);
+            $intentProcessed = true;
+        } elseif ($this->containsKeywords($userMessageLower, $scheduleKeywords)) {
+            $this->buildLessonScheduleContext($context, $userMessageLower);
+            $intentProcessed = true;
+        } elseif (!$isTeacherOnly && $this->containsKeywords($userMessageLower, $logKeywords)) {
+            $this->buildLogContext($context, $userMessageLower);
+            $intentProcessed = true;
+        } elseif (!$isTeacherOnly && $this->containsKeywords($userMessageLower, $teacherCountKeywords)) {
+            $this->buildTeacherCountContext($context);
+            $intentProcessed = true;
+        } elseif (!$isTeacherOnly && $this->containsKeywords($userMessageLower, $teacherListKeywords)) {
+            $this->buildTeacherListContext($context);
+            $intentProcessed = true;
+        }
+
+        if (!$intentProcessed) {
+            $studentId = $this->findStudentIdInMessage($userMessageLower);
+            if ($studentId) {
+                $this->buildStudentContext($context, $userMessageLower, $studentId);
+            }
+        }
     }
     
-    private function buildInstitutionContext(&$context, $institution, $totalStudents)
+    // ===================================================================
+    // TÜM build... ve yardımcı fonksiyonlar (EKSİKSİZ VE HATASIZ)
+    // ===================================================================
+    
+    private function buildUserContext(string &$context): void
     {
+        $currentUser = auth()->user();
+        $activeRole  = session()->get('active_role') ?? ($currentUser->getGroups()[0] ?? 'tanımsız');
+        $userProfile = (new UserProfileModel())->where('user_id', $currentUser->id)->first();
+        $userName    = trim(($userProfile->first_name ?? '') . ' ' . ($userProfile->last_name ?? '')) ?: $currentUser->username;
+
+        $context .= "== Aktif Kullanıcı Bilgileri ==\n";
+        $context .= "Adı Soyadı: " . $userName . "\n";
+        $context .= "Sistemdeki Rolü: " . $activeRole . "\n";
+    }
+
+    private function buildInstitutionContext(string &$context): void
+    {
+        $institution = (new InstitutionModel())->first();
         $context .= "== Kurum Bilgileri ==\n";
         if ($institution) {
-                if (!empty($institution->kurum_adi)) $context .= "Kurumun Tam Adı: " . $institution->kurum_adi . "\n";
-                if (!empty($institution->kurum_kisa_adi)) $context .= "Kurumun Kısa Adı: " . $institution->kurum_kisa_adi . "\n";
-                if (!empty($institution->sirket_adi)) $context .= "Bağlı Olduğu Şirket: " . $institution->sirket_adi . "\n";
-                if (!empty($institution->kurum_kodu)) $context .= "Kurum Kodu: " . $institution->kurum_kodu . "\n";
-                if (!empty($institution->sabit_telefon)) $context .= "Sabit Telefon: " . $institution->sabit_telefon . "\n";
-                if (!empty($institution->adresi)) $context .= "Adres: " . $institution->adresi . "\n";
-                if (!empty($institution->web_sayfasi)) $context .= "Web Sitesi: " . $institution->web_sayfasi . "\n";
-                if (!empty($institution->epostasi)) $context .= "E-posta: " . $institution->epostasi . "\n";
-                if (!empty($institution->kurum_vergi_dairesi)) $context .= "Vergi Dairesi: " . $institution->kurum_vergi_dairesi . "\n";
-                if (!empty($institution->kurum_vergi_no)) $context .= "Vergi Numarası: " . $institution->kurum_vergi_no . "\n";
+            if (!empty($institution->kurum_adi)) $context .= "Kurum Adı: {$institution->kurum_adi}\n";
+            if (!empty($institution->sabit_telefon)) $context .= "Telefon: {$institution->sabit_telefon}\n";
+            if (!empty($institution->epostasi)) $context .= "E-posta: {$institution->epostasi}\n";
         } else {
             $context .= "Sistemde kayıtlı kurum bilgisi bulunamadı.\n";
         }
-           // YENİ EKLENEN SATIR:
-            $context .= "Sistemde kayıtlı toplam aktif öğrenci sayısı: " . $totalStudents . "\n";
     }
 
-    private function buildUserGroupContext(&$context, $userModel)
+    private function buildAvailabilityContext(string &$context, string $userMessageLower): void
     {
-        $usersWithGroups = $userModel->select('users.username, up.first_name, up.last_name, agu.group')->join('user_profiles as up', 'up.user_id = users.id', 'left')->join('auth_groups_users as agu', 'agu.user_id = users.id', 'left')->orderBy('agu.group', 'ASC')->orderBy('up.first_name', 'ASC')->asObject()->findAll();
-        $groupedUsers = [];
-        foreach ($usersWithGroups as $user) {
-            $group = $user->group ?? 'Grup Atanmamış';
-            $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: $user->username;
-            $groupedUsers[$group][] = $fullName;
+        $teacherId = $this->findSystemUserIdInMessage($userMessageLower);
+        $date = date('Y-m-d');
+        if (str_contains($userMessageLower, 'yarın')) $date = date('Y-m-d', strtotime('+1 day'));
+
+        $context .= "\n== {$date} Tarihli Müsaitlik Durumu ==\n";
+        
+        $teachersToScan = [];
+        if ($teacherId) {
+            $user = (new UserModel())->find($teacherId);
+            if ($user) $teachersToScan[] = $user;
+        } else {
+            $teachersToScan = (new UserModel())->select('users.id, first_name, last_name')
+                ->join('auth_groups_users agu', 'agu.user_id = users.id')
+                ->join('user_profiles up', 'up.user_id = users.id', 'left')
+                ->where('agu.group', 'ogretmen')->where('users.deleted_at', null)->findAll();
         }
-        $context .= "\n== Kullanıcı ve Grup Bilgileri ==\n";
-        foreach ($groupedUsers as $groupName => $users) {
-            $context .= "**" . ucfirst($groupName) . " Grubu:** " . implode(', ', $users) . "\n";
+
+        if (empty($teachersToScan)) {
+            $context .= "Sistemde sorgulanacak aktif öğretmen bulunamadı.\n";
+            return;
+        }
+
+        $otsConfig = config('Ots');
+        $allLessonsToday = (new LessonModel())->where('lesson_date', $date)->findAll();
+        $historyModel = new LessonHistoryModel();
+        $dayOfWeek = (int)date('N', strtotime($date));
+        
+        foreach ($teachersToScan as $teacher) {
+            $userProfile = (new UserProfileModel())->where('user_id', $teacher->id)->first();
+            $teacherFullName = "{$userProfile->first_name} {$userProfile->last_name}";
+            $context .= "\n**{$teacherFullName}**:\n";
+            
+            $bookedSlots = [];
+            foreach($allLessonsToday as $lesson) {
+                if ($lesson['teacher_id'] == $teacher->id) {
+                    $bookedSlots[] = substr($lesson['start_time'], 0, 5);
+                }
+            }
+
+            $emptySlots = [];
+            for ($hour = $otsConfig->scheduleStartHour; $hour < $otsConfig->scheduleEndHour; $hour++) {
+                $timeSlot = str_pad((string)$hour, 2, '0', STR_PAD_LEFT) . ':00';
+                if (!in_array($timeSlot, $bookedSlots)) $emptySlots[] = $timeSlot;
+            }
+
+            if (empty($emptySlots)) {
+                $context .= "- Bu tarihte boş saati bulunmuyor.\n";
+                continue;
+            }
+            
+            $suggestionKeywords = ['öner', 'öneri', 'tavsiye et'];
+            if ($this->containsKeywords($userMessageLower, $suggestionKeywords)) {
+                $teacherSuggestionsFound = false;
+                foreach ($emptySlots as $slot) {
+                    $studentSuggestions = $historyModel->getStudentSuggestionsForSlot($dayOfWeek, $slot . ':00');
+                    if (!empty($studentSuggestions)) {
+                        $teacherSuggestionsFound = true;
+                        $studentNames = array_column($studentSuggestions, 'student_name');
+                        $context .= "- **{$slot}** için önerilenler: " . implode(', ', $studentNames) . "\n";
+                    }
+                }
+                if (!$teacherSuggestionsFound) {
+                    $context .= "- Boş saatleri (" . implode(', ', $emptySlots) . ") mevcut, ancak bu saatlere uygun öğrenci önerisi bulunamadı.\n";
+                }
+            } else {
+                $context .= "- Müsait saatler: " . implode(', ', $emptySlots) . "\n";
+            }
         }
     }
-
-    private function buildReportContext(&$context, $reportModel)
+    
+    private function buildReportContext(string &$context, string $userMessageLower): void
     {
-        $reportDate = Time::now('Europe/Istanbul');
-        $year = $reportDate->getYear();
-        $month = $reportDate->getMonth();
-        $summary = $reportModel->getMonthlySummary($year, $month);
-
-        if (($summary['total_hours'] ?? 0) === 0) {
-            $reportDate = $reportDate->subMonths(1);
-            $year = $reportDate->getYear();
-            $month = $reportDate->getMonth();
-            $summary = $reportModel->getMonthlySummary($year, $month);
+        $reportModel = new ReportModel();
+        $year = date('Y');
+        $month = date('m');
+        if(str_contains($userMessageLower, 'geçen ay')) {
+            $date = strtotime('-1 month');
+            $year = date('Y', $date);
+            $month = date('m', $date);
         }
+        $context .= "\n== Rapor ve İstatistik Bilgileri ({$year}-{$month}) ==\n";
 
-        $monthName = $reportDate->toLocalizedString('MMMM');
-
-        $context .= "\n== Geçmiş Veri Raporu ({$monthName} {$year}) ==\n";
-        if (($summary['total_hours'] ?? 0) > 0) {
-            $context .= "**Genel Özet:** Toplam {$summary['total_hours']} saat ders yapıldı (Bireysel: {$summary['total_individual']}, Grup: {$summary['total_group']}).\n";
+        if ($this->containsKeywords($userMessageLower, ['ders almayan'])) {
+            $inactiveStudents = $reportModel->getStudentsWithNoLessons($year, $month);
+            $context .= "Bu Ay Ders Almayan Aktif Öğrenciler:\n";
+            if (empty($inactiveStudents)) $context .= "- Bu ay ders almayan öğrenci bulunmamaktadır.\n";
+            else foreach($inactiveStudents as $s) $context .= "- {$s['student_name']} (Veli Tel: {$s['veli_anne_telefon']} / {$s['veli_baba_telefon']})\n";
+        } elseif ($this->containsKeywords($userMessageLower, ['en çok'])) {
             $teacherReport = $reportModel->getDetailedTeacherReport($year, $month);
-            if (!empty($teacherReport)) {
-                $context .= "**Öğretmen Performansları:**\n";
-                foreach ($teacherReport as $teacher) {
-                    $teacherName = ($teacher['first_name'] ?? '') . ' ' . ($teacher['last_name'] ?? '');
-                    if(trim($teacherName) !== '') {
-                         $context .= "- {$teacherName}: Toplam {$teacher['total_hours']} saat\n";
+            if(empty($teacherReport)) $context .= "Raporlanacak öğretmen verisi bulunamadı.\n";
+            else {
+                usort($teacherReport, fn($a, $b) => $b['total_hours'] <=> $a['total_hours']);
+                $topTeacher = $teacherReport[0];
+                $context .= "Bu Ay En Çok Ders Veren Öğretmen: {$topTeacher['first_name']} {$topTeacher['last_name']} ({$topTeacher['total_hours']} saat)\n";
+            }
+        } else {
+             $summary = $reportModel->getMonthlySummary($year, $month);
+            $context .= "Aylık Özet: {$summary['total_hours']} saat ders, {$summary['total_individual']} bireysel, {$summary['total_group']} grup, {$summary['total_students']} öğrenci.\n";
+        }
+    }
+    
+    private function buildFixedScheduleContext(string &$context, string $userMessageLower): void
+    {
+        $teacherId = $this->findSystemUserIdInMessage($userMessageLower);
+        if (!$teacherId) {
+            $currentUser = auth()->user();
+            if ($currentUser->inGroup('ogretmen')) $teacherId = $currentUser->id;
+        }
+
+        $context .= "\n== Sabit Haftalık Ders Programı ==\n";
+        if (!$teacherId) {
+            $context .= "Lütfen programını görmek istediğiniz öğretmenin adını belirtin.\n";
+            return;
+        }
+        
+        $teacherProfile = (new UserProfileModel())->where('user_id', $teacherId)->first();
+        $schedule = (new FixedLessonModel())->getFixedScheduleForTeacher($teacherId);
+
+        if (empty($schedule)) {
+            $context .= "{$teacherProfile->first_name} {$teacherProfile->last_name} için sabit program bulunmuyor.\n";
+            return;
+        }
+
+        $daysOfWeek = [1 => 'Pazartesi', 2 => 'Salı', 3 => 'Çarşamba', 4 => 'Perşembe', 5 => 'Cuma', 6 => 'Cumartesi', 7 => 'Pazar'];
+        $context .= "{$teacherProfile->first_name} {$teacherProfile->last_name} için sabit program:\n";
+        
+        $groupedSchedule = [];
+        foreach ($schedule as $lesson) {
+            $dayName = $daysOfWeek[$lesson['day_of_week']] ?? 'Bilinmeyen Gün';
+            $groupedSchedule[$dayName][] = "- " . substr($lesson['start_time'], 0, 5) . "-" . substr($lesson['end_time'], 0, 5) . ": {$lesson['adi']} {$lesson['soyadi']}";
+        }
+
+        foreach ($groupedSchedule as $day => $lessons) {
+            $context .= "**{$day}**\n" . implode("\n", $lessons) . "\n";
+        }
+    }
+
+    private function buildLessonScheduleContext(string &$context, string $userMessageLower): void
+    {
+        $lessonModel = new LessonModel();
+        $date = date('Y-m-d');
+        if (str_contains($userMessageLower, 'yarın')) $date = date('Y-m-d', strtotime('+1 day'));
+        if (str_contains($userMessageLower, 'dün')) $date = date('Y-m-d', strtotime('-1 day'));
+
+        $studentId = $this->findStudentIdInMessage($userMessageLower);
+        $teacherId = $this->findSystemUserIdInMessage($userMessageLower);
+        if (!$teacherId && !$studentId) {
+             $currentUser = auth()->user();
+            if ($currentUser->inGroup('ogretmen')) $teacherId = $currentUser->id;
+        }
+
+        $context .= "\n== {$date} Tarihli Ders Programı Bilgileri ==\n";
+        
+        if ($teacherId) {
+            $teacherProfile = (new UserProfileModel())->where('user_id', $teacherId)->first();
+            $lessons = $lessonModel->getLessonsForTeacherByDate($teacherId, $date);
+            $context .= "**{$teacherProfile->first_name} {$teacherProfile->last_name}**:\n";
+            if (empty($lessons)) $context .= "- Bu tarihte kayıtlı dersi bulunmuyor.\n";
+            else foreach ($lessons as $l) $context .= "- {$l['start_time']}-{$l['end_time']}: {$l['adi']} {$l['soyadi']}\n";
+        } elseif ($studentId) {
+            $student = (new StudentModel())->find($studentId);
+            $lessons = $lessonModel->getLessonsForStudentByDate($studentId, $date);
+            $context .= "**{$student['adi']} {$student['soyadi']}**:\n";
+            if (empty($lessons)) $context .= "- Bu tarihte kayıtlı dersi bulunmuyor.\n";
+            else foreach ($lessons as $l) $context .= "- {$l['start_time']}-{$l['end_time']}: {$l['ogretmen_adi']} ile {$l['ders_tipi']}\n";
+        } else {
+            $context .= "Lütfen ders programını görmek istediğiniz öğrenci veya öğretmenin adını belirtin.\n";
+        }
+    }
+    
+    private function buildLogContext(string &$context, string $userMessageLower): void
+    {
+        $logModel = new LogModel();
+        $context .= "\n== Son Sistem Hareketleri ==\n";
+        
+        $logs = $logModel->select('logs.*, users.username')
+                         ->join('users', 'users.id = logs.user_id', 'left')
+                         ->orderBy('logs.id', 'DESC')
+                         ->limit(10)->findAll();
+                         
+        if (empty($logs)) {
+            $context .= "Görüntülenecek sistem hareketi bulunamadı.\n";
+        } else {
+            foreach ($logs as $log) {
+                $createdAt = $log['created_at'] ?? 'Tarih Yok';
+                $message = $log['message'] ?? 'Mesaj Yok';
+                $username = $log['username'] ?? 'Sistem';
+                $ipAddress = $log['ip_address'] ?? 'IP Yok';
+                $context .= "- [{$createdAt}] {$message} (Yapan: {$username}, IP: {$ipAddress})\n";
+            }
+        }
+    }
+
+    private function buildTeacherCountContext(string &$context): void
+    {
+        $count = (new AuthGroupsUsersModel())
+            ->join('users', 'users.id = auth_groups_users.user_id')
+            ->where('group', 'ogretmen')
+            ->where('users.deleted_at', null)
+            ->countAllResults();
+
+        $context .= "\n== Öğretmen Sayısı Bilgisi ==\n";
+        $context .= "Sistemde kayıtlı toplam aktif öğretmen sayısı: " . $count . "\n";
+    }
+
+    private function buildTeacherListContext(string &$context): void
+    {
+        $teachers = (new UserModel())->select('users.id, first_name, last_name, secret as email, phone_number')
+            ->join('auth_groups_users agu', 'agu.user_id = users.id')
+            ->join('user_profiles up', 'up.user_id = users.id', 'left')
+            ->join('auth_identities ai', 'ai.user_id = users.id AND ai.type = "email_password"', 'left')
+            ->where('agu.group', 'ogretmen')->where('users.deleted_at', null)->findAll();
+        
+        $context .= "\n== Sistemdeki Öğretmenler Listesi ==\n";
+        if (!empty($teachers)) {
+            foreach ($teachers as $teacher) {
+                $context .= "- {$teacher->first_name} {$teacher->last_name} (E-posta: {$teacher->email}, Tel: {$teacher->phone_number})\n";
+            }
+        } else {
+            $context .= "Sistemde 'öğretmen' grubuna atanmış aktif bir kullanıcı bulunmamaktadır.\n";
+        }
+    }
+    
+private function buildStudentContext(string &$context, string $userMessageLower, ?int $studentId): void
+    {
+        $studentModel = new StudentModel();
+        $targetStudent = $studentId ? $studentModel->find($studentId) : null;
+
+        $context .= "\n== Öğrenci Bilgileri ==\n";
+        if ($targetStudent) {
+            $context .= "İstenen Öğrenci: {$targetStudent['adi']} {$targetStudent['soyadi']}\n";
+            if (!empty($targetStudent['tc_kimlik_no'])) $context .= "- T.C. Kimlik No: {$targetStudent['tc_kimlik_no']}\n";
+            if (!empty($targetStudent['veli_anne_adi_soyadi'])) $context .= "- Anne: {$targetStudent['veli_anne_adi_soyadi']} (Tel: {$targetStudent['veli_anne_telefon']})\n";
+            if (!empty($targetStudent['veli_baba_adi_soyadi'])) $context .= "- Baba: {$targetStudent['veli_baba_adi_soyadi']} (Tel: {$targetStudent['veli_baba_telefon']})\n";
+            $context .= "--- Kalan Ders Hakları ---\n";
+            $context .= "- Normal (Bireysel/Grup): " . ($targetStudent['normal_bireysel_hak'] ?? 0) . "/" . ($targetStudent['normal_grup_hak'] ?? 0) . "\n";
+            $context .= "- Telafi (Bireysel/Grup): " . ($targetStudent['telafi_bireysel_hak'] ?? 0) . "/" . ($targetStudent['telafi_grup_hak'] ?? 0) . "\n";
+
+            // --- RAPOR KONTROL MEKANİZMASI ---
+            if ($this->containsKeywords($userMessageLower, ['ram', 'rapor'])) {
+                $context .= "\n--- RAM Raporu Analizi Başladı ---\n";
+
+                // 1. Veritabanında rapor adı kayıtlı mı?
+                if (empty($targetStudent['ram_raporu'])) {
+                    $context .= "Problem: Veritabanında bu öğrenciye ait bir RAM raporu dosya adı bulunamadı.\n";
+                } else {
+                    $reportFileName = $targetStudent['ram_raporu'];
+                    $context .= "Bilgi: Veritabanında bulunan dosya adı: {$reportFileName}\n";
+                    
+                    // 2. Dosya fiziksel olarak sunucuda var mı?
+                    $reportPath = WRITEPATH . 'uploads/ram_reports/' . $reportFileName;
+                    $context .= "Bilgi: Dosyanın sunucudaki tam yolu: {$reportPath}\n";
+
+                    if (!file_exists($reportPath)) {
+                        $context .= "Problem: Dosya sunucuda belirtilen yolda bulunamadı! Lütfen dosyanın varlığını ve yolun doğruluğunu kontrol edin.\n";
+                    } else {
+                        // 3. Dosya okunabiliyor mu ve içeriği var mı?
+                        $reportContent = $this->readPdfContent($reportPath);
+                        if (empty(trim($reportContent))) {
+                             $context .= "Problem: Rapor dosyası bulundu ancak içeriği boş veya okunamadı. Dosya bozuk veya sadece resim içeriyor olabilir.\n";
+                        } else {
+                            $context .= "Başarılı: Rapor dosyası okundu. İçeriğin özeti aşağıdadır:\n";
+                            $context .= substr($reportContent, 0, 750) . "...\n"; // Özet karakter sayısını artırdım
+                        }
                     }
                 }
             }
         } else {
-            $context .= "Rapor oluşturmak için yeterli geçmiş ders verisi bulunamadı.\n";
+            $context .= "Sorguda adı geçen öğrenci sistemde bulunamadı.\n";
         }
     }
 
-private function buildFixedScheduleContext(&$context, $userMessageLower, $currentUser, $userName, $userProfileModel, $fixedLessonModel, $historyModel)
+private function readPdfContent(string $filePath): ?string
 {
-    $targetUser = null;
-    $allTeachers = $userProfileModel->select('user_profiles.first_name, user_profiles.last_name, users.id as user_id')
-        ->join('users', 'users.id = user_profiles.user_id')
-        ->join('auth_groups_users', 'auth_groups_users.user_id = users.id')
-        ->where('auth_groups_users.group', 'ogretmen')
-        ->asObject()
-        ->findAll();
-
-    foreach ($allTeachers as $teacher) {
-        $teacherFullName = mb_strtolower(trim(($teacher->first_name ?? '') . ' ' . ($teacher->last_name ?? '')), 'UTF-8');
-        if (!empty($teacherFullName) && str_contains($userMessageLower, $teacherFullName)) {
-            $targetUser = ['id' => $teacher->user_id, 'full_name' => $teacher->first_name . ' ' . $teacher->last_name];
-            break;
-        }
-    }
-    
-    // Eğer hedef öğretmen bulunamazsa veya soran kişi öğretmen ise, hedef kendisidir.
-    if ($targetUser === null && $currentUser->inGroup('ogretmen')) {
-        $userProfile = $userProfileModel->where('user_id', $currentUser->id)->asObject()->first();
-        $targetUser = ['id' => $currentUser->id, 'full_name' => ($userProfile->first_name ?? '') . ' ' . ($userProfile->last_name ?? $userName)];
+    // 1. Dosyanın var olup olmadığını ve boş olup olmadığını kontrol et
+    if (!file_exists($filePath) || filesize($filePath) === 0) {
+        log_message('error', '[AIController] PDF dosyası bulunamadı veya boş: ' . $filePath);
+        return null;
     }
 
-    // Eğer hala bir hedef yoksa (yönetici genel bir soru sormadıysa), işlem yapma
-    if ($targetUser === null) {
-        $context .= "\n== Sabit Ders Programı Bilgisi ==\nLütfen programını veya boş saatlerini öğrenmek istediğiniz öğretmenin adını belirtin.\n";
-        return;
-    }
-    
-    $todayNum = (int)date('N');
-    $todayName = Time::now('Europe/Istanbul')->toLocalizedString('EEEE');
-    $fixedSchedule = $fixedLessonModel->getFixedScheduleForTeacher($targetUser['id']);
-    
-    $context .= "\n== {$targetUser['full_name']} için Sabit Ders Programı Analizi (Bugün: {$todayName}) ==\n";
-    
-    $occupiedSlots = [];
-    $context .= "**Bugünkü Dolu Saatler:**\n";
-    $todaysLessonsFound = false;
-    foreach ($fixedSchedule as $lesson) {
-        if ((int)$lesson['day_of_week'] === $todayNum) {
-            $startTime = substr($lesson['start_time'], 0, 5);
-            $context .= "- {$startTime}: {$lesson['adi']} {$lesson['soyadi']}\n";
-            $occupiedSlots[] = $startTime;
-            $todaysLessonsFound = true;
-        }
-    }
-    if (!$todaysLessonsFound) {
-        $context .= "Bugün için planlanmış sabit ders bulunmuyor.\n";
-    }
+    // 2. Komutu oluştur ve çalıştır (Linux için yol belirtmeye gerek yok)
+    // -layout: Orijinal PDF'in düzenini korumaya çalışır.
+    // -enc UTF-8: Türkçe karakterlerin doğru çıkmasını sağlar.
+    // -: Son tire, çıktının dosyaya yazılmak yerine doğrudan geri döndürülmesini sağlar.
+    $command = 'pdftotext -layout -enc UTF-8 "' . $filePath . '" -';
 
-    // YENİ VE TAMAMLANMIŞ MANTIK
-    $context .= "\n**Bugünkü Boş Saatler ve Öğrenci Önerileri:**\n";
-    $workHours = range(9, 17); // Mesai saatleri 09:00 - 17:59
-    $freeSlotsFound = false;
-    foreach ($workHours as $hour) {
-        $slot = str_pad((string)$hour, 2, '0', STR_PAD_LEFT) . ':00';
-        if (!in_array($slot, $occupiedSlots)) {
-            $freeSlotsFound = true;
-            $suggestions = $historyModel->getStudentSuggestionsForSlot($todayNum, $slot.':00');
-            $context .= "- **{$slot}:** ";
-            if (!empty($suggestions)) {
-                $studentNames = array_column($suggestions, 'student_name');
-                $context .= "Geçmiş ders alan öğrenciler: " . implode(', ', $studentNames) . "\n";
-            } else {
-                $context .= "Bu saate uygun geçmiş ders kaydı/öneri bulunamadı.\n";
-            }
+    try {
+        // shell_exec, komutun çıktısını bir string olarak döndürür.
+        $content = shell_exec($command);
+
+        // Eğer komut başarısız olursa veya çıktı boşsa, null döndür.
+        if ($content === null || trim($content) === '') {
+            log_message('warning', '[AIController] pdftotext aracı PDF içeriğini okuyamadı veya dosya boş. Dosya: ' . $filePath);
+            return null;
         }
-    }
-    if (!$freeSlotsFound) {
-        $context .= "Bugün programda hiç boş saat bulunmuyor.\n";
+
+        return $content;
+
+    } catch (\Exception $e) {
+        log_message('error', '[AIController] pdftotext komutu çalıştırılırken bir istisna oluştu: ' . $e->getMessage());
+        return null;
     }
 }
 
@@ -368,5 +500,37 @@ private function buildFixedScheduleContext(&$context, $userMessageLower, $curren
             if (str_contains($text, $keyword)) return true;
         }
         return false;
+    }
+
+    private function findSystemUserIdInMessage(string $userMessageLower): ?int
+    {
+        $profiles = (new UserProfileModel())->select('user_id, first_name, last_name')->findAll();
+        foreach ($profiles as $profile) {
+            $fullNameLower = $this->turkish_strtolower(trim($profile->first_name . ' ' . $profile->last_name));
+            if (!empty($fullNameLower) && str_contains($userMessageLower, $fullNameLower)) {
+                return (int)$profile->user_id;
+            }
+        }
+        return null;
+    }
+
+    private function findStudentIdInMessage(string $userMessageLower): ?int
+    {
+        $students = (new StudentModel())->select('id, adi, soyadi')->findAll();
+        foreach ($students as $student) {
+            $fullNameLower = $this->turkish_strtolower(trim($student['adi'] . ' ' . $student['soyadi']));
+            if (!empty($fullNameLower) && str_contains($userMessageLower, $fullNameLower)) {
+                return (int)$student['id'];
+            }
+        }
+        return null;
+    }
+
+    private function turkish_strtolower(string $text): string
+    {
+        $search  = ['İ', 'I', 'Ğ', 'Ü', 'Ş', 'Ö', 'Ç'];
+        $replace = ['i', 'ı', 'ğ', 'ü', 'ş', 'ö', 'ç'];
+        $text = str_replace($search, $replace, $text);
+        return mb_strtolower($text, 'UTF-8');
     }
 }

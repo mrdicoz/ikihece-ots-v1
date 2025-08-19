@@ -68,4 +68,6 @@ class LessonHistoryModel extends Model
             ->like('lesson_history.start_time', substr($startTime, 0, 5), 'after')
             ->findAll(5);
     }
+
+    
 }

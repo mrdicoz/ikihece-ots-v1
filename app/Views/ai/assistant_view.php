@@ -60,11 +60,67 @@
         <div class="d-flex align-items-center w-100">
             <textarea name="message" id="messageInput" class="form-control flex-grow-1 bg-light border-0 me-2" style="resize: none;" placeholder="Mesajınızı buraya yazın..." rows="1" required autofocus></textarea>
             
-            <button type="submit" id="sendButton" class="btn btn-success d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+            <button type="button" class="btn btn-outline-secondary d-flex align-items-center justify-content-center me-2" style="width: 44px; height: 44px; flex-shrink: 0;" data-bs-toggle="modal" data-bs-target="#promptsModal" title="Örnek Komutlar">
+                <i class="bi bi-lightbulb-fill"></i>
+            </button>
+            
+            <button type="submit" id="sendButton" class="btn btn-success d-flex align-items-center justify-content-center" style="width: 44px; height: 44px; flex-shrink: 0;">
                 <i class="bi bi-send-fill"></i>
             </button>
         </div>
     </form>
 </footer>
 
+<div class="modal fade" id="promptsModal" tabindex="-1" aria-labelledby="promptsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="promptsModalLabel"><i class="bi bi-lightbulb"></i> Örnek Komutlar</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+      </div>
+      <div class="modal-body">
+        <?php if (!empty($samplePrompts)): ?>
+            <p class="text-muted small">Başlamak için bir komutun üzerine tıklayın.</p>
+            <div class="list-group">
+                <?php foreach ($samplePrompts as $prompt): ?>
+                    <a href="#" class="list-group-item list-group-item-action sample-prompt">
+                        <?= esc($prompt) ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        <?php else: ?>
+            <p>Rolünüz için görüntülenecek örnek komut bulunamadı.</p>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+</div>
+<?= $this->endSection() ?>
+
+<?= $this->section('pageScripts') ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const messageInput = document.getElementById('messageInput');
+    const promptsModalEl = document.getElementById('promptsModal');
+    
+    // Modal'ın bir örneğini oluşturuyoruz ki JavaScript ile kontrol edebilelim.
+    const promptsModal = new bootstrap.Modal(promptsModalEl);
+
+    // Modal içindeki her bir komut satırına tıklama olayı ekliyoruz.
+    document.querySelectorAll('.sample-prompt').forEach(item => {
+        item.addEventListener('click', function(e) {
+            e.preventDefault(); // Linkin normal davranışını engelle
+            
+            // Tıklanan komutun metnini alıp, chat input'una yazdırıyoruz.
+            messageInput.value = this.textContent.trim();
+            
+            // Kullanıcının yazmaya devam edebilmesi için input'a odaklanıyoruz.
+            messageInput.focus();
+            
+            // Komut seçildikten sonra modal'ı kapatıyoruz.
+            promptsModal.hide();
+        });
+    });
+});
+</script>
 <?= $this->endSection() ?>

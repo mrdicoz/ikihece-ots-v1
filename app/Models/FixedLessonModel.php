@@ -38,4 +38,18 @@ class FixedLessonModel extends Model
             ->orderBy('fixed_lessons.start_time', 'ASC')
             ->findAll();
     }
+
+    /**
+     * Belirli bir öğretmenin, belirli bir gündeki sabit ders programını
+     * öğrenci bilgileriyle birlikte getirir.
+     */
+    public function getScheduleForTeacher(int $teacherId, int $dayOfWeek)
+    {
+        return $this->select('fixed_lessons.start_time, students.adi, students.soyadi')
+                    ->join('students', 'students.id = fixed_lessons.student_id', 'left') // Öğrencisiz dersler için left join
+                    ->where('fixed_lessons.teacher_id', $teacherId)
+                    ->where('fixed_lessons.day_of_week', $dayOfWeek)
+                    ->orderBy('fixed_lessons.start_time', 'ASC')
+                    ->findAll();
+    }
 }
