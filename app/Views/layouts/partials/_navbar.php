@@ -67,6 +67,7 @@ if ($isLoggedIn) {
                             <li><a class="dropdown-item" href="<?= route_to('admin.assignments.index') ?>"><i class="bi bi-person-rolodex"></i> Atamalar</a></li>
                             <li><a class="dropdown-item" href="<?= route_to('admin.announcements.index') ?>"><i class="bi bi-megaphone"></i> Duyuru Yap</a></li>               
                             <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="<?= route_to('admin.update.index') ?>"><i class="bi bi-cloud-arrow-down-fill"></i> Sistemi Güncelle</a></li>
                             <li><a class="dropdown-item" href="<?= route_to('admin.logs.index') ?>"><i class="bi bi-journal-text"></i> Log Kayıtları</a></li>
                             <li><a class="dropdown-item" href="<?= route_to('admin.ai.trainer') ?>"><i class="bi bi-robot"></i> Model Eğitimi</a></li>
                             <li><a class="dropdown-item" href="<?= route_to('admin.students.importView') ?>"><i class="bi bi-cloud-upload-fill"></i> İçe Aktar</a></li>

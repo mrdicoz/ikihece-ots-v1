@@ -138,6 +138,13 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
     // --------------------------------------------------------------------
     $routes->group('admin', ['filter' => 'group:admin'], static function ($routes) {
 
+
+        // --- YENİ GÜNCELLEME ROTLARI ---
+        $routes->get('update', 'Admin\UpdateController::index', ['as' => 'admin.update.index']);
+        $routes->get('update/check', 'Admin\UpdateController::check', ['as' => 'admin.update.check']);
+        $routes->get('update/run', 'Admin\UpdateController::runUpdate', ['as' => 'admin.update.run']);
+
+
         $routes->get('ai-trainer', 'Admin\DataImportController::history', ['as' => 'admin.ai.trainer']);
         $routes->post('ai-trainer', 'Admin\DataImportController::processUpload', ['as' => 'admin.ai.processUpload']);
 
