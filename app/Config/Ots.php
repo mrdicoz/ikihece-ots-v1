@@ -10,7 +10,7 @@ class Ots extends BaseConfig
      * Projenin mevcut versiyon numarası.
      * Güncelleme kontrolü bu değişkene göre yapılacaktır.
      */
-    public string $version = '0.0.2';
+    public string $version = '0.0.3';
 
     /**
      * Sistemde kullanılabilecek tüm kullanıcı grupları.

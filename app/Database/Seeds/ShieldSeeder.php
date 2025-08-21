@@ -29,15 +29,15 @@ class ShieldSeeder extends Seeder
 
         $adminUser->createEmailIdentity([
             'email'    => 'admin@ikihece.com',
-            'password' => 'Muradicoz1987',
+            'password' => 'admin@ikihece.com',
         ]);
 
         $adminUser->addGroup('admin');
 
         $profileModel->save([
             'user_id'    => $adminUser->id,
-            'first_name' => 'Murad',
-            'last_name'  => 'İçöz',
+            'first_name' => 'Sistem',
+            'last_name'  => 'Yöneticisi',
         ]);
 
         echo "Varsayılan admin kullanıcısı başarıyla oluşturuldu.\n";
