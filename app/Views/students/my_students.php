@@ -31,10 +31,10 @@
                             <td class="align-middle fw-bold">
                                 <?= esc($student['adi']) . ' ' . esc($student['soyadi']) ?>
                                 <div class="d-md-none text-muted small">
-                                    Veli: <?= esc($student['veli_anne_adi_soyadi']) ?>
+                                    Veli: <?= esc($student['veli_anne']) ?>
                                 </div>
                             </td>
-                            <td class="align-middle d-none d-md-table-cell"><?= esc($student['veli_anne_adi_soyadi']) ?></td>
+                            <td class="align-middle d-none d-md-table-cell"><?= esc($student['veli_anne']) ?></td>
                             <td class="align-middle d-none d-md-table-cell"><?= esc($student['veli_anne_telefon']) ?></td>
                         </tr>
                         <?php endforeach; ?>

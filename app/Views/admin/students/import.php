@@ -4,16 +4,19 @@
 
 <?= $this->section('main') ?>
 <div class="container-fluid mt-4">
-
-    <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-cloud-upload-fill"></i> Öğrenci Verilerini İçeri Aktar</h1>
-    </div>
-
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="alert alert-danger"><?= session()->getFlashdata('error') ?></div>
-    <?php endif; ?>
+    <h1 class="h3 mb-4 text-gray-800"><i class="bi bi-cloud-upload-fill"></i> Toplu Öğrenci Veri Aktarımı</h1>
+    
     <?php if (session()->getFlashdata('success')): ?>
-        <div class="alert alert-success"><?= session()->getFlashdata('success') ?></div>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <?= session()->getFlashdata('success') ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endif; ?>
+    <?php if (session()->getFlashdata('error')): ?>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <?= session()->getFlashdata('error') ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
     <?php endif; ?>
 
     <div class="card shadow">
@@ -21,61 +24,29 @@
             <div class="row">
                 <div class="col-lg-5 mb-4 mb-lg-0">
                     <h4>İşlem Adımları</h4>
-                    <p class="text-muted">Toplu öğrenci kaydı için lütfen aşağıdaki adımları takip edin.</p>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item d-flex align-items-center">
-                            <i class="bi bi-1-circle-fill text-success me-3 fs-4"></i>
-                            <div>
-                                <strong>Örnek Şablonu İndirin</strong>
-                                <small class="d-block">Verilerinizi hazırlamak için güncel şablonu kullanın.</small>
-                            </div>
-                        </li>
-                        <li class="list-group-item d-flex align-items-center">
-                            <i class="bi bi-2-circle-fill text-success me-3 fs-4"></i>
-                            <div>
-                                <strong>Dosyanızı Hazırlayın</strong>
-                                <small class="d-block">Şablondaki sütunlara uygun şekilde verilerinizi girin.</small>
-                            </div>
-                        </li>
-                        <li class="list-group-item d-flex align-items-center">
-                            <i class="bi bi-3-circle-fill text-success me-3 fs-4"></i>
-                            <div>
-                                <strong>Dosyayı Yükleyin</strong>
-                                <small class="d-block">Hazırladığınız dosyayı yandaki alana sürükleyin veya seçin.</small>
-                            </div>
-                        </li>
-                    </ul>
-                    <div class="d-grid mt-4">
-                        <a href="<?= base_url('assets/OgrenciListesi_Sablon.xls') ?>" class="btn btn-success" download>
-                            <i class="bi bi-download"></i> Örnek Şablonu İndir
-                        </a>
-                    </div>
+                    <p class="text-muted">Lütfen adımları takip ederek veri aktarımını gerçekleştirin.</p>
+                    <ol class="list-group list-group-numbered">
+                        <li class="list-group-item"><strong>Dosyanızı Kontrol Edin:</strong> Elinizdeki `student.xlsx` veya `.csv` dosyasının sütunlarının doğru olduğundan emin olun.</li>
+                        <li class="list-group-item"><strong>Dosyayı Yükleyin:</strong> Hazırladığınız dosyayı yandaki alana sürükleyin veya seçin.</li>
+                        <li class="list-group-item"><strong>İşlemi Başlatın:</strong> "Yükle ve İşle" butonuna tıklayarak verilerinizi sisteme aktarın.</li>
+                    </ol>
                 </div>
-
                 <div class="col-lg-7 border-start-lg">
-                    <form id="import-form" action="<?= site_url('admin/students/import') ?>" method="post" enctype="multipart/form-data">
+                    <form id="import-form" action="<?= route_to('admin.students.import') ?>" method="post" enctype="multipart/form-data">
                         <?= csrf_field() ?>
-                        
-                        <div id="drop-zone" class="drop-zone">
+                        <div id="drop-zone" class="drop-zone p-5 text-center">
                             <i class="bi bi-file-earmark-arrow-up-fill fs-1"></i>
                             <p class="drop-zone-text mt-3">Dosyanızı buraya sürükleyin veya seçmek için tıklayın</p>
-                            <small>(.xls, .xlsx, .csv)</small>
+                            <small>(.ods, .xls, .xlsx, .csv)</small>
                         </div>
-                        
-                        <input type="file" id="file-input" name="file" class="d-none" required accept=".xls, .xlsx, .csv">
-                        
+                        <input type="file" id="file-input" name="file" class="d-none" required accept=".ods,.xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.oasis.opendocument.spreadsheet">
                         <div class="mt-3 text-center" id="file-info" style="display: none;">
-                            Seçilen Dosya: <span id="file-name-display" class="file-name-display"></span>
+                            Seçilen Dosya: <span id="file-name-display" class="fw-bold text-success"></span>
                         </div>
-                        
                         <div class="d-grid mt-4">
                             <button type="submit" id="submit-button" class="btn btn-success mt-3" disabled>
                                 <i class="bi bi-hdd-stack-fill"></i> Yükle ve İşle
                             </button>
-                        </div>
-                        
-                        <div class="progress mt-3" id="progress-bar-container" style="display: none;">
-                            <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
                         </div>
                     </form>
                 </div>
@@ -85,73 +56,39 @@
 </div>
 <?= $this->endSection() ?>
 
-
 <?= $this->section('pageScripts') ?>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
     const submitButton = document.getElementById('submit-button');
-    const fileInfo = document.getElementById('file-info');
     const fileNameDisplay = document.getElementById('file-name-display');
+    const fileInfo = document.getElementById('file-info');
     const importForm = document.getElementById('import-form');
-    const progressBarContainer = document.getElementById('progress-bar-container');
-    const progressBar = document.getElementById('progress-bar');
 
-    // Dropzone'a tıklandığında gizli file input'u tetikle
     dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => handleFileSelect(fileInput.files));
 
-    // Dosya sürükleme olayları
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('dragover');
-    });
-
-    dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('dragover');
-    });
-
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('bg-light'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('bg-light'));
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
-        dropZone.classList.remove('dragover');
-        const files = e.dataTransfer.files;
+        dropZone.classList.remove('bg-light');
+        handleFileSelect(e.dataTransfer.files);
+    });
+
+    function handleFileSelect(files) {
         if (files.length > 0) {
             fileInput.files = files;
-            handleFileSelect();
-        }
-    });
-    
-    // Dosya input'u değiştiğinde
-    fileInput.addEventListener('change', handleFileSelect);
-
-    function handleFileSelect() {
-        if (fileInput.files.length > 0) {
-            const fileName = fileInput.files[0].name;
-            fileNameDisplay.textContent = fileName;
+            fileNameDisplay.textContent = files[0].name;
             fileInfo.style.display = 'block';
             submitButton.disabled = false;
-        } else {
-            fileInfo.style.display = 'none';
-            submitButton.disabled = true;
         }
     }
 
-    // Form gönderildiğinde
     importForm.addEventListener('submit', function() {
         submitButton.disabled = true;
-        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> İşleniyor...';
-        
-        progressBarContainer.style.display = 'block';
-        let progress = 0;
-        const interval = setInterval(() => {
-            progress += 10;
-            if (progress > 100) progress = 100;
-            progressBar.style.width = progress + '%';
-            progressBar.textContent = progress + '%';
-            if(progress === 100) {
-                clearInterval(interval);
-            }
-        }, 200);
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Lütfen Bekleyin, İşleniyor...';
     });
 });
 </script>

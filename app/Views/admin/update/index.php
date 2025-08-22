@@ -16,7 +16,9 @@
                 </div>
                 <div class="card-body">
                     <p><strong>Mevcut Yüklü Versiyon:</strong> <span class="badge bg-success fs-6"><?= esc($currentVersion) ?></span></p>
-                    <p><strong>Son Versiyon:</strong> <span id="latest-version" class="badge bg-secondary fs-6">Bilinmiyor</span></p>
+                    
+                    <p><strong>Sunucudaki Son Versiyon:</strong> <span id="latest-version" class="badge bg-secondary fs-6">Bilinmiyor</span></p>
+                    
                     <hr>
                     <div id="update-status">
                         <div class="d-grid gap-2">

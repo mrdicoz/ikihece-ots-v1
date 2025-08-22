@@ -12,34 +12,20 @@ class StudentModel extends Model
     protected $returnType       = 'array';
     protected $useSoftDeletes   = true;
     protected $protectFields    = true;
-   protected $allowedFields    = [
-        'okul_no', 'tc_kimlik_no', 'adi', 'soyadi', 'cinsiyet', 'dogum_tarihi',
-        'kayit_tarihi', 'sinifi', 'subesi', 'gelis_donemi', 'ayrilis_tarihi',
-        'ayrilis_nedeni', 'servis_durumu', 'servis_plakasi', 'veli_anne_tc',
-        'veli_anne_adi_soyadi', 'veli_anne_telefon', 'veli_anne_eposta',
-        'veli_anne_is_adresi', 'veli_anne_gorevi', 'veli_anne_mezuniyet',
-        'veli_anne_sag_durumu', 'veli_baba_tc', 'veli_baba_adi_soyadi',
-        'veli_baba_telefon', 'veli_baba_eposta', 'veli_baba_is_adresi',
-        'veli_baba_gorevi', 'veli_baba_mezuniyet', 'veli_baba_sag_durumu',
-        'acil_durum_aranacak_kisi_1_adi', 'acil_durum_aranacak_kisi_1_yakinlik',
-        'acil_durum_aranacak_kisi_1_telefon', 'acil_durum_aranacak_kisi_2_adi',
-        'acil_durum_aranacak_kisi_2_yakinlik', 'acil_durum_aranacak_kisi_2_telefon',
-        'kan_grubu', 'gecirilen_hastaliklar', 'alerjiler', 'ameliyatlar',
-        'ilaclar', 'diyet_durumu', 'engel_durumu', 'boy', 'kilo', 'goz_sorunu',
-        'isitsel_sorun', 'kardes_var_mi', 'kardes_okulumuzda_mi', 'kardes_adi_1',
-        'kardes_dogum_tarihi_1', 'kardes_okulu_1', 'kardes_adi_2',
-        'kardes_dogum_tarihi_2', 'kardes_okulu_2', 'adres_il', 'adres_ilce',
-        'adres_mahalle', 'adres_detay', 'sozlesme_no', 'sozlesme_tarihi',
-        'sozlesme_tutari', 'odeme_sekli', 'google_konum', 'profile_image',
-        'ram_raporu', 'ram_baslangic_tarihi', 'ram_bitis_tarihi', 'normal_bireysel_hak',
-        'normal_grup_hak', 'telafi_bireysel_hak', 'telafi_grup_hak',
+    
+    // VERİTABANI İLE BİREBİR UYUMLU, GÜNCEL SÜTUN LİSTESİ
+    protected $allowedFields    = [
+        'adi', 'soyadi', 'tckn', 'cinsiyet', 'dogum_tarihi', 'iletisim', 
+        'adres_detayi', 'city_id', 'district_id', 'google_konum', 
+        'veli_baba', 'veli_baba_telefon', 'veli_baba_tc', 
+        'veli_anne', 'veli_anne_telefon', 'veli_anne_tc', 
+        'servis', 'mesafe', 'orgun_egitim', 'egitim_sekli', 'egitim_programi', 
+        'ram', 'ram_baslagic', 'ram_bitis', 'ram_raporu', 
+        'hastane_adi', 'hastane_raporu_baslama_tarihi', 'hastane_raporu_bitis_tarihi', 
+        'hastane_randevu_tarihi', 'hastane_randevu_saati', 'hastane_aciklama', 
+        'profile_image', 'normal_bireysel_hak', 'normal_grup_hak', 
+        'telafi_bireysel_hak', 'telafi_grup_hak'
     ];
-
-    protected bool $allowEmptyInserts = false;
-    protected bool $updateOnlyChanged = true;
-
-    protected array $casts = [];
-    protected array $castHandlers = [];
 
     // Dates
     protected $useTimestamps = true;

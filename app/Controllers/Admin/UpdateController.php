@@ -73,18 +73,13 @@ class UpdateController extends BaseController
 
             $this->stream_message("Yeni dosyalar kopyalanıyor...");
             
-            // --- DÜZELTİLMİŞ KOPYALAMA MANTIĞI ---
-            // Zip içindeki ana klasörü bul (GitHub'dan veya manuel oluşturulmuş)
             $files = array_diff(scandir($extractPath), ['.', '..']);
-            $sourceDir = $extractPath; // Varsayılan olarak ana çıkarma dizini
-            
-            // Eğer zip içinde tek bir ana klasör varsa, onun içine giriyoruz.
+            $sourceDir = $extractPath;
             if (count($files) === 1 && is_dir($extractPath . DIRECTORY_SEPARATOR . reset($files))) {
                 $sourceDir = $extractPath . DIRECTORY_SEPARATOR . reset($files);
             }
             
             $this->copy_directory($sourceDir, ROOTPATH);
-            // --- DÜZELTME BİTTİ ---
 
             $this->stream_message("Dosya kopyalama tamamlandı.");
             
@@ -127,7 +122,7 @@ class UpdateController extends BaseController
         }];
         $ch = curl_init($url);
         curl_setopt_array($ch, $options);
-        $result = curl_exec($ch);
+        curl_exec($ch);
         if (curl_errno($ch)) {
             $error = curl_error($ch);
             curl_close($ch);

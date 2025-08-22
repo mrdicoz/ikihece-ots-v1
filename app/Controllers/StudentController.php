@@ -4,68 +4,41 @@ namespace App\Controllers;
 
 use App\Controllers\BaseController;
 use App\Models\StudentModel;
+use App\Models\CityModel;
+use App\Models\DistrictModel;
 
 class StudentController extends BaseController
 {
-    /**
-     * Tüm öğrencileri listeler.
-     */
     public function index()
     {
         $model = new StudentModel();
-        
-        // --- DEĞİŞİKLİK BURADA ---
-        // Sayfalamayı kaldırıp TÜM öğrencileri alıyoruz.
-        // DataTables geri kalan her şeyi (arama, sayfalama vb.) halledecek.
         $data = [
             'title'    => 'Öğrenci Yönetimi',
-            'students' => $model->findAll(), 
-            // 'pager' satırı kaldırıldı, artık ihtiyacımız yok.
+            'students' => $model->findAll(),
         ];
-
         return view('students/index', array_merge($this->data, $data));
-
     }
 
-    /**
-     * Yeni öğrenci ekleme formunu gösterir.
-     */
     public function new()
     {
+        $cityModel = new CityModel();
         $data = [
-            'title' => 'Yeni Öğrenci Ekle',
-            // Yeni öğrenci için boş bir 'student' dizisi gönderiyoruz ki form hata vermesin
-            'student' => array_fill_keys((new StudentModel())->allowedFields, null)
+            'title'   => 'Yeni Öğrenci Ekle',
+            'student' => array_fill_keys((new StudentModel())->allowedFields, null),
+            'cities'  => $cityModel->orderBy('name', 'ASC')->findAll(),
         ];
         return view('students/new', array_merge($this->data, $data));
-
     }
 
-    /**
-     * Yeni öğrenciyi veritabanına kaydeder.
-     */
     public function create()
     {
         $model = new StudentModel();
         $data = $this->request->getPost();
 
-        // Fotoğraf yükleme işlemi
-        $croppedImageData = $this->request->getPost('cropped_image_data');
-        if (!empty($croppedImageData)) {
-            list(, $croppedImageData) = explode(',', $croppedImageData);
-            $decodedImage = base64_decode($croppedImageData);
-            $imageName = uniqid('student_') . '.jpg';
-            $uploadPath = FCPATH . 'uploads/student_photos/';
-
-            if (!is_dir($uploadPath)) {
-                mkdir($uploadPath, 0777, true);
-            }
-
-            file_put_contents($uploadPath . $imageName, $decodedImage);
-            $data['profile_image'] = 'uploads/student_photos/' . $imageName;
+        if (isset($data['egitim_programi']) && is_array($data['egitim_programi'])) {
+            $data['egitim_programi'] = implode(',', $data['egitim_programi']);
         }
-
-        // RAM Raporu Yükleme
+        
         $reportFile = $this->request->getFile('ram_raporu');
         if ($reportFile && $reportFile->isValid() && !$reportFile->hasMoved()) {
             $newName = $reportFile->getRandomName();
@@ -73,103 +46,102 @@ class StudentController extends BaseController
             $data['ram_raporu'] = $newName;
         }
 
-
         if ($model->insert($data)) {
-            // --- LOGLAMA EKLENDİ ---
-        $yeniOgrenciId = $model->getInsertID();
-        $yeniOgrenciData = $model->find($yeniOgrenciId);
-        \CodeIgniter\Events\Events::trigger('student.created', $yeniOgrenciData, auth()->user());
-        // --- LOGLAMA SONU ---
-            return redirect()->to(site_url('students'))->with('success', 'Öğrenci başarıyla eklendi.');
+            $yeniOgrenciId = $model->getInsertID();
+            $yeniOgrenciData = $model->find($yeniOgrenciId);
+            \CodeIgniter\Events\Events::trigger('student.created', $yeniOgrenciData, auth()->user());
+            return redirect()->to(site_url('my-students'))->with('success', 'Öğrenci başarıyla eklendi.');
         }
 
         return redirect()->back()->withInput()->with('errors', $model->errors());
     }
 
-    /**
-     * Belirli bir öğrencinin detaylarını gösterir.
-     */
     public function show($id = null)
     {
         $model = new StudentModel();
         $user = auth()->user();
 
-        // --- YENİ GÜVENLİK KONTROLÜ ---
-        // Eğer kullanıcı bir öğretmen ise (ama yönetici değilse),
-        // sadece kendi öğrencisini görebildiğinden emin ol.
-        if ($user->inGroup('ogretmen') && ! $user->inGroup('admin', 'yonetici', 'mudur', 'sekreter')) {
+        // --- GÜVENLİK KONTROLÜ ---
+        if ($user->inGroup('ogretmen') && !$user->inGroup('admin', 'yonetici', 'mudur', 'sekreter')) {
             if (!$model->isStudentOfTeacher($id, $user->id)) {
-                // Eğer öğrenci bu öğretmene ait değilse, kendi öğrenci listesine yönlendir.
-                return redirect()->to(route_to('students.my'))
-                                 ->with('error', 'Bu öğrencinin detaylarını görme yetkiniz bulunmamaktadır.');
+                return redirect()->to(site_url('my-students'))->with('error', 'Bu öğrencinin detaylarını görme yetkiniz yok.');
             }
         }
         // --- GÜVENLİK KONTROLÜ SONU ---
 
-        $data = [
-            'title'   => 'Öğrenci Detayları',
-            'student' => $model->find($id),
-        ];
+        $student = $model
+            ->select('students.*, cities.name as city_name, districts.name as district_name')
+            ->join('cities', 'cities.id = students.city_id', 'left')
+            ->join('districts', 'districts.id = students.district_id', 'left')
+            ->find($id);
 
-        if (empty($data['student'])) {
+        if (empty($student)) {
             throw new \CodeIgniter\Exceptions\PageNotFoundException('Öğrenci bulunamadı: ' . $id);
         }
+        
+        $student['egitim_programi'] = !empty($student['egitim_programi']) ? explode(',', $student['egitim_programi']) : [];
 
+        $data = [
+            'title'   => 'Öğrenci Profili',
+            'student' => $student,
+        ];
+        
         return view('students/show', array_merge($this->data, $data));
-
     }
-    
-    /**
-     * Öğrenci düzenleme formunu gösterir.
-     */
+
     public function edit($id = null)
     {
         $model = new StudentModel();
-        $data = [
-            'title'   => 'Öğrenciyi Düzenle',
-            'student' => $model->find($id),
-        ];
+        $user = auth()->user();
 
-        if (empty($data['student'])) {
+        // --- GÜVENLİK KONTROLÜ ---
+        if ($user->inGroup('ogretmen') && !$user->inGroup('admin', 'yonetici', 'mudur', 'sekreter')) {
+            if (!$model->isStudentOfTeacher($id, $user->id)) {
+                return redirect()->to(site_url('students'))->with('error', 'Bu öğrenciyi düzenleme yetkiniz yok.');
+            }
+        }
+        // --- GÜVENLİK KONTROLÜ SONU ---
+
+        $cityModel = new CityModel();
+        $student = $model->find($id);
+
+        if (empty($student)) {
             throw new \CodeIgniter\Exceptions\PageNotFoundException('Öğrenci bulunamadı: ' . $id);
         }
 
+        $student['egitim_programi'] = !empty($student['egitim_programi']) ? explode(',', $student['egitim_programi']) : [];
+
+        $data = [
+            'title'   => 'Öğrenciyi Düzenle',
+            'student' => $student,
+            'cities'  => $cityModel->orderBy('name', 'ASC')->findAll(),
+        ];
+
         return view('students/edit', array_merge($this->data, $data));
     }
-
-
-    /**
-     * Öğrenci bilgilerini günceller.
-     */
+    
     public function update($id = null)
     {
         $model = new StudentModel();
-        $student = $model->find($id);
+        $user = auth()->user();
+
+        // --- GÜVENLİK KONTROLÜ ---
+        if ($user->inGroup('ogretmen') && !$user->inGroup('admin', 'yonetici', 'mudur', 'sekreter')) {
+            if (!$model->isStudentOfTeacher($id, $user->id)) {
+                return redirect()->to(site_url('my-students'))->with('error', 'Bu öğrenciyi güncelleme yetkiniz yok.');
+            }
+        }
+        // --- GÜVENLİK KONTROLÜ SONU ---
+        
         $data = $this->request->getPost();
 
-        // Fotoğraf yükleme işlemi
-        $croppedImageData = $this->request->getPost('cropped_image_data');
-        if (!empty($croppedImageData)) {
-            if (!empty($student['profile_image']) && file_exists(FCPATH . $student['profile_image'])) {
-                 unlink(FCPATH . $student['profile_image']);
-            }
-
-            list(, $croppedImageData) = explode(',', $croppedImageData);
-            $decodedImage = base64_decode($croppedImageData);
-            $imageName = 'student_' . $id . '_' . uniqid() . '.jpg';
-            $uploadPath = FCPATH . 'uploads/student_photos/';
-
-            if (!is_dir($uploadPath)) {
-                mkdir($uploadPath, 0777, true);
-            }
-            
-            file_put_contents($uploadPath . $imageName, $decodedImage);
-            $data['profile_image'] = 'uploads/student_photos/' . $imageName;
+        if (isset($data['egitim_programi']) && is_array($data['egitim_programi'])) {
+            $data['egitim_programi'] = implode(',', $data['egitim_programi']);
         }
 
-        // RAM Raporu Yükleme
         $reportFile = $this->request->getFile('ram_raporu');
         if ($reportFile && $reportFile->isValid() && !$reportFile->hasMoved()) {
+            $student = $model->find($id);
             if (!empty($student['ram_raporu']) && file_exists(WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu'])) {
                 unlink(WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu']);
             }
@@ -179,66 +151,67 @@ class StudentController extends BaseController
         }
 
         if ($model->update($id, $data)) {
-            // --- LOGLAMA EKLENDİ ---
-        // Log için güncellenmiş öğrenci verisini tekrar çekelim
-        $guncelOgrenciData = $model->find($id);
-        \CodeIgniter\Events\Events::trigger('student.updated', $guncelOgrenciData, auth()->user());
-        // --- LOGLAMA SONU ---
-            return redirect()->to(site_url('students'))->with('success', 'Öğrenci başarıyla güncellendi.');
+            $guncelOgrenciData = $model->find($id);
+            \CodeIgniter\Events\Events::trigger('student.updated', $guncelOgrenciData, auth()->user());
+            return redirect()->to(site_url('students/' . $id))->with('success', 'Öğrenci başarıyla güncellendi.');
         }
 
         return redirect()->back()->withInput()->with('errors', $model->errors());
     }
 
-    /**
-     * Öğrenciyi veritabanından (soft) siler.
-     */
     public function delete($id = null)
     {
         $model = new StudentModel();
+        $user = auth()->user();
 
-            // --- LOGLAMA EKLENDİ ---
-                // Silmeden önce öğrencinin bilgilerini alıyoruz ki log mesajında kullanabilelim.
-                $silinecekOgrenci = $model->find($id);
-                if (!$silinecekOgrenci) {
-                    return redirect()->back()->with('error', 'Silinecek öğrenci bulunamadı.');
-                }
-                // --- LOGLAMA SONU ---
-
-
-        if ($model->delete($id)) {
-            // --- LOGLAMA EKLENDİ ---
-        \CodeIgniter\Events\Events::trigger('student.deleted', $silinecekOgrenci, auth()->user());
-        // --- LOGLAMA SONU ---
-            return redirect()->to(site_url('students'))->with('success', 'Öğrenci başarıyla silindi.');
+        // --- GÜVENLİK KONTROLÜ ---
+        if ($user->inGroup('ogretmen') && !$user->inGroup('admin', 'yonetici', 'mudur', 'sekreter')) {
+            if (!$model->isStudentOfTeacher($id, $user->id)) {
+                return redirect()->to(site_url('my-students'))->with('error', 'Bu öğrenciyi silme yetkiniz yok.');
+            }
         }
+        // --- GÜVENLİK KONTROLÜ SONU ---
 
+        $silinecekOgrenci = $model->find($id);
+        if (!$silinecekOgrenci) {
+            return redirect()->back()->with('error', 'Silinecek öğrenci bulunamadı.');
+        }
+        if ($model->delete($id)) {
+            \CodeIgniter\Events\Events::trigger('student.deleted', $silinecekOgrenci, auth()->user());
+            return redirect()->to(site_url('my-students'))->with('success', 'Öğrenci başarıyla silindi.');
+        }
         return redirect()->back()->with('error', 'Öğrenci silinirken bir hata oluştu.');
     }
-        public function viewRamReport($studentId)
+
+    public function viewRamReport($studentId)
     {
+        // Not: Öğretmenlerin sadece kendi öğrencilerinin raporunu görmesi için
+        // buraya da bir güvenlik kontrolü eklenebilir. Şimdilik temel yetki kontrolü yeterli.
         $studentModel = new StudentModel();
         $student = $studentModel->find($studentId);
-
         if (empty($student) || empty($student['ram_raporu'])) {
             throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound('İstenen rapor bulunamadı.');
         }
-
         $filePath = WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu'];
-
         if (!file_exists($filePath)) {
             throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound('Rapor dosyası sunucuda mevcut değil.');
         }
-
         return $this->response
             ->setHeader('Content-Type', 'application/pdf')
             ->setHeader('Content-Disposition', 'inline; filename="' . $student['ram_raporu'] . '"')
             ->setBody(file_get_contents($filePath));
     }
+    
+    public function getDistricts($cityId)
+    {
+        if ($this->request->isAJAX()) {
+            $districtModel = new DistrictModel();
+            $districts = $districtModel->where('city_id', $cityId)->orderBy('name', 'ASC')->findAll();
+            return $this->response->setJSON($districts);
+        }
+        return redirect()->to('/');
+    }
 
-        /**
-     * Giriş yapmış öğretmene atanmış öğrencileri listeler.
-     */
     public function myStudents()
     {
         $model = new StudentModel();
