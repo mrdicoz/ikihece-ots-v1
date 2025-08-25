@@ -81,10 +81,12 @@ class StudentController extends BaseController
                     'ram_baslagic'      => $this->formatDate($sheet->getCell('V' . $rowNum)->getValue()),
                     'ram_bitis'         => $this->formatDate($sheet->getCell('W' . $rowNum)->getValue()),
                     'ram_raporu'        => trim($sheet->getCell('X' . $rowNum)->getValue()), // DÜZELTME BURADA
-                    'egitim_programi'   => $this->mapEgitimProgrami(trim($sheet->getCell('Y' . $rowNum)->getValue())),
-                    'hastane_adi'       => trim($sheet->getCell('Z' . $rowNum)->getValue()),
-                    'hastane_raporu_baslama_tarihi' => $this->formatDate($sheet->getCell('AA' . $rowNum)->getValue()),
-                    'hastane_raporu_bitis_tarihi' => $this->formatDate($sheet->getCell('AB' . $rowNum)->getValue()),
+                    'egitim_programi'   => $this->mapEgitimProgrami(trim($sheet->getCell('Z' . $rowNum)->getValue())),
+                    'hastane_adi'       => trim($sheet->getCell('AA' . $rowNum)->getValue()),
+                    'hastane_raporu_baslama_tarihi' => $this->formatDate($sheet->getCell('AB' . $rowNum)->getValue()),
+                    'hastane_raporu_bitis_tarihi' => $this->formatDate($sheet->getCell('AC' . $rowNum)->getValue()),
+                    'google_konum'      => trim($sheet->getCell('AF' . $rowNum)->getValue()), // **DÜZELTME BURADA**
+
                 ];
 
                 // Upsert logic: Kayıt varsa güncelle, yoksa ekle
