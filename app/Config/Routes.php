@@ -73,6 +73,8 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
     $routes->group('', ['filter' => 'group:admin,yonetici,mudur,sekreter,ogretmen'], static function ($routes) {
         $routes->get('students/view-ram-report/(:num)', 'StudentController::viewRamReport/$1', ['as' => 'students.viewRamReport']);
         $routes->resource('students', ['controller' => 'StudentController']);
+
+    
     });
 
     // Veli Paneli Rotaları
@@ -138,6 +140,10 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
     // --------------------------------------------------------------------
     $routes->group('admin', ['filter' => 'group:admin'], static function ($routes) {
 
+          $routes->get('import', 'Admin\StudentController::importView', ['as' => 'admin.students.importView']);
+        $routes->post('import-mapping', 'Admin\StudentController::importMapping', ['as' => 'admin.students.importMapping']);
+        $routes->post('import-process', 'Admin\StudentController::importProcess', ['as' => 'admin.students.importProcess']);
+
 
         // --- YENİ GÜNCELLEME ROTLARI ---
         $routes->get('update', 'Admin\UpdateController::index', ['as' => 'admin.update.index']);
@@ -180,9 +186,6 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         // Loglar
         $routes->get('logs', 'Admin\LogController::index', ['as' => 'admin.logs.index']);
         
-        // Öğrenci İçe Aktarma
-        $routes->get('students/import', 'Admin\StudentController::importView', ['as' => 'admin.students.importView']);
-        $routes->post('students/import', 'Admin\StudentController::import', ['as' => 'admin.students.import']);
         
         // Kurum Ayarları
         $routes->get('institution', 'Admin\InstitutionController::index', ['as' => 'admin.institution.index']);

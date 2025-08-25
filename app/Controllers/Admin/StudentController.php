@@ -11,7 +11,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 class StudentController extends BaseController
 {
     /**
-     * Toplu öğrenci aktarma formunu gösterir.
+     * Toplu öğrenci aktarma formunu gösterir (Adım 0).
      */
     public function importView()
     {
@@ -19,9 +19,9 @@ class StudentController extends BaseController
     }
 
     /**
-     * Yüklenen CSV/Excel dosyasını işleyerek öğrencileri veritabanına aktarır.
+     * Yüklenen dosyayı okur, başlıkları alır ve eşleştirme görünümüne yönlendirir (Adım 1).
      */
-    public function import()
+       public function importMapping()
     {
         $file = $this->request->getFile('file');
 
@@ -29,87 +29,196 @@ class StudentController extends BaseController
             return redirect()->back()->with('error', 'Dosya yüklenirken bir hata oluştu: ' . $file->getErrorString());
         }
 
+        $newName = $file->getRandomName();
+        $file->move(WRITEPATH . 'uploads', $newName);
+        $filePath = WRITEPATH . 'uploads/' . $newName;
+
         try {
-            $spreadsheet = IOFactory::load($file->getTempName());
+            $spreadsheet = IOFactory::load($filePath);
             $sheet = $spreadsheet->getActiveSheet();
-            $startRow = 2; // Verilerin başladığı satır (başlık satırını atla)
+            
+            $headerRow = $sheet->getRowIterator(1, 1)->current();
+
+            $fileColumns = [];
+            $cellIterator = $headerRow->getCellIterator();
+            $cellIterator->setIterateOnlyExistingCells(true);
+            foreach ($cellIterator as $cell) {
+                $fileColumns[] = $cell->getValue();
+            }
+
+            $studentModel = new StudentModel();
+            $dbColumns = $studentModel->allowedFields;
+            
+            // DÜZELTME: Kafa karışıklığı yaratan 'city_id' ve 'district_id' kaldırıldı.
+            $dbColumns = array_filter($dbColumns, function($field) {
+                return !in_array($field, ['city_id', 'district_id']);
+            });
+
+            // Gerekli 'il' ve 'ilce' seçenekleri ekleniyor.
+            $dbColumns[] = 'il';
+            $dbColumns[] = 'ilce';
+            sort($dbColumns);
+
+
+            $data = [
+                'fileName'    => $newName,
+                'fileColumns' => $fileColumns,
+                'dbColumns'   => $dbColumns,
+            ];
+            
+            return view('admin/students/import_mapping', $data);
+
+        } catch (\Exception $e) {
+            if (isset($filePath) && file_exists($filePath)) {
+                unlink($filePath);
+            }
+            return redirect()->back()->with('error', 'Dosya okunurken bir hata oluştu: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Kullanıcının eşleştirdiği verileri veritabanına aktarır (Adım 2).
+     */
+  public function importProcess()
+    {
+        $fileName = $this->request->getPost('file_name');
+        $mappings = $this->request->getPost('mappings');
+        $filePath = WRITEPATH . 'uploads/' . $fileName;
+
+        if (empty($fileName) || !file_exists($filePath)) {
+            return redirect()->to(route_to('admin.students.importView'))->with('error', 'İşlenecek dosya bulunamadı. Lütfen dosyayı tekrar yükleyin.');
+        }
+
+        try {
+            $spreadsheet = IOFactory::load($filePath);
+            $sheet = $spreadsheet->getActiveSheet();
+            $startRow = 2;
             $highestRow = $sheet->getHighestRow();
 
             $studentModel = new StudentModel();
             $cityModel = new CityModel();
             $districtModel = new DistrictModel();
 
-            // Performans için il ve ilçeleri önbelleğe al (Büyük harfe çevirerek)
             $cities = array_change_key_case(array_column($cityModel->findAll(), 'id', 'name'), CASE_UPPER);
-            $districts = array_change_key_case(array_column($districtModel->findAll(), 'id', 'name'), CASE_UPPER);
+            
+            $districtsData = $districtModel->select('districts.id, districts.name, cities.name as city_name')
+                                           ->join('cities', 'cities.id = districts.city_id')
+                                           ->asArray()
+                                           ->findAll();
+            
+            $districts = [];
+            foreach ($districtsData as $d) {
+                $cityKey = strtoupper(str_replace(['İ', 'I'], ['i', 'ı'], $d['city_name']));
+                $districtKey = strtoupper(str_replace(['İ', 'I'], ['i', 'ı'], $d['name']));
+                $districts[$cityKey . '_' . $districtKey] = $d['id'];
+            }
 
             $processedCount = 0;
+            $dbFields = $studentModel->allowedFields;
             
+            // DÜZELTME: Hata ayıklama için TCKN, il ve ilçe eşleştirmelerini başta bulduk.
+            $tcknDbKey = array_search('tckn', $mappings);
+            $cityKeyIndex = array_search('il', $mappings);
+            $districtKeyIndex = array_search('ilce', $mappings);
+
             for ($rowNum = $startRow; $rowNum <= $highestRow; $rowNum++) {
-                $tckn = trim($sheet->getCell('D' . $rowNum)->getValue());
+                $rowData = $sheet->rangeToArray('A' . $rowNum . ':' . $sheet->getHighestColumn($rowNum) . $rowNum, null, true, false)[0];
                 
-                // TCKN boş ise veya geçerli değilse bu satırı atla
-                if (empty($tckn) || strlen($tckn) !== 11) {
+                if ($tcknDbKey === false || !isset($rowData[$tcknDbKey]) || empty(trim($rowData[$tcknDbKey])) || strlen(trim($rowData[$tcknDbKey])) !== 11) {
                     continue;
                 }
+                $tckn = trim($rowData[$tcknDbKey]);
 
-                $ilAdi = strtoupper(trim($sheet->getCell('J' . $rowNum)->getValue()));
-                $ilceAdi = strtoupper(trim($sheet->getCell('I' . $rowNum)->getValue()));
+                $data = [];
+                $cityNameForDistrictLookup = null;
+                
+                // DÜZELTME: İl ve ilçe verileri, sütun sıralamasından bağımsız olarak burada işleniyor.
+                // 1. İl bilgisini işle
+                if ($cityKeyIndex !== false && isset($rowData[$cityKeyIndex])) {
+                    $cityName = trim($rowData[$cityKeyIndex]);
+                    $cityNameForDistrictLookup = strtoupper(str_replace(['İ', 'I'], ['i', 'ı'], $cityName));
+                    if (isset($cities[$cityNameForDistrictLookup])) {
+                        $data['city_id'] = $cities[$cityNameForDistrictLookup];
+                    }
+                }
 
-                // CSV dosyasındaki sütunlarla veritabanı alanlarını eşleştir
-                $data = [
-                    'adi'               => trim($sheet->getCell('B' . $rowNum)->getValue()),
-                    'soyadi'            => trim($sheet->getCell('C' . $rowNum)->getValue()),
-                    'tckn'              => $tckn,
-                    'cinsiyet'          => $this->mapCinsiyet(trim($sheet->getCell('E' . $rowNum)->getValue())),
-                    'dogum_tarihi'      => $this->formatDate($sheet->getCell('F' . $rowNum)->getValue()),
-                    'iletisim'          => trim($sheet->getCell('G' . $rowNum)->getValue()),
-                    'adres_detayi'      => trim($sheet->getCell('H' . $rowNum)->getValue()),
-                    'city_id'           => $cities[$ilAdi] ?? null,
-                    'district_id'       => $districts[$ilceAdi] ?? null,
-                    'servis'            => $this->mapServisDurumu(trim($sheet->getCell('K' . $rowNum)->getValue())),
-                    'mesafe'            => $this->mapMesafe(trim($sheet->getCell('L' . $rowNum)->getValue())),
-                    'orgun_egitim'      => strtolower(trim($sheet->getCell('M' . $rowNum)->getValue())) === 'evet' ? 'evet' : 'hayir',
-                    'egitim_sekli'      => $this->mapEgitimSekli(trim($sheet->getCell('N' . $rowNum)->getValue())),
-                    'veli_baba'         => trim($sheet->getCell('O' . $rowNum)->getValue()),
-                    'veli_baba_telefon' => trim($sheet->getCell('P' . $rowNum)->getValue()),
-                    'veli_baba_tc'      => trim($sheet->getCell('Q' . $rowNum)->getValue()),
-                    'veli_anne'         => trim($sheet->getCell('R' . $rowNum)->getValue()),
-                    'veli_anne_telefon' => trim($sheet->getCell('S' . $rowNum)->getValue()),
-                    'veli_anne_tc'      => trim($sheet->getCell('T' . $rowNum)->getValue()),
-                    'ram'               => trim($sheet->getCell('U' . $rowNum)->getValue()),
-                    'ram_baslagic'      => $this->formatDate($sheet->getCell('V' . $rowNum)->getValue()),
-                    'ram_bitis'         => $this->formatDate($sheet->getCell('W' . $rowNum)->getValue()),
-                    'ram_raporu'        => trim($sheet->getCell('X' . $rowNum)->getValue()), // DÜZELTME BURADA
-                    'egitim_programi'   => $this->mapEgitimProgrami(trim($sheet->getCell('Z' . $rowNum)->getValue())),
-                    'hastane_adi'       => trim($sheet->getCell('AA' . $rowNum)->getValue()),
-                    'hastane_raporu_baslama_tarihi' => $this->formatDate($sheet->getCell('AB' . $rowNum)->getValue()),
-                    'hastane_raporu_bitis_tarihi' => $this->formatDate($sheet->getCell('AC' . $rowNum)->getValue()),
-                    'google_konum'      => trim($sheet->getCell('AF' . $rowNum)->getValue()), // **DÜZELTME BURADA**
+                // 2. İlçe bilgisini işle
+                if ($districtKeyIndex !== false && isset($rowData[$districtKeyIndex])) {
+                    $districtName = trim($rowData[$districtKeyIndex]);
+                    if ($cityNameForDistrictLookup) { // İl bilgisi varsa devam et
+                        $upperDistrictName = strtoupper(str_replace(['İ', 'I'], ['i', 'ı'], $districtName));
+                        $key = $cityNameForDistrictLookup . '_' . $upperDistrictName;
+                        if (isset($districts[$key])) {
+                            $data['district_id'] = $districts[$key];
+                        }
+                    }
+                }
 
-                ];
+                // Kalan diğer alanları işle
+                foreach ($mappings as $colIndex => $dbField) {
+                    if (empty($dbField) || !isset($rowData[$colIndex])) {
+                        continue;
+                    }
+                    
+                    $cellValue = trim($rowData[$colIndex]);
 
-                // Upsert logic: Kayıt varsa güncelle, yoksa ekle
-                $existing = $studentModel->where('tckn', $data['tckn'])->first();
-                if ($existing) {
-                    $studentModel->update($existing['id'], $data);
+                    if (!in_array($dbField, $dbFields)) {
+                        continue;
+                    }
+                    
+                    // İl ve ilçe alanlarını zaten yukarıda işlediğimiz için burada atla
+                    if ($dbField === 'il' || $dbField === 'ilce') {
+                        continue;
+                    }
+
+                    switch ($dbField) {
+                        case 'dogum_tarihi':
+                        case 'ram_baslagic':
+                        case 'ram_bitis':
+                        case 'hastane_raporu_baslama_tarihi':
+                        case 'hastane_raporu_bitis_tarihi':
+                        case 'hastane_randevu_tarihi':
+                            $data[$dbField] = $this->formatDate($cellValue);
+                            break;
+                        case 'cinsiyet':      $data[$dbField] = $this->mapCinsiyet($cellValue); break;
+                        case 'servis':        $data[$dbField] = $this->mapServisDurumu($cellValue); break;
+                        case 'mesafe':        $data[$dbField] = $this->mapMesafe($cellValue); break;
+                        case 'orgun_egitim':  $data[$dbField] = in_array(strtolower($cellValue), ['evet', '1', 'true']) ? 1 : 0; break;
+                        case 'egitim_sekli':  $data[$dbField] = $this->mapEgitimSekli($cellValue); break;
+                        default:
+                            if (in_array($dbField, $dbFields)) {
+                                $data[$dbField] = !empty($cellValue) ? $cellValue : null;
+                            }
+                            break;
+                    }
+                }
+
+                if (empty($data)) continue;
+
+                $existingStudent = $studentModel->where('tckn', $tckn)->first();
+                if ($existingStudent) {
+                    $studentModel->update($existingStudent['id'], $data);
                 } else {
                     $studentModel->insert($data);
                 }
                 $processedCount++;
             }
 
-            return redirect()->to(route_to('admin.students.importView'))->with('success', $processedCount . ' öğrenci kaydı başarıyla işlendi (eklendi/güncellendi).');
+            unlink($filePath);
+
+            return redirect()->to(route_to('admin.students.importView'))->with('success', $processedCount . ' öğrenci kaydı başarıyla işlendi.');
 
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Dosya işlenirken kritik bir hata oluştu: ' . $e->getMessage() . ' (Satır: ' . $e->getLine() . ')');
+            if (isset($filePath) && file_exists($filePath)) {
+                unlink($filePath);
+            }
+            return redirect()->to(route_to('admin.students.importView'))->with('error', 'Veri işlenirken kritik bir hata oluştu: ' . $e->getMessage() . ' (Satır: ' . $e->getLine() . ')');
         }
     }
-
+    // Helper Functions
     private function formatDate($dateValue): ?string { if (empty($dateValue)) return null; try { if (is_numeric($dateValue)) { $unixDate = ($dateValue - 25569) * 86400; return gmdate("Y-m-d", $unixDate); } return (new \DateTime($dateValue))->format('Y-m-d'); } catch (\Exception $e) { return null; } }
     private function mapCinsiyet($value) { return strtolower(trim($value)) === 'erkek' ? 'erkek' : 'kadin'; }
     private function mapServisDurumu($value) { $v = strtolower(trim($value)); if(in_array($v, ['var','yok','arasira'])) return $v; return null; }
     private function mapMesafe($value) { $v = strtolower(trim($value)); if(in_array($v, ['civar','yakın','uzak'])) return $v; return null; }
-    private function mapEgitimSekli($value) { $v = strtolower(trim($value)); if(in_array($v, ['tam gün','öğlenci','sabahcı'])) return $v; return null; }
-    private function mapEgitimProgrami($value) { $programs = array_map('trim', explode(',', $value)); return implode(',', $programs); }
+    private function mapEgitimSekli($value) { $v = strtolower(trim($value)); if(in_array($v, ['tam gün','yarım gün'])) return $v; return null; }
 }

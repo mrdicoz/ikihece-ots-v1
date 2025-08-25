@@ -32,7 +32,7 @@
                     </ol>
                 </div>
                 <div class="col-lg-7 border-start-lg">
-                    <form id="import-form" action="<?= route_to('admin.students.import') ?>" method="post" enctype="multipart/form-data">
+                    <form id="import-form" action="<?= route_to('admin.students.importMapping') ?>" method="post" enctype="multipart/form-data">
                         <?= csrf_field() ?>
                         <div id="drop-zone" class="drop-zone p-5 text-center">
                             <i class="bi bi-file-earmark-arrow-up-fill fs-1"></i>
