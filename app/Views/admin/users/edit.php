@@ -1,96 +1,95 @@
 <?= $this->extend('layouts/app') ?>
 
 <?= $this->section('main') ?>
-<div class="container mt-4">
-    <h4><i class="bi bi-pencil-square"></i> <?= esc($title) ?>: <?= esc($user->username) ?></h4>
-    <hr>
+<div class="container-fluid mt-4">
+    <div class="d-sm-flex align-items-center justify-content-between mb-3">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-pencil-square"></i> <?= esc($title) ?></h1>
+    </div>
 
-    <div class="card">
-        <div class="card-body">
-            
-            <?= session()->getFlashdata('error') ? '<div class="alert alert-danger">'.session()->getFlashdata('error').'</div>' : '' ?>
-            <?= service('validation')->listErrors('list') ?>
+    <?= session()->getFlashdata('error') ? '<div class="alert alert-danger">'.session()->getFlashdata('error').'</div>' : '' ?>
+    <?= service('validation')->listErrors('list') ?>
 
-            <form action="<?= route_to('admin.users.update', $user->id) ?>" method="post">
-                <?= csrf_field() ?>
-
+    <form action="<?= route_to('admin.users.update', $user->id) ?>" method="post">
+        <?= csrf_field() ?>
+        
+        <div class="card shadow">
+            <div class="card-body">
                 <div class="row">
-                    <div class="col-md-6">
-                        <h5>Profil Bilgileri</h5>
-                        <div class="mb-3">
-                             <label class="form-label">Profil Fotoğrafı</label>
-                             <div class="d-flex align-items-center">
-                                 <img src="<?= base_url($profile->profile_photo ?? '/assets/images/user.jpg') ?>" alt="Profil Fotoğrafı" id="profile-pic-preview" class="img-thumbnail rounded-circle me-3" style="width: 80px; height: 80px; object-fit: cover;">
-                                 <div>
-                                     <label for="profile_photo_input" class="btn btn-outline-primary btn-sm">
-                                         <i class="bi bi-camera"></i> Fotoğrafı Değiştir
-                                     </label>
-                                     <input type="file" id="profile_photo_input" class="d-none" accept="image/*">
-                                     <input type="hidden" name="cropped_image_data" id="cropped_image_data">
-                                 </div>
-                             </div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="first_name" class="form-label">Ad</label>
-                            <input type="text" class="form-control" name="first_name" value="<?= old('first_name', $profile->first_name ?? '') ?>" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="last_name" class="form-label">Soyad</label>
-                            <input type="text" class="form-control" name="last_name" value="<?= old('last_name', $profile->last_name ?? '') ?>" required>
-                        </div>
-                    </div>
-
-                    <div class="col-md-6">
-                        <h5>Hesap Bilgileri</h5>
-                        <div class="mb-3">
-                            <label for="username" class="form-label">Kullanıcı Adı</label>
-                            <input type="text" class="form-control" name="username" value="<?= old('username', $user->username) ?>" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="email" class="form-label">E-posta</label>
-                            <input type="email" class="form-control" name="email" value="<?= old('email', $user->email) ?>" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Yeni Şifre</label>
-                            <input type="password" class="form-control" name="password">
-                            <small class="form-text text-muted">Değiştirmek istemiyorsanız boş bırakın.</small>
-                        </div>
-                        <div class="mb-3">
-                            <label for="password_confirm" class="form-label">Yeni Şifre (Tekrar)</label>
-                            <input type="password" class="form-control" name="password_confirm">
+                    <div class="col-md-8">
+                        <h5 class="mb-3">Profil Bilgileri</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Adı</label>
+                                <input type="text" name="first_name" class="form-control" value="<?= old('first_name', $profile->first_name ?? '') ?>" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Soyadı</label>
+                                <input type="text" name="last_name" class="form-control" value="<?= old('last_name', $profile->last_name ?? '') ?>" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Kullanıcı Adı</label>
+                                <input type="text" name="username" class="form-control" value="<?= old('username', $user->username) ?>" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">E-Posta</label>
+                                <input type="email" name="email" class="form-control" value="<?= old('email', $user->email) ?>" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Yeni Şifre</label>
+                                <input type="password" name="password" class="form-control">
+                                <small class="form-text text-muted">Değiştirmek istemiyorsanız boş bırakın.</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Yeni Şifre Tekrar</label>
+                                <input type="password" name="password_confirm" class="form-control">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">T.C. Kimlik No</label>
+                                <input type="text" name="tc_kimlik_no" class="form-control" value="<?= old('tc_kimlik_no', $profile->tc_kimlik_no ?? '') ?>" maxlength="11" required>
+                            </div>
+                            <div class="col-md-6 mb-3" id="branch-field" style="<?= in_array('ogretmen', $userGroups) ? 'display: block;' : 'display: none;' ?>">
+                                <label class="form-label">Branş</label>
+                                <select name="branch" class="form-select">
+                                    <option value="">Branş Seçiniz...</option>
+                                    <?php foreach ($branches as $branch): ?>
+                                        <option value="<?= esc($branch) ?>" <?= (old('branch', $profile->branch ?? '') == $branch) ? 'selected' : '' ?>><?= esc($branch) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <hr>
-
-                <h5>Yetkilendirme</h5>
-                <div class="row">
-                    <div class="col-md-6">
-                        <label for="groups" class="form-label">Kullanıcı Grupları</label>
-<select name="groups[]" id="groups" class="form-select" multiple>
-    <?php foreach ($allGroups as $key => $name): ?>
-        <option value="<?= esc($key) ?>" <?= in_array($key, $userGroups) ? 'selected' : '' ?>>
-            <?= esc($name) ?>
-        </option>
-    <?php endforeach; ?>
-</select>
-                    </div>
-                    <div class="col-md-6 d-flex align-items-center">
-                        <div class="form-check form-switch">
+                    <div class="col-md-4">
+                        <h5 class="mb-3 text-center">Profil Fotoğrafı</h5>
+                        <div class="d-flex justify-content-center">
+                            <img src="<?= base_url($profile->profile_photo ?? '/assets/images/user.jpg') ?>" alt="Profil Fotoğrafı" id="profile-pic-preview" class="img-thumbnail rounded-circle mb-2" style="width: 120px; height: 120px; object-fit: cover;">
+                        </div>
+                        <div>
+                            <label for="profile_photo_input" class="btn btn-outline-success w-100"><i class="bi bi-camera"></i> Fotoğraf Değiştir</label>
+                            <input type="file" id="profile_photo_input" class="d-none" accept="image/*">
+                            <input type="hidden" name="cropped_image_data" id="cropped_image_data">
+                        </div>
+                        <h5 class="mt-4 mb-3">Yetkilendirme</h5>
+                        <label class="form-label">Kullanıcı Grupları</label>
+                        <select name="groups[]" id="groups" class="form-select" multiple>
+                            <?php foreach ($allGroups as $key => $name): ?>
+                                <option value="<?= esc($key) ?>" <?= in_array($key, $userGroups) ? 'selected' : '' ?>>
+                                    <?= esc($name) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-check form-switch mt-3">
                             <input class="form-check-input" type="checkbox" name="active" role="switch" id="active" <?= $user->active ? 'checked' : '' ?>>
                             <label class="form-check-label" for="active">Hesap Aktif Olsun</label>
                         </div>
                     </div>
-                </div>
-
-                <div class="text-end mt-4">
-                    <a href="<?= route_to('admin.users.show', $user->id) ?>" class="btn btn-secondary">İptal</a>
-                    <button type="submit" class="btn btn-primary">Değişiklikleri Kaydet</button>
-                </div>
-            </form>
-        </div>
-    </div>
+                </div>             
+            </div>
+            <div class="card-footer text-end">
+                <a href="<?= route_to('admin.users.show', $user->id) ?>" class="btn btn-secondary">İptal</a>
+                <button type="submit" class="btn btn-success">Değişiklikleri Kaydet</button>
+            </div>
+        </div>    
+    </form>
 </div>
 <div class="modal fade" id="cropperModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -109,9 +108,23 @@
 <?= $this->section('pageScripts') ?>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        new TomSelect('#groups',{
+        const groupSelect = new TomSelect('#groups',{
             plugins: ['remove_button'],
         });
+        
+        const branchField = document.getElementById('branch-field');
+        
+        groupSelect.on('change', function(value) {
+            if (value.includes('ogretmen')) {
+                branchField.style.display = 'block';
+            } else {
+                branchField.style.display = 'none';
+            }
+        });
+        const initialGroups = groupSelect.getValue();
+        if (initialGroups.includes('ogretmen')) {
+            branchField.style.display = 'block';
+        }
     });
 </script>
 <script>
@@ -136,8 +149,10 @@ document.addEventListener('DOMContentLoaded', function () {
         cropper = new Cropper(image, { aspectRatio: 1 / 1, viewMode: 1 });
     });
     cropperModalEl.addEventListener('hidden.bs.modal', function () {
-        cropper.destroy();
-        cropper = null;
+        if (cropper) {
+            cropper.destroy();
+            cropper = null;
+        }
         fileInput.value = '';
     });
     cropButton.addEventListener('click', function () {

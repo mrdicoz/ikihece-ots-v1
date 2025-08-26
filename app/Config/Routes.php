@@ -144,6 +144,7 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->post('import-mapping', 'Admin\StudentController::importMapping', ['as' => 'admin.students.importMapping']);
         $routes->post('import-process', 'Admin\StudentController::importProcess', ['as' => 'admin.students.importProcess']);
 
+        
 
         // --- YENİ GÜNCELLEME ROTLARI ---
         $routes->get('update', 'Admin\UpdateController::index', ['as' => 'admin.update.index']);
@@ -181,6 +182,8 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->get('users/edit/(:num)', 'Admin\UserController::edit/$1', ['as' => 'admin.users.edit']);
         $routes->post('users/update/(:num)', 'Admin\UserController::update/$1', ['as' => 'admin.users.update']);
         $routes->post('users/delete/(:num)', 'Admin\UserController::delete/$1', ['as' => 'admin.users.delete']);
+        $routes->get('users/(:any)', 'Admin\UserController::index/$1', ['as' => 'admin.users.index.filtered']);
+
         
         
         // Loglar

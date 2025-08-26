@@ -45,7 +45,12 @@
                     <?php else: // calisan ?>
                         <div class="mb-3">
                             <label for="branch" class="form-label">Branş / Departman</label>
-                            <input type="text" class="form-control" id="branch" name="branch" value="<?= old('branch') ?>" required>
+                            <select class="form-select" id="branch" name="branch" required>
+                                <option value="">Branş Seçiniz...</option>
+                                <?php foreach ($branches as $branch): ?>
+                                    <option value="<?= esc($branch) ?>" <?= (old('branch') == $branch) ? 'selected' : '' ?>><?= esc($branch) ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                     <?php endif; ?>
 
@@ -74,7 +79,6 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('pageScripts') ?>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     // initCropper fonksiyonu public/assets/js/custom.js dosyasından geliyor

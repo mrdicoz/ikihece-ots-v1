@@ -24,7 +24,11 @@
                             <h5 class="card-title">Kullanıcı Bilgileri</h5>
                             <ul class="list-group list-group-flush">
                                 <li class="list-group-item"><strong>E-posta:</strong> <?= esc($user->email ?? 'Belirtilmemiş') ?></li>
+                                <li class="list-group-item"><strong>T.C. Kimlik No:</strong> <?= esc($profile->tc_kimlik_no ?? 'Belirtilmemiş') ?></li>
                                 <li class="list-group-item"><strong>Telefon:</strong> <?= esc($profile->phone_number ?? 'Belirtilmemiş') ?></li>
+                                <?php if ($user->inGroup('ogretmen')): ?>
+                                    <li class="list-group-item"><strong>Branş:</strong> <?= esc($profile->branch ?? 'Belirtilmemiş') ?></li>
+                                <?php endif; ?>
                                 <li class="list-group-item"><strong>Durum:</strong>
                                     <?php if ($user->active): ?>
                                         <span class="badge bg-success">Aktif</span>

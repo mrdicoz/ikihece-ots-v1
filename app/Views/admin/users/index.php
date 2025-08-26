@@ -6,13 +6,24 @@
         <div class="col-6">
             <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-people"></i> <?= esc($title) ?></h1>
         </div>
-
         <div class="col-6 text-end">
             <a href="<?= route_to('admin.users.new') ?>" class="btn btn-success btn-sm">
                 <i class="bi bi-person-plus-fill fa-sm text-white-50"></i> Yeni Kullanıcı Ekle
             </a>
         </div>
     </div>
+    
+<ul class="nav nav-tabs nav-pills nav-justified gap-2 mb-4">
+    <li class="nav-item">
+        <a class="nav-link <?= is_null($currentGroup) ? 'active bg-success text-white' : '' ?>" aria-current="page" href="<?= route_to('admin.users.index') ?>">Tüm Kullanıcılar</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $currentGroup === 'calisan' ? 'active bg-success text-white' : '' ?>" href="<?= route_to('admin.users.index.filtered', 'calisan') ?>">Çalışanlar</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $currentGroup === 'veli' ? 'active bg-success text-white' : '' ?>" href="<?= route_to('admin.users.index.filtered', 'veli') ?>">Veliler</a>
+    </li>
+</ul>
 
     <div class="card shadow">
         <div class="card-body">
@@ -23,6 +34,7 @@
                             <th>Fotoğraf</th>
                             <th>Kullanıcı Adı</th>
                             <th class="d-none d-lg-table-cell">Ad Soyad</th>
+                            <th class="d-none d-md-table-cell">Branş</th>
                             <th class="d-none d-lg-table-cell">Gruplar</th>
                             <th class="d-none d-lg-table-cell">Durum</th>
                         </tr>
@@ -38,6 +50,7 @@
                                 </td>
                                 <td><?= esc($user->username) ?></td>
                                 <td class="d-none d-lg-table-cell"><?= esc($user->first_name ?? '') ?> <?= esc($user->last_name ?? '') ?></td>
+                                <td class="d-none d-md-table-cell"><?= esc($user->branch ?? '---') ?></td>
                                 <td class="d-none d-lg-table-cell">
                                     <?php 
                                     $groups = explode(',', $user->user_groups ?? '');
@@ -72,15 +85,13 @@
     $(document).ready(function() {
         $('#users-table').DataTable({
             "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/tr.json" },
-            // Sütunları gizlediğimiz için, Datatables'ın sıralama özelliğinin
-            // doğru çalışması için hedef sütunları belirtmek iyi bir pratiktir.
-            // Bu örnekte varsayılan sıralama yeterli olacaktır.
+            "columnDefs": [
+                { "type": "turkish", "targets": "_all" }
+            ],
+            "order": []
         });
 
-        // Satırlara tıklama özelliği ekle
         $('#users-table tbody').on('click', 'tr', function () {
-            // Datatables'ın arama sonrası satırları yeniden çizdiğini düşünerek
-            // event listener'ı bu şekilde bağlamak daha sağlamdır.
             window.location.href = $(this).data('href');
         });
     });

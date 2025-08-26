@@ -43,6 +43,21 @@ class OnboardingController extends BaseController
         }
         
         $data['role'] = $role;
+
+        // Calisan rolü için branş listesini hazırlayalım.
+        if ($role === 'calisan') {
+            $data['branches'] = [
+                'Fizyoterapist',
+                'Dil ve Konuşma Bozuklukları Uzmanı',
+                'Odyoloji ve Konuşma Bozuklukları Uzmanı',
+                'Özel Eğitim Alanı Öğretmeni',
+                'Uzman Öğretici',
+                'Psikolog & PDR',
+                'Okul Öncesi Öğretmeni',
+                'Çocuk Gelişimi Öğretmeni'
+            ];
+        }
+
         return view('onboarding/profile_form', $data);
     }
 
@@ -65,7 +80,7 @@ class OnboardingController extends BaseController
         if ($role === 'veli') {
             $rules['tc_kimlik_no'] = 'required|exact_length[11]|numeric';
         } else { // calisan
-            $rules['branch'] = 'required|string|min_length[2]';
+            $rules['branch'] = 'required|in_list[Fizyoterapist,Dil ve Konuşma Bozuklukları Uzmanı,Odyoloji ve Konuşma Bozuklukları Uzmanı,Özel Eğitim Alanı Öğretmeni,Uzman Öğretici,Psikolog & PDR,Okul Öncesi Öğretmeni,Çocuk Gelişimi Öğretmeni]';
         }
 
         if (!$this->validate($rules)) {
@@ -81,9 +96,8 @@ class OnboardingController extends BaseController
         ];
         
         if ($role === 'veli') {
-            // Veli için TC no'yu user_profiles'da özel bir alanda saklayabiliriz.
-            // Şimdilik ana tabloda olmadığını varsayarak ilerliyorum.
-            // Eğer eklenecekse migration ve model güncellenmeli.
+             $profileData['tc_kimlik_no'] = $this->request->getPost('tc_kimlik_no');
+
         } else { // calisan
             $profileData['branch'] = $this->request->getPost('branch');
         }
