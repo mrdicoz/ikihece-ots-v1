@@ -10,7 +10,7 @@ class StudentModel extends Model
     protected $primaryKey       = 'id';
     protected $useAutoIncrement = true;
     protected $returnType       = 'array';
-    protected $useSoftDeletes   = true;
+    protected $useSoftDeletes   = false;
     protected $protectFields    = true;
     
     // VERİTABANI İLE BİREBİR UYUMLU, GÜNCEL SÜTUN LİSTESİ
@@ -32,24 +32,71 @@ class StudentModel extends Model
     protected $dateFormat    = 'datetime';
     protected $createdField  = 'created_at';
     protected $updatedField  = 'updated_at';
-    protected $deletedField  = 'deleted_at';
 
-    // Validation
-    protected $validationRules      = [];
-    protected $validationMessages   = [];
+// Validation
+protected $validationRules      = [
+    'adi'        => 'required|string|max_length[100]',
+    'soyadi'     => 'required|string|max_length[100]',
+    'tckn'       => 'required|exact_length[11]|is_unique[students.tckn,id,{id}]', // ESKİ HALİNE GETİRİN    
+    'iletisim'   => 'required',
+    'city_id'    => 'required|integer|greater_than[0]',
+    'district_id'=> 'required|integer|greater_than[0]',
+];
+
+protected $validationMessages   = [
+    'adi' => [
+        'required' => 'Öğrenci Adı alanı zorunludur.',
+    ],
+    'soyadi' => [
+        'required' => 'Öğrenci Soyadı alanı zorunludur.',
+    ],
+    'tckn' => [
+        'required'     => 'T.C. Kimlik Numarası zorunludur.',
+        'exact_length' => 'T.C. Kimlik Numarası tam 11 haneli olmalıdır.',
+        'is_unique'    => 'Bu T.C. Kimlik Numarası zaten başka bir öğrenciye kayıtlı.', // ESKİ HALİ
+    ],
+    'iletisim' => [
+        'required' => 'İletişim (Telefon) alanı zorunludur.'
+    ],
+    'city_id' => [
+        'required'      => 'İl seçimi zorunludur.',
+        'greater_than'  => 'Lütfen geçerli bir il seçiniz.',
+    ],
+    'district_id' => [
+        'required'      => 'İlçe seçimi zorunludur.',
+        'greater_than'  => 'Lütfen geçerli bir ilçe seçiniz.',
+    ],
+];
     protected $skipValidation       = false;
     protected $cleanValidationRules = true;
 
-    // Callbacks
-    protected $allowCallbacks = true;
-    protected $beforeInsert   = [];
-    protected $afterInsert    = [];
-    protected $beforeUpdate   = [];
-    protected $afterUpdate    = [];
-    protected $beforeFind     = [];
-    protected $afterFind      = [];
-    protected $beforeDelete   = [];
-    protected $afterDelete    = [];
+
+// Callbacks
+protected $allowCallbacks = true;
+protected $beforeInsert   = [];
+protected $afterInsert    = [];
+protected $beforeUpdate   = [];
+protected $afterUpdate    = [];
+protected $beforeFind     = [];
+protected $afterFind      = [];
+protected $beforeDelete   = [];
+protected $afterDelete    = [];
+
+/**
+ * TC kimlik numarasının soft delete durumuna göre müsait olup olmadığını kontrol eder
+ */
+public function isTcAvailable($tc, $exceptId = null): bool
+{
+    $builder = $this->builder();
+    $builder->where('tckn', $tc)
+            ->where('deleted_at IS NULL');
+    
+    if ($exceptId) {
+        $builder->where('id !=', $exceptId);
+    }
+    
+    return $builder->countAllResults() === 0;
+}
 
     /**
      * Bir öğretmenin ders programına eklediği (ders verdiği) tüm öğrencileri,

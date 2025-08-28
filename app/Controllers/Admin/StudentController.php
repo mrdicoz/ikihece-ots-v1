@@ -180,6 +180,22 @@ class StudentController extends BaseController
                         case 'hastane_randevu_tarihi':
                             $data[$dbField] = $this->formatDate($cellValue);
                             break;
+
+                        case 'egitim_programi':
+                            if (!empty($cellValue)) {
+                                // 1. CSV'den gelen veriyi virgülle diziye ayır
+                                $programs = explode(',', $cellValue);
+
+                                // 2. Her programın başındaki/sonundaki boşlukları temizle ve boş olanları kaldır
+                                $cleanedPrograms = array_filter(array_map('trim', $programs));
+                                
+                                // 3. DOĞRU KOD: Temizlenmiş diziyi SADECE virgül ile birleştir
+                                $data[$dbField] = !empty($cleanedPrograms) ? implode(',', $cleanedPrograms) : null;
+                            } else {
+                                $data[$dbField] = null;
+                            }
+                            break;
+                            
                         case 'cinsiyet':      $data[$dbField] = $this->mapCinsiyet($cellValue); break;
                         case 'servis':        $data[$dbField] = $this->mapServisDurumu($cellValue); break;
                         case 'mesafe':        $data[$dbField] = $this->mapMesafe($cellValue); break;

@@ -336,11 +336,9 @@ class ScheduleController extends BaseController
         return view('schedule/parent_schedule', $this->data);
     }
 
-    // 1. Mevcut getStudentSuggestions metodunu bu kodla değiştirin.
-    /**
-     * AJAX ile çağrılır. Belirli bir öğretmen ve zaman dilimi için
-     * akıllı öğrenci öneri listesi döndürür. (Pazartesi Geri Besleme Eklendi)
-     * @return \CodeIgniter\HTTP\ResponseInterface
+        /**
+     * AKILLANDIRILMIŞ FİNAL VERSİYON: Mevcut yapıyı koruyarak,
+     * konuştuğumuz tüm kurallara göre 4 katmanlı öneri listesi döndürür.
      */
     public function getStudentSuggestions()
     {
@@ -348,6 +346,7 @@ class ScheduleController extends BaseController
             return $this->response->setStatusCode(403, 'Forbidden');
         }
 
+        // 1. Gerekli Parametreleri ve Modelleri Al
         $teacherId = $this->request->getGet('teacher_id');
         $date = $this->request->getGet('date');
         $startTime = $this->request->getGet('start_time');
@@ -358,13 +357,14 @@ class ScheduleController extends BaseController
 
         $fixedLessonModel = new \App\Models\FixedLessonModel();
         $lessonHistoryModel = new \App\Models\LessonHistoryModel();
+        $studentModel = new \App\Models\StudentModel();
+        $teacherProfile = model('UserProfileModel')->where('user_id', $teacherId)->first();
 
         $dayOfWeek = date('N', strtotime($date));
         $suggestions = [];
-        $existingStudentIds = [];
+        $existingStudentIds = []; // Önerilen öğrencileri tekrar önermemek için takip listesi
 
-        // 1. Katman: Sabit Ders Önerileri
-        // YENİ: telafi hakları eklendi
+        // --- 0. Katman: Sabit Dersler (YEŞİL GÖRÜNECEK) ---
         $fixedStudents = $fixedLessonModel->select('s.id, s.adi, s.soyadi, s.telafi_bireysel_hak, s.telafi_grup_hak')
             ->join('students s', 's.id = fixed_lessons.student_id')
             ->where('fixed_lessons.teacher_id', $teacherId)
@@ -373,110 +373,92 @@ class ScheduleController extends BaseController
             ->findAll();
 
         foreach ($fixedStudents as $student) {
-            // YENİ: telafi hakları yanıta eklendi
             $suggestions[] = [
-                'id' => $student['id'], 
-                'name' => trim($student['adi'] . ' ' . $student['soyadi']), 
-                'type' => 'fixed',
-                'bireysel' => $student['telafi_bireysel_hak'],
-                'grup' => $student['telafi_grup_hak']
+                'id'       => $student['id'],
+                'name'     => trim($student['adi'] . ' ' . $student['soyadi']),
+                'type'     => 'fixed',
+                'bireysel' => $student['telafi_bireysel_hak'] ?? 0,
+                'grup'     => $student['telafi_grup_hak'] ?? 0
             ];
             $existingStudentIds[] = $student['id'];
         }
 
-        // 2. Katman: Geçmiş Ders Önerileri
-        $teacherProfile = model('UserProfileModel')->where('user_id', $teacherId)->first();
+        // --- 1. ve 2. Katmanlar: Akıllı Öneriler (MAVİ GÖRÜNECEK) ---
         $teacherFullName = $teacherProfile ? trim($teacherProfile->first_name . ' ' . $teacherProfile->last_name) : '';
-        
-        $historyStudents = [];
-        if (!empty($teacherFullName)) {
-            // A. Öncelik: Öğretmenin kendi geçmişine bak
-            $historyStudents = $lessonHistoryModel
-                ->select('student_name, COUNT(id) as lesson_count')
-                ->where('LOWER(teacher_name)', strtolower($teacherFullName))
-                ->where('start_time', $startTime)
-                ->groupBy('student_name')
-                ->orderBy('lesson_count', 'DESC')
-                ->limit(10)->findAll();
-        } 
-        
-        // B. Geri Besleme: Eğer öğretmenin geçmişi boşsa VE GÜN PAZARTESİ İSE,
-        //    genel Pazartesi verilerine bak.
-        if (empty($historyStudents) && in_array($dayOfWeek, [1, 2, 3, 4, 5, 6])) {
-            $historyStudents = $lessonHistoryModel
-                ->select('student_name, COUNT(id) as lesson_count')
-                ->where('DAYOFWEEK(lesson_date) = 2') // MySQL'de Pazar=1, Pazartesi=2
-                ->where('start_time', $startTime)
-                ->groupBy('student_name')
-                ->orderBy('lesson_count', 'DESC')
-                ->limit(10)->findAll();
+        $hasHistory = !empty($teacherFullName) && $lessonHistoryModel->teacherHasHistory($teacherFullName);
+
+        $historySuggestionsData = [];
+        if ($hasHistory) {
+            // Katman 1: Öğretmenin Kendi Geçmişi
+            $historySuggestionsData = $lessonHistoryModel->getSuggestionsByTeacherHistory($teacherFullName, (int)$dayOfWeek, $startTime);
+        } else {
+            // Katman 2: Branş Uyumu (Yeni Öğretmenler İçin)
+            $teacherBranch = $teacherProfile->branch ?? '';
+            if (!empty($teacherBranch)) {
+                $historySuggestionsData = $lessonHistoryModel->getSuggestionsByBranch($teacherBranch, (int)$dayOfWeek, $startTime);
+            }
         }
+        
+        // Akıllı önerileri ana listeye ekle
+        $this->_addHistorySuggestions($historySuggestionsData, $suggestions, $existingStudentIds, 'history');
 
-        // Bulunan geçmiş verilerini önerilere ekle
-        if (!empty($historyStudents)) {
-            $this->_addHistorySuggestions($historyStudents, $suggestions, $existingStudentIds);
-        }
-
-
-        // 3. Katman: Diğer Tüm Öğrenciler
-        $studentModel = new \App\Models\StudentModel();
-        // YENİ: telafi hakları eklendi
-        $otherStudentsBuilder = $studentModel->select('id, adi, soyadi, telafi_bireysel_hak, telafi_grup_hak');
+        // --- 3. Katman: Diğer Öğrenciler (Mesafeye Göre Sıralı -> Normal Renk) ---
+        $otherStudentsBuilder = $studentModel->select('id, adi, soyadi, mesafe, telafi_bireysel_hak, telafi_grup_hak');
         if (!empty($existingStudentIds)) {
             $otherStudentsBuilder->whereNotIn('id', $existingStudentIds);
         }
-        $otherStudents = $otherStudentsBuilder->orderBy('adi ASC, soyadi ASC')->findAll();
+        
+        $otherStudents = $otherStudentsBuilder
+            ->orderBy("FIELD(mesafe, 'civar', 'yakın', 'uzak')")
+            ->orderBy('adi', 'ASC')
+            ->findAll();
 
         foreach ($otherStudents as $student) {
-            // YENİ: telafi hakları yanıta eklendi
             $suggestions[] = [
-                'id' => $student['id'], 
-                'name' => trim($student['adi'] . ' ' . $student['soyadi']), 
-                'type' => 'other',
-                'bireysel' => $student['telafi_bireysel_hak'],
-                'grup' => $student['telafi_grup_hak']
+                'id'       => $student['id'],
+                'name'     => trim($student['adi'] . ' ' . $student['soyadi']),
+                'type'     => 'other',
+                'bireysel' => $student['telafi_bireysel_hak'] ?? 0,
+                'grup'     => $student['telafi_grup_hak'] ?? 0
             ];
         }
 
         return $this->response->setJSON($suggestions);
     }
 
-    // 2. Bu yeni yardımcı metodu Controller dosyanızın SONUNA ekleyin.
     /**
-     * Geçmiş verilerinden gelen öğrenci isimlerini bulur ve ana öneri listesine ekler.
-     * @param array $historyStudents
-     * @param array $suggestions
-     * @param array $existingStudentIds
+     * YARDIMCI FONKSİYON: Geçmiş verilerinden gelen öğrencileri bulur ve ana öneri listesine ekler.
      */
-    private function _addHistorySuggestions(array $historyStudents, array &$suggestions, array &$existingStudentIds)
+    private function _addHistorySuggestions(array $historyData, array &$suggestions, array &$existingStudentIds, string $type)
     {
-        $studentModel = new \App\Models\StudentModel();
-        $studentNames = array_column($historyStudents, 'student_name');
-
-        if (empty($studentNames)) {
+        if (empty($historyData)) {
             return;
         }
 
-        // YENİ: telafi hakları eklendi
-        $builder = $studentModel->select('id, adi, soyadi, telafi_bireysel_hak, telafi_grup_hak');
-        $builder->groupStart();
-        foreach ($studentNames as $name) {
-            $builder->orWhere('LOWER(CONCAT(adi, " ", soyadi))', strtolower(trim($name)));
-        }
-        $builder->groupEnd();
-        $studentDetails = $builder->findAll();
+        $studentModel = new \App\Models\StudentModel();
+        $studentNames = array_column($historyData, 'student_name');
 
-        foreach ($studentDetails as $student) {
-            if (!in_array($student['id'], $existingStudentIds)) {
-                // YENİ: telafi hakları yanıta eklendi
+        $studentDetails = $studentModel->select('id, adi, soyadi, telafi_bireysel_hak, telafi_grup_hak')
+            ->whereIn('CONCAT(adi, " ", soyadi)', $studentNames)
+            ->findAll();
+
+        $nameToDetailsMap = [];
+        foreach($studentDetails as $student) {
+            $nameToDetailsMap[trim($student['adi'] . ' ' . $student['soyadi'])] = $student;
+        }
+
+        foreach ($historyData as $hist) {
+            $studentDetail = $nameToDetailsMap[$hist['student_name']] ?? null;
+
+            if ($studentDetail && !in_array($studentDetail['id'], $existingStudentIds)) {
                 $suggestions[] = [
-                    'id' => $student['id'], 
-                    'name' => trim($student['adi'] . ' ' . $student['soyadi']), 
-                    'type' => 'history',
-                    'bireysel' => $student['telafi_bireysel_hak'],
-                    'grup' => $student['telafi_grup_hak']
+                    'id'       => $studentDetail['id'],
+                    'name'     => $hist['student_name'], // Sadece öğrenci adı, program yazmıyoruz.
+                    'type'     => $type,
+                    'bireysel' => $studentDetail['telafi_bireysel_hak'] ?? 0,
+                    'grup'     => $studentDetail['telafi_grup_hak'] ?? 0
                 ];
-                $existingStudentIds[] = $student['id'];
+                $existingStudentIds[] = $studentDetail['id'];
             }
         }
     }

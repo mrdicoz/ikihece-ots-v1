@@ -254,3 +254,23 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 });
+/**
+ * DataTables arama alanını büyük harfe zorlar ve aramayı tetikler.
+ * @param {DataTable} table - Hedef DataTable nesnesi.
+ */
+function forceUppercaseSearch(table) {
+    const searchInput = $('div.dataTables_wrapper div.dataTables_filter input');
+    
+    searchInput.on('keyup', function() {
+        // Input değerini al ve büyük harfe çevir
+        const uppercaseValue = this.value.toLocaleUpperCase('tr-TR');
+        
+        // Eğer değer değiştiyse, input'a geri yaz ve aramayı tetikle
+        if (this.value !== uppercaseValue) {
+            this.value = uppercaseValue;
+        }
+        
+        // DataTable'ın aramasıyla input değerini senkronize et
+        table.search(uppercaseValue).draw();
+    });
+}

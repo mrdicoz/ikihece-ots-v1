@@ -20,24 +20,36 @@
         <div class="card-body p-lg-5">
             <div class="row">
                 <div class="col-lg-5 mb-4 mb-lg-0">
-                    <h4>İşlem Adımları</h4>
-                    <p class="text-muted">Geçmiş ders programı verilerinizi yükleyerek yapay zeka modelini eğitebilirsiniz.</p>
+                   <h4>İşlem Adımları</h4>
+                    <p class="text-muted">Geçmiş ders programı verilerinizi yükleyerek yapay zeka modelini eğitebilirsiniz. Lütfen aşağıdaki adımları takip edin.</p>
                     <ul class="list-group list-group-flush">
                         <li class="list-group-item d-flex align-items-center">
                             <i class="bi bi-1-circle-fill text-success me-3 fs-4"></i>
                             <div>
-                                <strong>Dosyanızı Hazırlayın</strong>
-                                <small class="d-block">Dosyanın ilk satırında başlıklar olmalı ve sütun sırası şu şekilde olmalıdır: <b>Tarih, Saat, Eğitimci, Öğrenci.</b></small>
+                                <strong>Şablonu İndirin</strong>
+                                <small class="d-block">Veri yüklemek için doğru formattaki şablonu indirin.</small>
                             </div>
                         </li>
                         <li class="list-group-item d-flex align-items-center">
                             <i class="bi bi-2-circle-fill text-success me-3 fs-4"></i>
+                            <div>
+                                <strong>Dosyanızı Hazırlayın</strong>
+                                <small class="d-block">İndirdiğiniz şablona uygun şekilde verilerinizi doldurun.</small>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex align-items-center">
+                            <i class="bi bi-3-circle-fill text-success me-3 fs-4"></i>
                             <div>
                                 <strong>Dosyayı Yükleyin</strong>
                                 <small class="d-block">Hazırladığınız dosyayı yandaki alana sürükleyin veya seçin.</small>
                             </div>
                         </li>
                     </ul>
+                    <div class="d-grid mt-4">
+                        <a href="<?= base_url('assets/Gecmis_Ders_Sablonu.xlsx') ?>" class="btn btn-success" download>
+                            <i class="bi bi-download"></i> Şablon Dosyasını İndir
+                        </a>
+                    </div>
                 </div>
 
                 <div class="col-lg-7 border-start-lg">
@@ -64,6 +76,29 @@
                     </form>
                 </div>
             </div>
+        </div>
+    </div>
+        <div class="card shadow mt-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="bi bi-clock-history text-success"></i> Otomasyon Kurulumu (Cron Job)</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">
+                Ders geçmişinin her gece otomatik olarak güncellenmesi ve eski verilerin temizlenmesi için aşağıdaki komutu sunucunuzun (CloudPanel, cPanel, Plesk vb.) "Cron Job" veya "Zamanlanmış Görevler" bölümüne eklemeniz yeterlidir.
+            </p>
+            <label for="cron-command-input" class="form-label fw-bold">Kopyalanacak Komut:</label>
+            <div class="input-group">
+                <input type="text" id="cron-command-input" class="form-control" value="<?= esc($cronCommand ?? 'Komut oluşturulamadı.') ?>" readonly>
+                <button class="btn btn-outline-success" type="button" id="copy-cron-button" title="Panoya Kopyala">
+                    <i class="bi bi-clipboard"></i> Kopyala
+                </button>
+            </div>
+            <div id="copy-success-message" class="text-success small mt-2" style="display: none;">
+                <i class="bi bi-check-circle-fill"></i> Komut panoya kopyalandı!
+            </div>
+            <small class="d-block mt-3">
+                <strong>Not:</strong> Sunucunuzdaki PHP yolu <code>/usr/bin/php</code>'den farklıysa, komutun o kısmını hosting sağlayıcınızın belirttiği doğru yol ile düzenlemeniz gerekebilir.
+            </small>
         </div>
     </div>
 </div>
@@ -114,5 +149,29 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 });
+    // Kopyala butonuna tıklandığında çalışacak kod
+    document.getElementById('copy-cron-button').addEventListener('click', function() {
+        const commandInput = document.getElementById('cron-command-input');
+        const copyButton = this;
+        const successMessage = document.getElementById('copy-success-message');
+
+        // Input alanındaki metni seç ve panoya kopyala
+        navigator.clipboard.writeText(commandInput.value).then(() => {
+            // Başarı mesajını göster
+            successMessage.style.display = 'block';
+            copyButton.innerHTML = '<i class="bi bi-check-lg"></i> Kopyalandı';
+
+            // 2 saniye sonra butonu ve mesajı eski haline getir
+            setTimeout(() => {
+                successMessage.style.display = 'none';
+                copyButton.innerHTML = '<i class="bi bi-clipboard"></i> Kopyala';
+            }, 2000);
+        }).catch(err => {
+            console.error('Kopyalama başarısız oldu: ', err);
+            // Fallback for older browsers
+            commandInput.select();
+            document.execCommand('copy');
+        });
+    });
 </script>
 <?= $this->endSection() ?>

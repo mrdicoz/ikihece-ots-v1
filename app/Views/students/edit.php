@@ -4,15 +4,16 @@
 <?= $this->section('main') ?>
 <div class="container-fluid mt-4">
     <div class="d-sm-flex align-items-center justify-content-between mb-3">
-        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-backpack2"></i> <?= esc($title) ?></h1>
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-pencil-square"></i> <?= esc($title) ?></h1>
     </div>
 
-    <form action="<?= current_url() ?>" method="post" enctype="multipart/form-data">
-        <?= csrf_field() ?>
-        <?php if(isset($student) && !empty($student['id'])): ?>
-            <input type="hidden" name="_method" value="PUT">
-        <?php endif; ?>
+        <?= $this->include('layouts/partials/_session_messages') ?>
 
+
+    <form action="<?= site_url('students/' . $student['id']) ?>" method="post" enctype="multipart/form-data">
+        <?= csrf_field() ?>
+        <input type="hidden" name="_method" value="PUT">
+        
         <div class="card shadow">
             <div class="card-header p-0">
                 <ul class="nav nav-tabs nav-fill" id="studentTab" role="tablist">
@@ -36,10 +37,8 @@
                 </div>
             </div>
             <div class="card-footer text-end">
-                <a href="<?= site_url('students') ?>" class="btn btn-secondary">İptal</a>
-                <button type="submit" class="btn btn-success">
-                    <?= isset($student) && !empty($student['id']) ? 'Değişiklikleri Kaydet' : 'Öğrenciyi Oluştur' ?>
-                </button>
+                <a href="<?= site_url('students/' . $student['id']) ?>" class="btn btn-secondary">İptal</a>
+                <button type="submit" class="btn btn-success">Değişiklikleri Kaydet</button>
             </div>
         </div>
     </form>

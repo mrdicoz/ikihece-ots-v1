@@ -334,3 +334,9 @@
     .markdown-content li { margin-bottom: 0.5em; }
     .markdown-content code { background-color: #e9ecef; padding: 0.2em 0.4em; margin: 0; font-size: 85%; border-radius: 6px; }
     .markdown-content pre { background-color: #f8f9fa; padding: 1em; border-radius: 5px; overflow-x: auto; border: 1px solid #dee2e6; }
+
+
+    /* DataTables arama kutusunu büyük harfe zorla */
+div.dataTables_wrapper div.dataTables_filter input {
+    text-transform: uppercase;
+}

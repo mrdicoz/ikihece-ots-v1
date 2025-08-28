@@ -2,8 +2,8 @@
     <div class="col-md-8">
         <h5 class="mb-3">Temel Bilgiler</h5>
         <div class="row g-3">
-            <div class="col-md-6"><label class="form-label">Adı</label><input type="text" name="adi" class="form-control" value="<?= old('adi', $student['adi'] ?? '') ?>" required></div>
-            <div class="col-md-6"><label class="form-label">Soyadı</label><input type="text" name="soyadi" class="form-control" value="<?= old('soyadi', $student['soyadi'] ?? '') ?>" required></div>
+            <div class="col-md-6"><label class="form-label">Adı</label><input type="text" name="adi" class="form-control" value="<?= old('adi', $student['adi'] ?? '') ?>" ></div>
+            <div class="col-md-6"><label class="form-label">Soyadı</label><input type="text" name="soyadi" class="form-control" value="<?= old('soyadi', $student['soyadi'] ?? '') ?>" ></div>
             <div class="col-md-6"><label class="form-label">TC Kimlik No</label><input type="text" name="tckn" class="form-control" value="<?= old('tckn', $student['tckn'] ?? '') ?>"></div>
             <div class="col-md-6"><label class="form-label">Doğum Tarihi</label><input type="date" name="dogum_tarihi" class="form-control" value="<?= old('dogum_tarihi', $student['dogum_tarihi'] ?? '') ?>"></div>
             <div class="col-md-6"><label class="form-label">Cinsiyet</label><select name="cinsiyet" id="cinsiyet" class="form-select">
@@ -23,3 +23,28 @@
         </div> 
     </div>
 </div>
+
+<script>
+// Bu scriptin sadece bu form yüklendiğinde bir kez çalışmasını sağlıyoruz.
+document.addEventListener('DOMContentLoaded', function() {
+    // Adı ve Soyadı alanlarını büyük harfe çeviren fonksiyon
+    const capitalizeInputs = (selector) => {
+        const input = document.querySelector(selector);
+        if (input) {
+            input.addEventListener('input', function(e) {
+                const start = e.target.selectionStart;
+                const end = e.target.selectionEnd;
+                e.target.value = e.target.value.toLocaleUpperCase('tr-TR');
+                e.target.setSelectionRange(start, end);
+            });
+            input.addEventListener('change', function(e) {
+                 e.target.value = e.target.value.toLocaleUpperCase('tr-TR');
+            });
+        }
+    };
+
+    // Fonksiyonu ilgili alanlar için çağır
+    capitalizeInputs('input[name="adi"]');
+    capitalizeInputs('input[name="soyadi"]');
+});
+</script>

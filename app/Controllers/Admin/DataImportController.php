@@ -10,16 +10,26 @@ use Exception;
 
 class DataImportController extends BaseController
 {
-        public function history()
-    {
-        $data = [
-            'title' => 'Yapay Zeka Modelini Eğitimi',
-        ];
-        return view('admin/data_import/ai_trainer', array_merge($this->data, $data));
-        
 
+    public function history()
+    {
+        // Projenin sunucudaki tam yolunu al (sondaki / işaretini temizle)
+        $projectPath = rtrim(ROOTPATH, '/');
+
+        // Cron job komutunu bu yola göre dinamik olarak oluştur
+        $cronCommand = "0 0 * * * /usr/bin/php {$projectPath}/spark lesson:manage-history >/dev/null 2>&1";
+
+        $data = [
+            'title'       => 'Yapay Zeka Modelini Eğitimi',
+            'cronCommand' => $cronCommand, // Oluşturulan komutu view'e gönder
+        ];
+        
+        return view('admin/data_import/ai_trainer', array_merge($this->data, $data));
     }
 
+    /**
+     * Yüklenen Excel dosyasını işler ve yeni lesson_history tablosuna kaydeder.
+     */
     public function processUpload()
     {
         $file = $this->request->getFile('file');
@@ -30,7 +40,6 @@ class DataImportController extends BaseController
         try {
             $spreadsheet = IOFactory::load($file->getTempName());
             $sheet = $spreadsheet->getActiveSheet();
-            // getHighestRow, boş satırları da sayabilir, bu yüzden getHighestDataRow kullanalım
             $highestRow = $sheet->getHighestDataRow();
 
             $historyData = [];
@@ -38,42 +47,40 @@ class DataImportController extends BaseController
 
             // Başlık satırını atlamak için 2'den başlıyoruz
             for ($row = 2; $row <= $highestRow; $row++) {
-                $rowData = [
-                    'date'    => $sheet->getCell('A' . $row)->getValue(),
-                    'time'    => $sheet->getCell('B' . $row)->getValue(),
-                    'teacher' => $sheet->getCell('C' . $row)->getValue(),
-                    'student' => $sheet->getCell('D' . $row)->getValue(),
-                ];
-
-                // Satırda temel verilerden en az biri eksikse, o satırı tamamen atla
-                if (empty($rowData['teacher']) || empty($rowData['student']) || empty($rowData['date']) || empty($rowData['time'])) {
-                    $skippedRows[] = ['row' => $row, 'reason' => 'Eksik bilgi (Öğretmen, Öğrenci, Tarih veya Saat)'];
+                // Sütunları sizin belirttiğiniz sıraya göre okuyoruz
+                $dateValue = $sheet->getCell('A' . $row)->getValue();
+                $timeValue = $sheet->getCell('B' . $row)->getValue();
+                $studentName = $sheet->getCell('C' . $row)->getValue();
+                $studentProgram = $sheet->getCell('D' . $row)->getValue();
+                $teacherName = $sheet->getCell('E' . $row)->getValue();
+                $teacherBranch = $sheet->getCell('F' . $row)->getValue();
+                
+                // Temel alanlar boşsa satırı atla
+                if (empty($dateValue) || empty($timeValue) || empty($studentName) || empty($teacherName)) {
+                    $skippedRows[] = ['row' => $row, 'reason' => 'Eksik bilgi (Tarih, Saat, Öğrenci veya Öğretmen)'];
                     continue;
                 }
 
-                // --- Gelişmiş Saat ve Tarih İşleme ---
-                $processedTime = $this->parseTime($rowData['time']);
-                $processedDate = $this->parseDate($rowData['date']);
-
+                $processedDate = $this->parseDate($dateValue);
                 if ($processedDate === null) {
-                    $skippedRows[] = ['row' => $row, 'reason' => "Tanımlanamayan tarih formatı: '{$rowData['date']}'"];
-                    continue; // Tarih işlenemezse bu satırı atla
+                    $skippedRows[] = ['row' => $row, 'reason' => "Tanımlanamayan tarih formatı: '{$dateValue}'"];
+                    continue;
                 }
+                
+                $processedTime = $this->parseTime($timeValue);
 
                 $historyData[] = [
-                    'teacher_name' => trim($rowData['teacher']),
-                    'student_name' => trim($rowData['student']),
-                    'lesson_date'  => $processedDate,
-                    'start_time'   => $processedTime,
+                    'lesson_date'     => $processedDate,
+                    'start_time'      => $processedTime,
+                    'student_name'    => trim($studentName),
+                    'student_program' => trim($studentProgram),
+                    'teacher_name'    => trim($teacherName),
+                    'teacher_branch'  => trim($teacherBranch),
                 ];
             }
 
             if (empty($historyData)) {
-                $errorMessage = 'Dosyada işlenecek geçerli veri bulunamadı.';
-                if(!empty($skippedRows)){
-                    $errorMessage .= ' Atlanan ilk satır: ' . $skippedRows[0]['row'] . ' - Sebep: ' . $skippedRows[0]['reason'];
-                }
-                return redirect()->back()->with('error', $errorMessage);
+                return redirect()->back()->with('error', 'Dosyada işlenecek geçerli veri bulunamadı.');
             }
 
             $model = new LessonHistoryModel();
@@ -82,7 +89,7 @@ class DataImportController extends BaseController
             $successMessage = count($historyData) . ' adet geçmiş ders kaydı başarıyla işlendi ve veri setine eklendi.';
             if (!empty($skippedRows)) {
                 $successMessage .= " " . count($skippedRows) . " satır, geçersiz format veya eksik bilgi nedeniyle atlandı.";
-                session()->setFlashdata('skipped_rows', $skippedRows); // Detaylı bilgi için
+                session()->setFlashdata('skipped_rows', $skippedRows);
             }
 
             return redirect()->to(route_to('admin.ai.trainer'))->with('success', $successMessage);
@@ -93,55 +100,33 @@ class DataImportController extends BaseController
         }
     }
 
-    /**
-     * Gelen tarih verisini akıllıca işler ve Y-m-d formatına çevirir.
-     * Hem Excel'in sayısal zaman damgasını hem de yaygın metin formatlarını anlar.
-     * @param mixed $dateValue
-     * @return string|null
-     */
+    // Bu yardımcı fonksiyonlar aynı kalabilir, formatları doğru işliyorlar
     private function parseDate($dateValue): ?string
     {
         if (empty($dateValue)) return null;
 
-        // 1. Yöntem: Sayısal Excel Tarihi mi?
         if (is_numeric($dateValue)) {
             try {
                 return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($dateValue)->format('Y-m-d');
-            } catch (Exception $e) {
-                // Hata olursa diğer yöntemleri dene
-            }
+            } catch (Exception $e) { /* Diğer yöntemleri dene */ }
         }
-
-        // 2. Yöntem: Yaygın metin formatlarını dene
-        $formatsToTry = [
-            'n/j/Y',  // 5/1/2024
-            'd.m.Y',  // 05.01.2024
-            'd-m-Y',  // 05-01-2024
-            'Y-m-d',  // 2024-01-05
-        ];
-
+        
+        $formatsToTry = ['n/j/Y', 'd.m.Y', 'd-m-Y', 'Y-m-d'];
         foreach ($formatsToTry as $format) {
             $date = DateTime::createFromFormat($format, $dateValue);
             if ($date && $date->format($format) === $dateValue) {
                 return $date->format('Y-m-d');
             }
         }
-
-        return null; // Hiçbir format uymadı
+        return null;
     }
 
-    /**
-     * Gelen saat verisini işler. "10:00-10:50" gibi aralıklardan başlangıç saatini alır.
-     * @param mixed $timeValue
-     * @return string
-     */
     private function parseTime($timeValue): string
     {
         $timeValue = (string)$timeValue;
-        // Eğer "-" içeriyorsa, sadece ilk kısmı al
         if (strpos($timeValue, '-') !== false) {
             $timeValue = explode('-', $timeValue)[0];
         }
-        return trim($timeValue);
+        return date('H:i:s', strtotime(trim($timeValue)));
     }
 }

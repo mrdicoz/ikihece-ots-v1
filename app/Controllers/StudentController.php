@@ -9,15 +9,49 @@ use App\Models\DistrictModel;
 
 class StudentController extends BaseController
 {
-    public function index()
-    {
-        $model = new StudentModel();
-        $data = [
-            'title'    => 'Öğrenci Yönetimi',
-            'students' => $model->findAll(),
-        ];
-        return view('students/index', array_merge($this->data, $data));
+public function index()
+{
+    $model = new StudentModel();
+    $districtModel = new DistrictModel();
+
+    // GET üzerinden gelen filtreleme parametrelerini alıyoruz.
+    $filterDistrict = $this->request->getGet('district_id');
+    $filterMesafe   = $this->request->getGet('mesafe');
+
+    // Sorguyu filtrelemeye hazır hale getiriyoruz.
+    $query = $model;
+
+    // İlçe filtresi uygulanmışsa sorguya ekliyoruz.
+    if ($filterDistrict && is_numeric($filterDistrict)) {
+        $query->where('district_id', $filterDistrict);
     }
+
+    // Mesafe filtresi (Civar, Yakın, Uzak) uygulanmışsa sorguya ekliyoruz.
+    if ($filterMesafe && in_array($filterMesafe, ['Civar', 'Yakın', 'Uzak'])) {
+        $query->where('mesafe', $filterMesafe);
+    }
+
+    // Filtrelenmiş veya tüm öğrencileri çekiyoruz.
+    $students = $query->orderBy('adi', 'ASC')->findAll();
+
+    // YENİ MANTIK: Sadece öğrencisi olan ilçeleri çekiyoruz.
+    $districts = $districtModel
+        ->distinct()
+        ->select('districts.id, districts.name')
+        ->join('students', 'students.district_id = districts.id')
+        ->orderBy('districts.name', 'ASC')
+        ->findAll();
+
+    $data = [
+        'title'             => 'Öğrenci Yönetimi',
+        'students'          => $students,
+        'districts'         => $districts,
+        'selected_district' => $filterDistrict,
+        'selected_mesafe'   => $filterMesafe,
+    ];
+
+    return view('students/index', array_merge($this->data, $data));
+}
 
     public function new()
     {
@@ -30,31 +64,36 @@ class StudentController extends BaseController
         return view('students/new', array_merge($this->data, $data));
     }
 
-    public function create()
-    {
-        $model = new StudentModel();
-        $data = $this->request->getPost();
+public function create()
+{
+    $model = new StudentModel();
+    $data = $this->request->getPost();
 
-        if (isset($data['egitim_programi']) && is_array($data['egitim_programi'])) {
-            $data['egitim_programi'] = implode(',', $data['egitim_programi']);
-        }
-        
-        $reportFile = $this->request->getFile('ram_raporu');
-        if ($reportFile && $reportFile->isValid() && !$reportFile->hasMoved()) {
-            $newName = $reportFile->getRandomName();
-            $reportFile->move(WRITEPATH . 'uploads/ram_reports', $newName);
-            $data['ram_raporu'] = $newName;
-        }
+    if (isset($data['egitim_programi']) && is_array($data['egitim_programi'])) {
+        $data['egitim_programi'] = implode(',', $data['egitim_programi']);
+    }
+    
+    $reportFile = $this->request->getFile('ram_raporu');
+    if ($reportFile && $reportFile->isValid() && !$reportFile->hasMoved()) {
+        $newName = $reportFile->getRandomName();
+        $reportFile->move(WRITEPATH . 'uploads/ram_reports', $newName);
+        $data['ram_raporu'] = $newName;
+    }
 
-        if ($model->insert($data)) {
-            $yeniOgrenciId = $model->getInsertID();
-            $yeniOgrenciData = $model->find($yeniOgrenciId);
-            \CodeIgniter\Events\Events::trigger('student.created', $yeniOgrenciData, auth()->user());
-            return redirect()->to(site_url('my-students'))->with('success', 'Öğrenci başarıyla eklendi.');
-        }
-
+    // Tek insert işlemi ve sonucunu kontrol et
+    $insertResult = $model->insert($data);
+    
+    if ($insertResult === false) {
         return redirect()->back()->withInput()->with('errors', $model->errors());
     }
+
+    // Başarılı insert durumu
+    $yeniOgrenciId = $model->getInsertID();
+    $yeniOgrenciData = $model->find($yeniOgrenciId);
+    \CodeIgniter\Events\Events::trigger('student.created', $yeniOgrenciData, auth()->user());
+    
+    return redirect()->to(site_url('students'))->with('success', 'Öğrenci başarıyla eklendi.');
+}
 
     public function show($id = null)
     {
@@ -121,43 +160,48 @@ class StudentController extends BaseController
     }
     
     public function update($id = null)
-    {
-        $model = new StudentModel();
-        $user = auth()->user();
+{
+    $model = new StudentModel();
+    $user = auth()->user();
 
-        // --- GÜVENLİK KONTROLÜ ---
-        if ($user->inGroup('ogretmen') && !$user->inGroup('admin', 'yonetici', 'mudur', 'sekreter')) {
-            if (!$model->isStudentOfTeacher($id, $user->id)) {
-                return redirect()->to(site_url('my-students'))->with('error', 'Bu öğrenciyi güncelleme yetkiniz yok.');
-            }
+    // --- GÜVENLİK KONTROLÜ ---
+    if ($user->inGroup('ogretmen') && !$user->inGroup('admin', 'yonetici', 'mudur', 'sekreter')) {
+        if (!$model->isStudentOfTeacher($id, $user->id)) {
+            return redirect()->to(site_url('my-students'))->with('error', 'Bu öğrenciyi güncelleme yetkiniz yok.');
         }
-        // --- GÜVENLİK KONTROLÜ SONU ---
-        
-        $data = $this->request->getPost();
+    }
+    // --- GÜVENLİK KONTROLÜ SONU ---
+    
+    $data = $this->request->getPost();
 
-        if (isset($data['egitim_programi']) && is_array($data['egitim_programi'])) {
-            $data['egitim_programi'] = implode(',', $data['egitim_programi']);
+    if (isset($data['egitim_programi']) && is_array($data['egitim_programi'])) {
+        $data['egitim_programi'] = implode(',', $data['egitim_programi']);
+    }
+
+    $reportFile = $this->request->getFile('ram_raporu');
+    if ($reportFile && $reportFile->isValid() && !$reportFile->hasMoved()) {
+        $student = $model->find($id);
+        if (!empty($student['ram_raporu']) && file_exists(WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu'])) {
+            unlink(WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu']);
         }
+        $newName = $reportFile->getRandomName();
+        $reportFile->move(WRITEPATH . 'uploads/ram_reports', $newName);
+        $data['ram_raporu'] = $newName;
+    }
 
-        $reportFile = $this->request->getFile('ram_raporu');
-        if ($reportFile && $reportFile->isValid() && !$reportFile->hasMoved()) {
-            $student = $model->find($id);
-            if (!empty($student['ram_raporu']) && file_exists(WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu'])) {
-                unlink(WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu']);
-            }
-            $newName = $reportFile->getRandomName();
-            $reportFile->move(WRITEPATH . 'uploads/ram_reports', $newName);
-            $data['ram_raporu'] = $newName;
-        }
-
-        if ($model->update($id, $data)) {
-            $guncelOgrenciData = $model->find($id);
-            \CodeIgniter\Events\Events::trigger('student.updated', $guncelOgrenciData, auth()->user());
-            return redirect()->to(site_url('students/' . $id))->with('success', 'Öğrenci başarıyla güncellendi.');
-        }
-
+    // Değişiklik burada: update() metodu validasyon hatası verirse false döner.
+    if ($model->update($id, $data) === false) {
         return redirect()->back()->withInput()->with('errors', $model->errors());
     }
+
+    if ($model->update($id, $data)) {
+        $guncelOgrenciData = $model->find($id);
+        \CodeIgniter\Events\Events::trigger('student.updated', $guncelOgrenciData, auth()->user());
+        return redirect()->to(site_url('students/' . $id))->with('success', 'Öğrenci başarıyla güncellendi.');
+    }
+
+    return redirect()->back()->withInput()->with('errors', $model->errors());
+}
 
     public function delete($id = null)
     {
@@ -178,7 +222,7 @@ class StudentController extends BaseController
         }
         if ($model->delete($id)) {
             \CodeIgniter\Events\Events::trigger('student.deleted', $silinecekOgrenci, auth()->user());
-            return redirect()->to(site_url('my-students'))->with('success', 'Öğrenci başarıyla silindi.');
+            return redirect()->to(site_url('students'))->with('success', 'Öğrenci başarıyla silindi.');
         }
         return redirect()->back()->with('error', 'Öğrenci silinirken bir hata oluştu.');
     }
