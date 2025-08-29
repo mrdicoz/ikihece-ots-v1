@@ -87,35 +87,65 @@ abstract class BaseController extends Controller
         //$this->response->setBody(view('layouts/app', $this->data));
     }
     
-    /**
-     * Bu yeni metot, sadece giriş yapmış kullanıcılar için lisans durumunu kontrol eder.
+/**
+     * Lisans durumunu kontrol eder ve kullanıcıyı rolüne göre yönlendirir.
+     * Bu fonksiyon, "beyaz liste" dışındaki tüm sayfalarda çalışır.
      */
     private function checkLicenseStatus()
     {
-        // Lisans geçerliyse, hiçbir şey yapma, normal işleyişe devam et.
-        if ((new \App\Libraries\LicenseService())->checkLicense() === true) {
-            return;
+        // Adım 1: Hangi sayfaların bu kontrolden muaf olacağını belirle.
+        $allowedRoutes = [
+            'login',
+            'logout',
+            'register',
+            'auth/a/show',     // Shield'in e-posta aktivasyon, şifre sıfırlama gibi yolları
+            'maintenance',     // Bakım sayfasının kendisi
+            'admin/settings',  // Admin'in lisans gireceği sayfa (döngüyü önlemek için)
+        ];
+
+        $currentRoute = trim(uri_string(), '/');
+
+        // Adım 2: Eğer mevcut sayfa muaf listesindeyse, hiçbir şey yapmadan çık.
+        // Bu, sitenin her zaman login sayfasıyla başlayabilmesini sağlar.
+        foreach ($allowedRoutes as $route) {
+            if ($currentRoute === $route || str_starts_with($currentRoute, $route . '/')) {
+                return; // Bu sayfa herkese açık, lisans kontrolü yapma.
+            }
         }
 
-        // --- Lisans Geçerli Değilse ---
+        // --- Bu noktadan sonraki kodlar, sadece korunan sayfalar için çalışacaktır. ---
+
+        // Adım 3: Lisans kontrolü yap. Geçerliyse yine hiçbir şey yapma.
+        if ((new \App\Libraries\LicenseService())->checkLicense() === true) {
+            return; // Lisans geçerli, sayfanın yüklenmesine devam et.
+        }
+
+        // --- Bu noktadan sonraki kodlar, sadece LİSANS GEÇERSİZSE ve KORUNAN BİR SAYFADAYSA çalışır. ---
+
+        // Adım 4: Kullanıcının rolüne göre yönlendirme yap.
         
-        $currentRoute = trim(uri_string(), '/');
-        
-        // Giriş yapan kullanıcı admin veya yönetici mi?
-        if (auth()->user()->inGroup('admin', 'yonetici')) {
-            // Eğer zaten lisans/settings sayfasına gitmiyorsa, oraya yönlendir.
-            if ($currentRoute !== 'admin/settings') {
-                // Yönlendirme sonrası kodun çalışmasını durdurmak için send() ve exit() kullanılır.
+        // Önce giriş yapılmış mı diye kontrol et. Bu, olası bir "null user" hatasını önler.
+        if (auth()->loggedIn()) {
+            // Kullanıcı giriş yapmış.
+            if (auth()->user()->inGroup('admin', 'yonetici')) {
+                // Admin/Yönetici ise, lisans girmesi için ayarlar sayfasına yönlendir.
+                // Not: Zaten ayarlar sayfasındaysa yönlendirme yapılmaz (beyaz listede olduğu için).
                 return redirect()->to(route_to('admin.settings.index'))
                     ->with('error', 'Geçerli bir lisans anahtarı bulunamadı. Lütfen devam etmek için lisansınızı girin.')
                     ->send();
                 exit();
+            } else {
+                // Admin/Yönetici değil ama giriş yapmış (örn: veli, öğretmen),
+                // oturumunu güvenle kapat ve bakım sayfasına yönlendir.
+                auth()->logout();
+                return redirect()->to(route_to('maintenance'))->send();
+                exit();
             }
         } else {
-            // Kullanıcı admin/yönetici değilse, oturumunu kapatıp bakım sayfasına yönlendir.
-            auth()->logout();
-            return redirect()->to(route_to('maintenance'))->send();
-            exit();
+            // Ziyaretçi (giriş yapmamış) korumalı bir sayfaya girmeye çalışıyorsa,
+            // Shield'in kendi "session" filtresi onu zaten login sayfasına yönlendirecektir.
+            // Bu yüzden burada ekstra bir yönlendirme yapmaya gerek yok.
+            return;
         }
     }
 }

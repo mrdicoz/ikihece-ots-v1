@@ -18,4 +18,10 @@ class Home extends BaseController
         // Rota adını kullanarak yönlendirme yapmak daha sağlıklıdır.
         return redirect()->to(route_to('dashboard'));
     }
+
+    public function maintenance(): string
+    {
+        $this->data['title'] = 'Sistem Bakımda';
+        return view('maintenance', $this->data);
+    }
 }
