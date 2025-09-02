@@ -11,7 +11,12 @@ class EntitlementController extends BaseController
 {
     public function importView()
     {
-        return view('admin/entitlements/import', ['title' => 'Öğrenci Ders Haklarını Yükle']);
+
+        $data = [
+           'title'       => 'Öğrenci Ders Haklarını Yükle',
+        ];
+
+        return view('admin/entitlements/import', array_merge($this->data, $data));
     }
 
     public function processImport()

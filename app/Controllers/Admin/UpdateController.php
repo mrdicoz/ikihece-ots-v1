@@ -15,7 +15,8 @@ class UpdateController extends BaseController
             'title'          => 'Sistem Güncelleme',
             'currentVersion' => config('Ots')->version,
         ];
-        return view('admin/update/index', $data);
+
+        return view('admin/update/index', array_merge($this->data, $data));
     }
 
     public function check()

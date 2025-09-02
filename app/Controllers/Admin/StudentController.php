@@ -15,7 +15,11 @@ class StudentController extends BaseController
      */
     public function importView()
     {
-        return view('admin/students/import');
+                $data = [
+           'title'       => 'Toplu Öğrenci Yükleme',
+        ];
+
+        return view('admin/students/import', array_merge($this->data, $data));
     }
 
     /**
