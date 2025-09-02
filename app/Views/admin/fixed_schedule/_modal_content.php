@@ -22,11 +22,19 @@
     <input type="hidden" name="day_of_week" value="<?= esc($day_of_week) ?>">
     <input type="hidden" name="day_name" value="<?= esc($day_name) ?>">
 
-    <div class="mb-3">
+<div class="mb-3">
         <label for="start_time" class="form-label">Ders Saati</label>
         <select name="start_time" class="form-select" required>
             <option value="">Saat Seçin...</option>
-            <?php for ($h = 8; $h <= 18; $h++): $time = str_pad($h, 2, '0', STR_PAD_LEFT) . ':00'; ?>
+            <?php
+                // Saat aralığını Config/Ots.php dosyasından alıyoruz
+                $startHour = config('Ots')->scheduleStartHour; //
+                $endHour = config('Ots')->scheduleEndHour; //
+
+                // Belirtilen saat aralığında bir döngü oluşturuyoruz
+                for ($h = $startHour; $h < $endHour; $h++): 
+                    $time = str_pad((string) $h, 2, '0', STR_PAD_LEFT) . ':00';
+            ?>
                 <option value="<?= $time ?>"><?= $time ?></option>
             <?php endfor; ?>
         </select>

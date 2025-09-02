@@ -133,73 +133,82 @@
                     </div>
                 </div>
             </div>
-
-
         </div>
 
         <div class="col-md-6">
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 fw-bold text-success"><i class="bi bi-backpack2-fill"></i> Öğrenci Listesi</h6>
-                    
-                    <div class="ms-auto">
-                        <div class="btn-group" role="group" aria-label="Hızlı Ekleme Butonları">
-                            <?php if (auth()->user()->can('ogrenciler.ekle')): ?>
-                                <a href="<?= site_url('students/new') ?>" class="btn btn-sm btn-outline-success" title="Yeni Öğrenci Ekle">
-                                    <i class="bi bi-person-plus-fill"> Yeni Öğrenci Ekle</i>
-                                </a>
-                            <?php endif; ?>
-
-                            <?php if (auth()->user()->can('kullanicilar.yonet')): ?>
-                                <a href="<?= route_to('admin.users.new') ?>" class="btn btn-sm btn-outline-secondary" title="Yeni Kullanıcı Ekle">
-                                    <i class="bi bi-person-add"> Yeni Kullanıcı Ekle</i>
-                                </a>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
+                    <h6 class="m-0 fw-bold text-success"><i class="bi bi-backpack2-fill"></i> Son Eklenen Öğrenciler</h6>
+                    <a href="<?= site_url('students/new') ?>" class="btn btn-sm btn-outline-success" title="Yeni Öğrenci Ekle">
+                        <i class="bi bi-person-plus-fill"></i>
+                    </a>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle" id="studentDashboardTable" width="100%" cellspacing="0">
                             <thead>
                                 <tr>
-                                    <th class="d-none d-md-table-cell" style="width: 50px;">Fotoğraf</th>
-                                    <th class="d-none d-md-table-cell">Adı Soyadı</th>
-                                    <th class="d-none d-md-table-cell">Veli Adı</th>
-                                    <th class="d-md-none">Öğrenci Bilgileri</th>
+                                    <th>Öğrenci</th>
+                                    <th class="d-none d-lg-table-cell">Programlar</th>
+                                    <th class="d-none d-lg-table-cell text-center">RAM</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($students as $student): ?>
                                 <tr data-href="<?= site_url('students/' . $student['id']) ?>" style="cursor: pointer;">
-                                    <?php 
-                                        // Veli adını önceden hesapla
-                                        $veli_adi = !empty($student['veli_anne_adi_soyadi']) 
-                                                    ? $student['veli_anne_adi_soyadi'] 
-                                                    : ($student['veli_baba_adi_soyadi'] ?? 'Belirtilmemiş');
-                                    ?>
-
-                                    <td class="d-none d-md-table-cell">
-                                        <img src="<?= base_url($student['profile_image'] ?? 'assets/images/user.jpg') . '?v=' . time() ?>" 
-                                             alt="<?= esc($student['adi']) ?>" 
-                                             class="rounded-circle" width="40" height="40" 
-                                             style="object-fit: cover;">
-                                    </td>
-                                    <td class="d-none d-md-table-cell"><?= esc($student['adi']) . ' ' . esc($student['soyadi']) ?></td>
-                                    <td class="d-none d-md-table-cell"><?= esc($veli_adi) ?></td>
-
-                                    <td class="d-md-none">
+                                    <td>
                                         <div class="d-flex align-items-center">
                                             <img src="<?= base_url($student['profile_image'] ?? 'assets/images/user.jpg') . '?v=' . time() ?>" 
                                                  alt="<?= esc($student['adi']) ?>" 
-                                                 class="rounded-circle me-3" width="40" height="40" 
+                                                 class="rounded-circle me-2" width="40" height="40" 
                                                  style="object-fit: cover;">
                                             <div>
                                                 <div class="fw-bold"><?= esc($student['adi']) . ' ' . esc($student['soyadi']) ?></div>
-                                                <div class="small text-muted">Veli: <?= esc($veli_adi) ?></div>
+                                                <div class="small text-muted d-lg-none">
+                                                <?php
+                                                    $programs = explode(',', $student['egitim_programi'] ?? '');
+                                                    foreach ($programs as $program) {
+                                                        $program = trim($program);
+                                                        if (empty($program)) continue;
+                                                        $badgeClass = 'bg-secondary'; $badgeHarf = '?';
+                                                        switch ($program) {
+                                                            case 'Bedensel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı': $badgeClass = 'bg-danger'; $badgeHarf = 'F'; break;
+                                                            case 'Dil ve Konuşma Bozukluğu Olan Bireyler İçin Destek Eğitim Programı': $badgeClass = 'bg-primary'; $badgeHarf = 'D'; break;
+                                                            case 'Zihinsel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı': $badgeClass = 'bg-success'; $badgeHarf = 'Z'; break;
+                                                            case 'Öğrenme Güçlüğü Olan Bireyler İçin Destek Eğitim Programı': $badgeClass = 'bg-warning text-dark'; $badgeHarf = 'Ö'; break;
+                                                            case 'Otizm Spektrum Bozukluğu Olan Bireyler İçin Destek Eğitim Programı': $badgeClass = 'bg-info text-dark'; $badgeHarf = 'O'; break;
+                                                        }
+                                                        echo "<span class=\"badge rounded-pill {$badgeClass}\" title=\"".esc($program)."\">{$badgeHarf}</span> ";
+                                                    }
+                                                ?>
+                                                </div>
                                             </div>
                                         </div>
+                                    </td>
+                                    <td class="align-middle d-none d-lg-table-cell">
+                                        <?php
+                                            $programs = explode(',', $student['egitim_programi'] ?? '');
+                                            foreach ($programs as $program):
+                                                $program = trim($program);
+                                                if (empty($program)) continue;
+                                                $badgeClass = 'bg-secondary'; $badgeHarf = '?';
+                                                switch ($program) {
+                                                    case 'Bedensel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı': $badgeClass = 'bg-danger'; $badgeHarf = 'F'; break;
+                                                    case 'Dil ve Konuşma Bozukluğu Olan Bireyler İçin Destek Eğitim Programı': $badgeClass = 'bg-primary'; $badgeHarf = 'D'; break;
+                                                    case 'Zihinsel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı': $badgeClass = 'bg-success'; $badgeHarf = 'Z'; break;
+                                                    case 'Öğrenme Güçlüğü Olan Bireyler İçin Destek Eğitim Programı': $badgeClass = 'bg-warning text-dark'; $badgeHarf = 'Ö'; break;
+                                                    case 'Otizm Spektrum Bozukluğu Olan Bireyler İçin Destek Eğitim Programı': $badgeClass = 'bg-info text-dark'; $badgeHarf = 'O'; break;
+                                                }
+                                            ?>
+                                            <span class="badge rounded-pill <?= $badgeClass ?>" title="<?= esc($program) ?>"><?= $badgeHarf ?></span>
+                                            <?php endforeach; ?>
+                                    </td>
+                                    <td class="align-middle text-center d-none d-lg-table-cell">
+                                        <?php if (!empty($student['ram_raporu'])): ?>
+                                            <span class="badge bg-success"><i class="bi bi-check-circle"></i> Var</span>
+                                        <?php else: ?>
+                                            <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Yok</span>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -220,22 +229,18 @@
         $('#studentDashboardTable').DataTable({
             "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/tr.json" },
             "pageLength": 7,
-            "searching": true,
+            "searching": false,
             "lengthChange": false,
             "info": false,
+             "order": [],
             "columnDefs": [
-                { "orderable": false, "searchable": false, "targets": 0 }
+                { "orderable": false, "targets": [0, 1, 2] }
             ]
         });
 
         $('#studentDashboardTable tbody').on('click', 'tr', function() {
             window.location.href = $(this).data('href');
         });
-
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl)
-        })
     });
 </script>
 <?= $this->endSection() ?>

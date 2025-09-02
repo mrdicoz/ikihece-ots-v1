@@ -21,6 +21,24 @@
                                     <img src="<?= base_url($ders['profile_image'] ?? 'assets/images/user.jpg') ?>" class="rounded-circle me-3" style="width:36px; height:36px; object-fit:cover;">
                                     <div>
                                         <div class="fw-bold"><?= esc($ders['adi'] . ' ' . $ders['soyadi']) ?></div>
+                                        <div class="small text-muted">
+                                            <?php
+                                                $programs = explode(',', $ders['egitim_programi'] ?? '');
+                                                foreach ($programs as $program):
+                                                    $program = trim($program);
+                                                    if (empty($program)) continue;
+                                                    $badgeClass = 'bg-secondary'; $badgeHarf = '?';
+                                                    switch ($program) {
+                                                        case 'Bedensel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı': $badgeClass = 'bg-danger'; $badgeHarf = 'F'; break;
+                                                        case 'Dil ve Konuşma Bozukluğu Olan Bireyler İçin Destek Eğitim Programı': $badgeClass = 'bg-primary'; $badgeHarf = 'D'; break;
+                                                        case 'Zihinsel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı': $badgeClass = 'bg-success'; $badgeHarf = 'Z'; break;
+                                                        case 'Öğrenme Güçlüğü Olan Bireyler İçin Destek Eğitim Programı': $badgeClass = 'bg-warning text-dark'; $badgeHarf = 'Ö'; break;
+                                                        case 'Otizm Spektrum Bozukluğu Olan Bireyler İçin Destek Eğitim Programı': $badgeClass = 'bg-info text-dark'; $badgeHarf = 'O'; break;
+                                                    }
+                                                ?>
+                                                <span class="badge rounded-pill <?= $badgeClass ?>" title="<?= esc($program) ?>"><?= $badgeHarf ?></span>
+                                            <?php endforeach; ?>
+                                        </div>
                                     </div>
                                 </a>
                                 <span class="badge bg-success rounded-pill">

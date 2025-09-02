@@ -102,6 +102,7 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->post('delete-day-lessons', 'ScheduleController::deleteLessonsForDay', ['as' => 'schedule.deleteForDay']);
         $routes->post('add-all-fixed', 'ScheduleController::addAllFixedLessonsForDay', ['as' => 'schedule.addAllFixed']);
         $routes->post('delete-all-day', 'ScheduleController::deleteAllLessonsForDay', ['as' => 'schedule.deleteAllForDay']);
+        $routes->post('update-lesson/(:num)', 'ScheduleController::updateLesson/$1', ['as' => 'schedule.update']); // YENİ EKLENEN ROTA
 
         
     });

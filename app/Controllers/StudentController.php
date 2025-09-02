@@ -159,7 +159,7 @@ public function create()
         return view('students/edit', array_merge($this->data, $data));
     }
     
-    public function update($id = null)
+public function update($id = null)
 {
     $model = new StudentModel();
     $user = auth()->user();
@@ -170,39 +170,37 @@ public function create()
             return redirect()->to(site_url('my-students'))->with('error', 'Bu öğrenciyi güncelleme yetkiniz yok.');
         }
     }
-    // --- GÜVENLİK KONTROLÜ SONU ---
     
     $data = $this->request->getPost();
+
+    // TCKN validation kuralını dinamik olarak ayarla
+    $model->setValidationRule('tckn', 'required|exact_length[11]|is_unique[students.tckn,id,' . $id . ']');
 
     if (isset($data['egitim_programi']) && is_array($data['egitim_programi'])) {
         $data['egitim_programi'] = implode(',', $data['egitim_programi']);
     }
 
+    // Dosya yükleme işlemleri...
     $reportFile = $this->request->getFile('ram_raporu');
     if ($reportFile && $reportFile->isValid() && !$reportFile->hasMoved()) {
         $student = $model->find($id);
         if (!empty($student['ram_raporu']) && file_exists(WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu'])) {
-            unlink(WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu']);
+            @unlink(WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu']);
         }
         $newName = $reportFile->getRandomName();
         $reportFile->move(WRITEPATH . 'uploads/ram_reports', $newName);
         $data['ram_raporu'] = $newName;
     }
 
-    // Değişiklik burada: update() metodu validasyon hatası verirse false döner.
-    if ($model->update($id, $data) === false) {
-        return redirect()->back()->withInput()->with('errors', $model->errors());
-    }
-
     if ($model->update($id, $data)) {
         $guncelOgrenciData = $model->find($id);
         \CodeIgniter\Events\Events::trigger('student.updated', $guncelOgrenciData, auth()->user());
+        
         return redirect()->to(site_url('students/' . $id))->with('success', 'Öğrenci başarıyla güncellendi.');
+    } else {
+        return redirect()->back()->withInput()->with('errors', $model->errors());
     }
-
-    return redirect()->back()->withInput()->with('errors', $model->errors());
 }
-
     public function delete($id = null)
     {
         $model = new StudentModel();

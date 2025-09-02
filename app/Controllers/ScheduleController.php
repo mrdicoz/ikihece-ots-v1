@@ -10,6 +10,10 @@ use App\Models\FixedLessonModel; // Bu modeli ekliyoruz
 use App\Models\StudentModel;
 use CodeIgniter\I18n\Time;
 use CodeIgniter\Shield\Models\UserModel;
+// YENİ EKLENECEK SATIRLAR BAŞLANGIÇ
+use App\Models\LessonHistoryModel;
+use App\Models\UserProfileModel;
+// YENİ EKLENECEK SATIRLAR BİTİŞ
 
 class ScheduleController extends BaseController
 {
@@ -72,7 +76,7 @@ class ScheduleController extends BaseController
         $loggedInUser = auth()->user();
 
         $teacherQuery = $userModel
-            ->select('users.id, user_profiles.first_name, user_profiles.last_name, user_profiles.profile_photo')
+            ->select('users.id, user_profiles.first_name, user_profiles.last_name, user_profiles.profile_photo, user_profiles.branch')
             ->join('auth_groups_users', 'auth_groups_users.user_id = users.id')
             ->join('user_profiles', 'user_profiles.user_id = users.id', 'left')
             ->where('auth_groups_users.group', 'ogretmen')
@@ -166,20 +170,83 @@ class ScheduleController extends BaseController
             return $this->response->setJSON($formattedStudents);
         }
     
-    /**
-     * Ders detaylarını getirir.
-     */
     public function getLessonDetails($lessonId)
     {
-        if (!$this->request->isAJAX()) { return $this->response->setStatusCode(403); }
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(403);
+        }
+
         $lessonModel = new LessonModel();
-        $lesson = $lessonModel
-            ->select('lessons.*, GROUP_CONCAT(CONCAT(s.adi, " ", s.soyadi) SEPARATOR ",") as student_names')
-            ->join('lesson_students ls', 'ls.lesson_id = lessons.id', 'left')
-            ->join('students s', 's.id = ls.student_id', 'left')
-            ->where('lessons.id', $lessonId)->groupBy('lessons.id')->first();
-        return $this->response->setJSON(['success' => (bool)$lesson, 'lesson' => $lesson]);
+        $lessonStudentModel = new LessonStudentModel();
+
+        // Dersin temel bilgilerini al
+        $lesson = $lessonModel->find($lessonId);
+
+        if (!$lesson) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Ders bulunamadı.']);
+        }
+
+        // Derse kayıtlı öğrencilerin ID ve Ad Soyad bilgilerini al
+        $students = $lessonStudentModel
+            ->select('students.id, CONCAT(students.adi, " ", students.soyadi) as name')
+            ->join('students', 'students.id = lesson_students.student_id')
+            ->where('lesson_id', $lessonId)
+            ->findAll();
+
+        $lesson['students'] = $students;
+
+        return $this->response->setJSON(['success' => true, 'lesson' => $lesson]);
     }
+
+    /**
+     * Mevcut bir dersin öğrenci listesini günceller.
+     * Eğer derste öğrenci kalmazsa, dersi siler.
+     */
+    public function updateLesson($lessonId)
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(403);
+        }
+
+        $lessonModel = new LessonModel();
+        $lessonStudentModel = new LessonStudentModel();
+        $db = \Config\Database::connect();
+
+        $studentIds = $this->request->getPost('students') ?? [];
+
+        // Önce dersin var olup olmadığını kontrol et
+        $lesson = $lessonModel->find($lessonId);
+        if (!$lesson) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Güncellenecek ders bulunamadı.']);
+        }
+
+        // Eğer hiç öğrenci gönderilmediyse, dersi sil
+        if (empty($studentIds)) {
+            return $this->deleteLesson($lessonId);
+        }
+
+        $db->transStart();
+
+        // Mevcut öğrenci kayıtlarını sil
+        $lessonStudentModel->where('lesson_id', $lessonId)->delete();
+
+        // Yeni öğrenci listesini ekle
+        $studentData = array_map(fn($id) => ['lesson_id' => $lessonId, 'student_id' => $id], $studentIds);
+        $lessonStudentModel->insertBatch($studentData);
+
+        if ($db->transStatus() === false) {
+            $db->transRollback();
+            return $this->response->setJSON(['success' => false, 'message' => 'Veritabanı hatası nedeniyle ders güncellenemedi.']);
+        }
+
+        $db->transCommit();
+        
+        // Olayı tetikle
+        \CodeIgniter\Events\Events::trigger('schedule.changed', $lesson, $lesson['teacher_id']);
+
+        return $this->response->setJSON(['success' => true, 'message' => 'Ders başarıyla güncellendi.']);
+    }
+
     
     /**
      * Yeni bir ders oluşturur.
@@ -336,17 +403,15 @@ class ScheduleController extends BaseController
         return view('schedule/parent_schedule', $this->data);
     }
 
-        /**
-     * AKILLANDIRILMIŞ FİNAL VERSİYON: Mevcut yapıyı koruyarak,
-     * konuştuğumuz tüm kurallara göre 4 katmanlı öneri listesi döndürür.
-     */
-    public function getStudentSuggestions()
-    {
-        if (!$this->request->isAJAX()) {
-            return $this->response->setStatusCode(403, 'Forbidden');
-        }
+// app/Controllers/ScheduleController.php İÇİNE YAPIŞTIRILACAK NİHAİ KOD
 
-        // 1. Gerekli Parametreleri ve Modelleri Al
+public function getStudentSuggestions()
+{
+    if (!$this->request->isAJAX()) {
+        return $this->response->setStatusCode(403, 'Forbidden');
+    }
+
+    try {
         $teacherId = $this->request->getGet('teacher_id');
         $date = $this->request->getGet('date');
         $startTime = $this->request->getGet('start_time');
@@ -355,62 +420,63 @@ class ScheduleController extends BaseController
             return $this->response->setStatusCode(400, 'Eksik parametre.');
         }
 
+        $studentModel = new \App\Models\StudentModel();
         $fixedLessonModel = new \App\Models\FixedLessonModel();
         $lessonHistoryModel = new \App\Models\LessonHistoryModel();
-        $studentModel = new \App\Models\StudentModel();
-        $teacherProfile = model('UserProfileModel')->where('user_id', $teacherId)->first();
-
-        $dayOfWeek = date('N', strtotime($date));
+        $teacherProfile = model(\App\Models\UserProfileModel::class)->where('user_id', $teacherId)->first();
+        
         $suggestions = [];
-        $existingStudentIds = []; // Önerilen öğrencileri tekrar önermemek için takip listesi
+        $existingStudentIds = [];
+        $dayOfWeek = date('N', strtotime($date));
 
-        // --- 0. Katman: Sabit Dersler (YEŞİL GÖRÜNECEK) ---
-        $fixedStudents = $fixedLessonModel->select('s.id, s.adi, s.soyadi, s.telafi_bireysel_hak, s.telafi_grup_hak')
-            ->join('students s', 's.id = fixed_lessons.student_id')
-            ->where('fixed_lessons.teacher_id', $teacherId)
-            ->where('fixed_lessons.day_of_week', $dayOfWeek)
-            ->where('fixed_lessons.start_time', $startTime)
-            ->findAll();
+        // --- KATMAN 0: SABİT DERSLER ---
+        $fixedLessonStudentIds = $fixedLessonModel
+            ->where('teacher_id', $teacherId)
+            ->where('day_of_week', $dayOfWeek)
+            ->where('start_time', $startTime)
+            ->findColumn('student_id');
 
-        foreach ($fixedStudents as $student) {
-            $suggestions[] = [
-                'id'       => $student['id'],
-                'name'     => trim($student['adi'] . ' ' . $student['soyadi']),
-                'type'     => 'fixed',
-                'bireysel' => $student['telafi_bireysel_hak'] ?? 0,
-                'grup'     => $student['telafi_grup_hak'] ?? 0
-            ];
-            $existingStudentIds[] = $student['id'];
+        if (!empty($fixedLessonStudentIds)) {
+            $fixedStudents = $studentModel->withDeleted()->find($fixedLessonStudentIds);
+            if (!empty($fixedStudents)) {
+                foreach ($fixedStudents as $student) {
+                    $suggestions[] = [
+                        'id'       => $student['id'],
+                        'name'     => trim($student['adi'] . ' ' . $student['soyadi']),
+                        'type'     => 'fixed',
+                        'bireysel' => $student['telafi_bireysel_hak'] ?? 0,
+                        'grup'     => $student['telafi_grup_hak'] ?? 0,
+                    ];
+                    $existingStudentIds[] = $student['id'];
+                }
+            }
         }
 
-        // --- 1. ve 2. Katmanlar: Akıllı Öneriler (MAVİ GÖRÜNECEK) ---
-        $teacherFullName = $teacherProfile ? trim($teacherProfile->first_name . ' ' . $teacherProfile->last_name) : '';
-        $hasHistory = !empty($teacherFullName) && $lessonHistoryModel->teacherHasHistory($teacherFullName);
-
-        $historySuggestionsData = [];
-        if ($hasHistory) {
-            // Katman 1: Öğretmenin Kendi Geçmişi
-            $historySuggestionsData = $lessonHistoryModel->getSuggestionsByTeacherHistory($teacherFullName, (int)$dayOfWeek, $startTime);
-        } else {
-            // Katman 2: Branş Uyumu (Yeni Öğretmenler İçin)
-            $teacherBranch = $teacherProfile->branch ?? '';
-            if (!empty($teacherBranch)) {
-                $historySuggestionsData = $lessonHistoryModel->getSuggestionsByBranch($teacherBranch, (int)$dayOfWeek, $startTime);
+        // --- KATMAN 1 & 2: AKILLI ÖNERİLER ---
+        if ($teacherProfile) {
+            $teacherFullName = trim($teacherProfile->first_name . ' ' . $teacherProfile->last_name);
+            if (!empty($teacherFullName)) {
+                $historySuggestionsData = [];
+                if ($lessonHistoryModel->teacherHasHistory($teacherFullName)) {
+                    $historySuggestionsData = $lessonHistoryModel->getSuggestionsByTeacherHistory($teacherFullName, (int)$dayOfWeek, $startTime);
+                } elseif (!empty($teacherProfile->branch)) {
+                    $historySuggestionsData = $lessonHistoryModel->getSuggestionsByBranch($teacherProfile->branch, (int)$dayOfWeek, $startTime);
+                }
+                $this->_addHistorySuggestions($historySuggestionsData, $suggestions, $existingStudentIds, 'history');
             }
         }
         
-        // Akıllı önerileri ana listeye ekle
-        $this->_addHistorySuggestions($historySuggestionsData, $suggestions, $existingStudentIds, 'history');
+        // --- KATMAN 3: DİĞER TÜM ÖĞRENCİLER (GÜVENLİ HALE GETİRİLDİ) ---
+        $otherStudentsQuery = $studentModel->withDeleted()
+            ->select('id, adi, soyadi, telafi_bireysel_hak, telafi_grup_hak');
 
-        // --- 3. Katman: Diğer Öğrenciler (Mesafeye Göre Sıralı -> Normal Renk) ---
-        $otherStudentsBuilder = $studentModel->select('id, adi, soyadi, mesafe, telafi_bireysel_hak, telafi_grup_hak');
+        // *** HATA DÜZELTMESİ: Sadece $existingStudentIds dizisi doluysa whereNotIn sorgusunu ekle ***
         if (!empty($existingStudentIds)) {
-            $otherStudentsBuilder->whereNotIn('id', $existingStudentIds);
+            $otherStudentsQuery->whereNotIn('id', $existingStudentIds);
         }
-        
-        $otherStudents = $otherStudentsBuilder
-            ->orderBy("FIELD(mesafe, 'civar', 'yakın', 'uzak')")
-            ->orderBy('adi', 'ASC')
+
+        $otherStudents = $otherStudentsQuery->orderBy('adi', 'ASC')
+            ->orderBy('soyadi', 'ASC')
             ->findAll();
 
         foreach ($otherStudents as $student) {
@@ -419,49 +485,64 @@ class ScheduleController extends BaseController
                 'name'     => trim($student['adi'] . ' ' . $student['soyadi']),
                 'type'     => 'other',
                 'bireysel' => $student['telafi_bireysel_hak'] ?? 0,
-                'grup'     => $student['telafi_grup_hak'] ?? 0
+                'grup'     => $student['telafi_grup_hak'] ?? 0,
             ];
         }
 
         return $this->response->setJSON($suggestions);
+
+    } catch (\Exception $e) {
+        log_message('error', '[ScheduleController] HATA: ' . $e->getMessage() . ' | DOSYA: ' . $e->getFile() . ' | SATIR: ' . $e->getLine());
+        return $this->response->setStatusCode(500)->setJSON([
+            'success' => false,
+            'message' => 'SUNUCU HATASI: ' . $e->getMessage(),
+            'file'    => $e->getFile(),
+            'line'    => $e->getLine()
+        ]);
+    }
+}
+
+// app/Controllers/ScheduleController.php İÇİNE YAPIŞTIRILACAK
+
+private function _addHistorySuggestions(array $historyData, array &$suggestions, array &$existingStudentIds, string $type)
+{
+    if (empty($historyData)) {
+        return;
     }
 
-    /**
-     * YARDIMCI FONKSİYON: Geçmiş verilerinden gelen öğrencileri bulur ve ana öneri listesine ekler.
-     */
-    private function _addHistorySuggestions(array $historyData, array &$suggestions, array &$existingStudentIds, string $type)
-    {
-        if (empty($historyData)) {
-            return;
-        }
+    $studentModel = new \App\Models\StudentModel();
+    $studentNames = array_column($historyData, 'student_name');
 
-        $studentModel = new \App\Models\StudentModel();
-        $studentNames = array_column($historyData, 'student_name');
+    if (empty($studentNames)) {
+        return;
+    }
 
-        $studentDetails = $studentModel->select('id, adi, soyadi, telafi_bireysel_hak, telafi_grup_hak')
-            ->whereIn('CONCAT(adi, " ", soyadi)', $studentNames)
-            ->findAll();
+    // DÜZELTME: Geçmişten gelen öğrenci silinmiş olsa bile bulabilmek için withDeleted() eklendi.
+    $studentDetails = $studentModel->withDeleted()
+        ->select('id, adi, soyadi, telafi_bireysel_hak, telafi_grup_hak')
+        ->whereIn('CONCAT(adi, " ", soyadi)', $studentNames)
+        ->findAll();
 
-        $nameToDetailsMap = [];
-        foreach($studentDetails as $student) {
-            $nameToDetailsMap[trim($student['adi'] . ' ' . $student['soyadi'])] = $student;
-        }
+    $nameToDetailsMap = [];
+    foreach($studentDetails as $student) {
+        $nameToDetailsMap[trim($student['adi'] . ' ' . $student['soyadi'])] = $student;
+    }
 
-        foreach ($historyData as $hist) {
-            $studentDetail = $nameToDetailsMap[$hist['student_name']] ?? null;
+    foreach ($historyData as $hist) {
+        $studentDetail = $nameToDetailsMap[$hist['student_name']] ?? null;
 
-            if ($studentDetail && !in_array($studentDetail['id'], $existingStudentIds)) {
-                $suggestions[] = [
-                    'id'       => $studentDetail['id'],
-                    'name'     => $hist['student_name'], // Sadece öğrenci adı, program yazmıyoruz.
-                    'type'     => $type,
-                    'bireysel' => $studentDetail['telafi_bireysel_hak'] ?? 0,
-                    'grup'     => $studentDetail['telafi_grup_hak'] ?? 0
-                ];
-                $existingStudentIds[] = $studentDetail['id'];
-            }
+        if ($studentDetail && !in_array($studentDetail['id'], $existingStudentIds)) {
+            $suggestions[] = [
+                'id'       => $studentDetail['id'],
+                'name'     => $hist['student_name'],
+                'type'     => $type,
+                'bireysel' => $studentDetail['telafi_bireysel_hak'] ?? 0,
+                'grup'     => $studentDetail['telafi_grup_hak'] ?? 0
+            ];
+            $existingStudentIds[] = $studentDetail['id'];
         }
     }
+}
 
 public function addFixedLessonsForDay()
     {
