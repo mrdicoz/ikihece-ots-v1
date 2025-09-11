@@ -69,6 +69,22 @@ public function create()
     $model = new StudentModel();
     $data = $this->request->getPost();
 
+    // Fotoğraf yükleme işlemi
+        $croppedImageData = $this->request->getPost('cropped_image_data');
+        if (!empty($croppedImageData)) {
+            list(, $croppedImageData) = explode(',', $croppedImageData);
+            $decodedImage = base64_decode($croppedImageData);
+            $imageName = uniqid('student_') . '.jpg';
+            $uploadPath = FCPATH . 'uploads/student_photos/';
+
+            if (!is_dir($uploadPath)) {
+                mkdir($uploadPath, 0777, true);
+            }
+
+            file_put_contents($uploadPath . $imageName, $decodedImage);
+            $data['profile_image'] = 'uploads/student_photos/' . $imageName;
+        }
+
     if (isset($data['egitim_programi']) && is_array($data['egitim_programi'])) {
         $data['egitim_programi'] = implode(',', $data['egitim_programi']);
     }
@@ -164,6 +180,8 @@ public function update($id = null)
     $model = new StudentModel();
     $user = auth()->user();
 
+    
+
     // --- GÜVENLİK KONTROLÜ ---
     if ($user->inGroup('ogretmen') && !$user->inGroup('admin', 'yonetici', 'mudur', 'sekreter')) {
         if (!$model->isStudentOfTeacher($id, $user->id)) {
@@ -172,6 +190,30 @@ public function update($id = null)
     }
     
     $data = $this->request->getPost();
+
+        // --- FOTOĞRAF GÜNCELLEME KISMI ---
+    $croppedImageData = $this->request->getPost('cropped_image_data');
+    if (!empty($croppedImageData)) {
+        // Mevcut bir fotoğraf varsa ve varsayılan değilse sunucudan sil
+        if (!empty($student['profile_image']) && $student['profile_image'] !== 'assets/images/user.jpg' && file_exists(FCPATH . $student['profile_image'])) {
+             @unlink(FCPATH . $student['profile_image']);
+        }
+
+        // Yeni fotoğrafı işle ve kaydet
+        list(, $croppedImageData) = explode(',', $croppedImageData);
+        $decodedImage = base64_decode($croppedImageData);
+        // İsimlendirme çakışmasını önlemek için öğrenci ID ve uniqid kullanalım
+        $imageName = 'student_' . $id . '_' . uniqid() . '.jpg';
+        $uploadPath = FCPATH . 'uploads/student_photos/';
+
+        if (!is_dir($uploadPath)) {
+            mkdir($uploadPath, 0777, true);
+        }
+        
+        file_put_contents($uploadPath . $imageName, $decodedImage);
+        $data['profile_image'] = 'uploads/student_photos/' . $imageName;
+    }
+    // --- FOTOĞRAF GÜNCELLEME SONU ---
 
     // TCKN validation kuralını dinamik olarak ayarla
     $model->setValidationRule('tckn', 'required|exact_length[11]|is_unique[students.tckn,id,' . $id . ']');

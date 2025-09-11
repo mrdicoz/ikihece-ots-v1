@@ -171,7 +171,10 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->post('save', 'FixedScheduleController::saveLesson', ['as' => 'admin.fixed_schedule.save']);
         $routes->post('delete', 'FixedScheduleController::deleteLesson', ['as' => 'admin.fixed_schedule.delete']);
         $routes->get('get-cell-content/(:num)/(:num)', 'FixedScheduleController::getCellContent/$1/$2', ['as' => 'admin.fixed_schedule.get_cell']);
-
+    // --- YENİ EKLENECEK ROTALAR ---
+    $routes->get('get-slot-content/(:num)/(:num)/(:num)', 'FixedScheduleController::getSlotContent/$1/$2/$3', ['as' => 'admin.fixed_schedule.get_slot_content']);
+    $routes->get('get-hour-details/(:num)/(:num)/(:num)', 'FixedScheduleController::getHourDetails/$1/$2/$3', ['as' => 'admin.fixed_schedule.get_hour_details']);
+    $routes->get('search-students', 'FixedScheduleController::searchStudents', ['as' => 'admin.fixed_schedule.search_students']);
 
     });
         

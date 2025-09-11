@@ -73,78 +73,78 @@ class NotificationController extends BaseController
         return $this->fail('Abonelik veritabanına kaydedilemedi.', 500);
     }
 
-    public function sendManualNotification()
-    {
-        if (! $this->request->isAJAX()) {
-            return $this->response->setStatusCode(403, 'Forbidden');
+public function sendManualNotification()
+{
+    if (! $this->request->isAJAX()) {
+        return $this->response->setStatusCode(403, 'Forbidden');
+    }
+
+    $teacherIds = $this->request->getPost('teacher_ids');
+
+    if (empty($teacherIds) || !is_array($teacherIds)) {
+        return $this->response->setStatusCode(400)->setJSON(['success' => false, 'message' => 'Geçersiz veya boş öğretmen seçimi yapıldı.']);
+    }
+
+    $payload = json_encode([
+        'title' => 'Ders Programı Güncellemesi',
+        'body'  => 'Yönetim tarafından programınızda bir güncelleme yapılmıştır. Lütfen kontrol ediniz.',
+        'icon'  => base_url('assets/images/favicon-192x192.png'),
+        'data'  => ['url' => route_to('schedule.my')] 
+    ]);
+
+    $pushSubscriptionModel = new PushSubscriptionModel();
+    $subscriptions = $pushSubscriptionModel->whereIn('user_id', $teacherIds)->asArray()->findAll();
+
+    if (empty($subscriptions)) {
+         return $this->response->setJSON(['success' => true, 'message' => 'Seçilen öğretmen(ler) için kayıtlı bir bildirim aboneliği bulunamadı.']);
+    }
+
+    try {
+        $auth = [
+            'VAPID' => [
+                'subject'    => 'mailto:' . env('app.fromEmail'), // getenv yerine env() kullanıldı
+                'publicKey'  => env('vapid.publicKey'),    // getenv yerine env() kullanıldı
+                'privateKey' => env('vapid.privateKey'),   // getenv yerine env() kullanıldı
+            ],
+        ];
+
+        $webPush = new WebPush($auth);
+
+        foreach ($subscriptions as $sub) {
+            $subscription = Subscription::create([
+                'endpoint'        => $sub['endpoint'],
+                'publicKey'       => $sub['p256dh'],
+                'authToken'       => $sub['auth'],
+                'contentEncoding' => 'aesgcm'
+            ]);
+            $webPush->queueNotification($subscription, $payload);
         }
 
-        $teacherIds = $this->request->getPost('teacher_ids');
-
-        if (empty($teacherIds) || !is_array($teacherIds)) {
-            return $this->response->setStatusCode(400)->setJSON(['success' => false, 'message' => 'Geçersiz veya boş öğretmen seçimi yapıldı.']);
-        }
-
-        $payload = json_encode([
-            'title' => 'Ders Programı Güncellemesi',
-            'body'  => 'Yönetim tarafından programınızda bir güncelleme yapılmıştır. Lütfen kontrol ediniz.',
-            'icon'  => base_url('assets/images/favicon-192x192.png'),
-            'data'  => ['url' => site_url('schedule')]
-        ]);
-
-        $pushSubscriptionModel = new PushSubscriptionModel();
-        // Hata 2: findAll() metodu obje değil, dizi (array) döndürür.
-        $subscriptions = $pushSubscriptionModel->whereIn('user_id', $teacherIds)->asArray()->findAll();
-
-        if (empty($subscriptions)) {
-             return $this->response->setJSON(['success' => true, 'message' => 'Seçilen öğretmen(ler) için kayıtlı bir bildirim aboneliği bulunamadı.']);
-        }
-
-        try {
-            $auth = [
-                'VAPID' => [
-                    'subject'    => 'mailto:' . getenv('app.fromEmail'),
-                    'publicKey'  => getenv('vapid.publicKey'),
-                    'privateKey' => getenv('vapid.privateKey'),
-                ],
-            ];
-
-            // Burada new WebPush dediğimizde, PHP artık doğru sınıftan nesne oluşturacak.
-            $webPush = new WebPush($auth);
-
-            foreach ($subscriptions as $sub) {
-                 // Hata 2'nin çözümü: $sub bir dizi olduğu için -> yerine [] kullanıyoruz.
-                $subscription = Subscription::create([
-                    'endpoint'    => $sub['endpoint'],
-                    'publicKey'   => $sub['p256dh'],
-                    'authToken'   => $sub['auth'],
-                    'contentEncoding' => 'aesgcm'
-                ]);
-                $webPush->queueNotification($subscription, $payload);
-            }
-
-            $sentCount = 0;
-            foreach ($webPush->flush() as $report) {
-                if ($report->isSuccess()) {
-                    $sentCount++;
-                } else {
-                    log_message('error', 'Bildirim Gönderim Hatası: ' . $report->getReason() . ' | Endpoint: ' . $report->getEndpoint());
-                    if ($report->isSubscriptionExpired() || $report->getStatusCode() === 404 || $report->getStatusCode() === 410) {
-                        $pushSubscriptionModel->where('endpoint', $report->getEndpoint())->delete();
-                    }
+        $sentCount = 0;
+        foreach ($webPush->flush() as $report) {
+            if ($report->isSuccess()) {
+                $sentCount++;
+            } else {
+                log_message('error', 'Bildirim Gönderim Hatası: ' . $report->getReason() . ' | Endpoint: ' . $report->getEndpoint());
+                
+                // **** İŞTE DÜZELTİLEN KISIM ****
+                // Hatalı getStatusCode() çağrısı kaldırıldı.
+                if ($report->isSubscriptionExpired()) {
+                    $pushSubscriptionModel->where('endpoint', $report->getEndpoint())->delete();
                 }
             }
-            
-            return $this->response->setJSON([
-                'success' => true, 
-                'message' => $sentCount . ' öğretmene bildirim başarıyla gönderildi.'
-            ]);
-
-        } catch (\Throwable $e) {
-            log_message('error', '[NotificationController] ' . $e->getFile() . ' Line: ' . $e->getLine() . ' Error: ' . $e->getMessage());
-            return $this->response->setStatusCode(500)->setJSON(['success' => false, 'message' => 'Bildirimler gönderilirken kritik bir hata oluştu.']);
         }
+        
+        return $this->response->setJSON([
+            'success' => true, 
+            'message' => $sentCount . ' öğretmene bildirim başarıyla gönderildi.'
+        ]);
+
+    } catch (\Throwable $e) {
+        log_message('error', '[NotificationController] ' . $e->getFile() . ' Line: ' . $e->getLine() . ' Error: ' . $e->getMessage());
+        return $this->response->setStatusCode(500)->setJSON(['success' => false, 'message' => 'Bildirimler gönderilirken kritik bir hata oluştu.']);
     }
+}
 
     // app/Controllers/NotificationController.php
 
