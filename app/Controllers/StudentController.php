@@ -9,32 +9,59 @@ use App\Models\DistrictModel;
 
 class StudentController extends BaseController
 {
+// app/Controllers/StudentController.php
+
 public function index()
 {
     $model = new StudentModel();
     $districtModel = new DistrictModel();
+    $fixedLessonModel = new \App\Models\FixedLessonModel();
 
-    // GET üzerinden gelen filtreleme parametrelerini alıyoruz.
+    // GET üzerinden gelen tüm filtreleme parametrelerini alıyoruz.
     $filterDistrict = $this->request->getGet('district_id');
     $filterMesafe   = $this->request->getGet('mesafe');
+    $filterSabitDurum = $this->request->getGet('sabit_durum');
+    $filterSabitGun   = $this->request->getGet('sabit_gun');
+    $filterProgram    = $this->request->getGet('egitim_programi'); // YENİ FİLTRE
 
-    // Sorguyu filtrelemeye hazır hale getiriyoruz.
     $query = $model;
 
-    // İlçe filtresi uygulanmışsa sorguya ekliyoruz.
+    // İlçe ve Mesafe filtreleri
     if ($filterDistrict && is_numeric($filterDistrict)) {
         $query->where('district_id', $filterDistrict);
     }
-
-    // Mesafe filtresi (Civar, Yakın, Uzak) uygulanmışsa sorguya ekliyoruz.
     if ($filterMesafe && in_array($filterMesafe, ['Civar', 'Yakın', 'Uzak'])) {
         $query->where('mesafe', $filterMesafe);
     }
 
-    // Filtrelenmiş veya tüm öğrencileri çekiyoruz.
+    // Sabit Ders Filtresi
+    if ($filterSabitDurum === 'eklenen') {
+        $fixedQuery = $fixedLessonModel->distinct()->select('student_id');
+        if ($filterSabitGun && is_numeric($filterSabitGun)) {
+            $fixedQuery->where('day_of_week', $filterSabitGun);
+        }
+        $fixedStudentIds = $fixedQuery->findColumn('student_id');
+        if (empty($fixedStudentIds)) {
+            $query->where('id', 0);
+        } else {
+            $query->whereIn('id', $fixedStudentIds);
+        }
+    } elseif ($filterSabitDurum === 'eklenmeyen') {
+        $fixedStudentIds = $fixedLessonModel->distinct()->findColumn('student_id');
+        if (!empty($fixedStudentIds)) {
+            $query->whereNotIn('id', $fixedStudentIds);
+        }
+    }
+    
+    // --- YENİ EĞİTİM PROGRAMI FİLTRESİ ---
+    if ($filterProgram && !empty($filterProgram)) {
+        // egitim_programi alanı 'program1,program2' gibi olduğu için LIKE ile arama yapıyoruz.
+        $query->like('egitim_programi', $filterProgram);
+    }
+    // --- YENİ FİLTRE SONU ---
+
     $students = $query->orderBy('adi', 'ASC')->findAll();
 
-    // YENİ MANTIK: Sadece öğrencisi olan ilçeleri çekiyoruz.
     $districts = $districtModel
         ->distinct()
         ->select('districts.id, districts.name')
@@ -42,12 +69,25 @@ public function index()
         ->orderBy('districts.name', 'ASC')
         ->findAll();
 
+    // View'de dropdown'ı doldurmak için eğitim programlarının listesi
+    $egitimProgramlari = [
+        'Bedensel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı',
+        'Dil ve Konuşma Bozukluğu Olan Bireyler İçin Destek Eğitim Programı',
+        'Zihinsel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı',
+        'Öğrenme Güçlüğü Olan Bireyler İçin Destek Eğitim Programı',
+        'Otizm Spektrum Bozukluğu Olan Bireyler İçin Destek Eğitim Programı'
+    ];
+
     $data = [
-        'title'             => 'Öğrenci Yönetimi',
-        'students'          => $students,
-        'districts'         => $districts,
-        'selected_district' => $filterDistrict,
-        'selected_mesafe'   => $filterMesafe,
+        'title'               => 'Öğrenci Yönetimi',
+        'students'            => $students,
+        'districts'           => $districts,
+        'egitim_programlari'  => $egitimProgramlari, // Listeyi view'e gönder
+        'selected_district'   => $filterDistrict,
+        'selected_mesafe'     => $filterMesafe,
+        'selected_sabit_durum'=> $filterSabitDurum,
+        'selected_sabit_gun'  => $filterSabitGun,
+        'selected_program'    => $filterProgram,   // Seçili programı view'e gönder
     ];
 
     return view('students/index', array_merge($this->data, $data));

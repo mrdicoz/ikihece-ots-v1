@@ -13,47 +13,88 @@
         </a>
     </div>
 
-    <div class="card shadow mb-3">
-        <div class="card-header">
-            <a href="#collapse-filters" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="collapse-filters" class="text-decoration-none text-body">
+<div class="card shadow mb-3">
+    <div class="card-header py-2" data-bs-toggle="collapse" href="#collapse-filters" role="button" aria-expanded="true" aria-controls="collapse-filters" style="cursor: pointer;">
+        <h6 class="m-0 fw-bold text-success d-flex justify-content-between align-items-center">
+            <span>
                 <i class="bi bi-funnel-fill"></i> Filtreleme Seçenekleri
-            </a>
-        </div>
-        <div class="collapse" id="collapse-filters">
-            <div class="card-body">
-                <form action="<?= site_url('students') ?>" method="get">
-                    <div class="row g-3">
-                        <div class="col-md-5">
-                            <label for="district_id" class="form-label">İlçeye Göre Filtrele</label>
-                            <select name="district_id" id="district_id" class="form-select">
-                                <option value="">Tüm İlçeler</option>
-                                <?php foreach($districts as $district): ?>
-                                    <option value="<?= $district->id ?>" <?= ($selected_district == $district->id) ? 'selected' : '' ?>>
-                                        <?= esc($district->name) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-5">
-                            <label for="mesafe" class="form-label">Mesafeye Göre Filtrele</label>
-                            <select name="mesafe" id="mesafe" class="form-select">
-                                <option value="">Tüm Mesafeler</option>
-                                <option value="Civar" <?= ($selected_mesafe == 'Civar') ? 'selected' : '' ?>>Civar</option>
-                                <option value="Yakın" <?= ($selected_mesafe == 'Yakın') ? 'selected' : '' ?>>Yakın</option>
-                                <option value="Uzak" <?= ($selected_mesafe == 'Uzak') ? 'selected' : '' ?>>Uzak</option>
-                            </select>
-                        </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <div class="btn-group w-100">
-                                <button type="submit" class="btn btn-success">Filtrele</button>
-                                <a href="<?= site_url('students') ?>" class="btn btn-secondary" title="Filtreyi Temizle"><i class="bi bi-arrow-clockwise"></i></a>
-                            </div>
+            </span>
+            <i class="bi bi-chevron-down filter-chevron"></i>
+        </h6>
+    </div>
+    <div class="collapse" id="collapse-filters">
+        <div class="card-body">
+            <form action="<?= site_url('students') ?>" method="get" id="filter-form">
+                <div class="row g-2 align-items-end">
+                    
+                    <div class="col-lg-2 col-md-4">
+                        <label for="district_id" class="form-label small">İlçe</label>
+                        <select name="district_id" id="district_id" class="form-select form-select-sm">
+                            <option value="">Tüm İlçeler</option>
+                            <?php foreach($districts as $district): ?>
+                                <option value="<?= $district->id ?>" <?= ($selected_district == $district->id) ? 'selected' : '' ?>>
+                                    <?= esc($district->name) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="col-lg-2 col-md-4">
+                        <label for="mesafe" class="form-label small">Mesafe</label>
+                        <select name="mesafe" id="mesafe" class="form-select form-select-sm">
+                            <option value="">Tümü</option>
+                            <option value="Civar" <?= ($selected_mesafe == 'Civar') ? 'selected' : '' ?>>Civar</option>
+                            <option value="Yakın" <?= ($selected_mesafe == 'Yakın') ? 'selected' : '' ?>>Yakın</option>
+                            <option value="Uzak" <?= ($selected_mesafe == 'Uzak') ? 'selected' : '' ?>>Uzak</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-lg-3 col-md-4">
+                        <label for="egitim_programi" class="form-label small">Eğitim Programı</label>
+                        <select name="egitim_programi" id="egitim_programi" class="form-select form-select-sm">
+                            <option value="">Tümü</option>
+                            <?php foreach($egitim_programlari as $program): ?>
+                            <option value="<?= esc($program) ?>" <?= ($selected_program == $program) ? 'selected' : '' ?>>
+                                <?= esc($program) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="col-lg-2 col-md-6">
+                        <label for="sabit_durum" class="form-label small">Sabit Program</label>
+                        <select name="sabit_durum" id="sabit_durum" class="form-select form-select-sm">
+                            <option value="">Tümü</option>
+                            <option value="eklenen" <?= ($selected_sabit_durum == 'eklenen') ? 'selected' : '' ?>>Eklenenler</option>
+                            <option value="eklenmeyen" <?= ($selected_sabit_durum == 'eklenmeyen') ? 'selected' : '' ?>>Eklenmeyenler</option>
+                        </select>
+                    </div>
+
+                    <div class="col-lg-1 col-md-6" id="sabit_gun_div" style="display: <?= ($selected_sabit_durum == 'eklenen') ? 'block' : 'none' ?>;">
+                        <label for="sabit_gun" class="form-label small">Günü</label>
+                        <select name="sabit_gun" id="sabit_gun" class="form-select form-select-sm">
+                            <option value="">Tümü</option>
+                            <option value="1" <?= ($selected_sabit_gun == '1') ? 'selected' : '' ?>>Pzt</option>
+                            <option value="2" <?= ($selected_sabit_gun == '2') ? 'selected' : '' ?>>Salı</option>
+                            <option value="3" <?= ($selected_sabit_gun == '3') ? 'selected' : '' ?>>Çrş</option>
+                            <option value="4" <?= ($selected_sabit_gun == '4') ? 'selected' : '' ?>>Perş</option>
+                            <option value="5" <?= ($selected_sabit_gun == '5') ? 'selected' : '' ?>>Cuma</option>
+                            <option value="6" <?= ($selected_sabit_gun == '6') ? 'selected' : '' ?>>Cmt</option>
+                            <option value="7" <?= ($selected_sabit_gun == '7') ? 'selected' : '' ?>>Paz</option>
+                        </select>
+                    </div>
+
+                    <div class="col-lg-2 col-md-12">
+                        <div class="btn-group w-100">
+                            <button type="submit" class="btn btn-success btn-sm">Filtrele</button>
+                            <a href="<?= site_url('students') ?>" class="btn btn-secondary btn-sm" title="Filtreyi Temizle"><i class="bi bi-arrow-clockwise"></i></a>
                         </div>
                     </div>
-                </form>
-            </div>
+                </div>
+            </form>
         </div>
     </div>
+</div>
 
     <div class="card shadow">
         <div class="card-body">
@@ -165,6 +206,15 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('pageScripts') ?>
+<style>
+    /* Açılır/kapanır filtre başlığındaki ok ikonu için animasyon */
+    .filter-chevron {
+        transition: transform 0.3s ease-in-out;
+    }
+    [aria-expanded="false"] .filter-chevron {
+        transform: rotate(-90deg);
+    }
+</style>
 <script>
         $(document).ready(function() {
         // DataTable'ı başlat
@@ -206,8 +256,58 @@
     }
 
     document.addEventListener("DOMContentLoaded", function() {
-        new TomSelect('#district_id',{ create: false, sortField: { field: "text", direction: "asc" } });
-        new TomSelect('#mesafe',{ create: false });
+    const filterCollapseElement = document.getElementById('collapse-filters');
+        
+        // Bootstrap'in Collapse bileşenini toggle özelliğini kapatarak manuel olarak başlatıyoruz.
+        // Bu, sayfa yüklenirken otomatik açılıp kapanmasını engeller.
+        const bsCollapse = new bootstrap.Collapse(filterCollapseElement, {
+            toggle: false 
+        });
+
+        // 1. Sayfa yüklendiğinde localStorage'ı kontrol et ve durumu ayarla
+        if (localStorage.getItem('filterCollapseState') === 'open') {
+            bsCollapse.show();
+        } else {
+            // Hiçbir kayıt yoksa veya 'closed' ise kapalı kalmasını sağla
+            bsCollapse.hide();
+        }
+
+        // 2. Filtre bölümü AÇILDIĞINDA bu durumu kaydet
+        filterCollapseElement.addEventListener('show.bs.collapse', function () {
+            localStorage.setItem('filterCollapseState', 'open');
+        });
+
+        // 3. Filtre bölümü KAPANDIĞINDA bu durumu kaydet
+        filterCollapseElement.addEventListener('hide.bs.collapse', function () {
+            localStorage.setItem('filterCollapseState', 'closed');
+        });
+        // --- YENİ KOD SONU ---
+        const tomSelectConfig = {
+            create: false,
+            render: {
+                option: function(data, escape) {
+                    return `<div class="option">${escape(data.text)}</div>`;
+                }
+            }
+        };
+
+        new TomSelect('#district_id',{ ...tomSelectConfig, sortField: { field: "text", direction: "asc" } });
+        new TomSelect('#mesafe', tomSelectConfig);
+        new TomSelect('#sabit_durum', tomSelectConfig);
+        new TomSelect('#sabit_gun', tomSelectConfig);
+        new TomSelect('#egitim_programi', { ...tomSelectConfig, placeholder: 'Programa göre filtrele...' });
+
+        // Sabit Program filtresi değiştiğinde Günü göster/gizle
+        $('#sabit_durum').on('change', function() {
+            if ($(this).val() === 'eklenen') {
+                $('#sabit_gun_div').slideDown('fast');
+            } else {
+                $('#sabit_gun_div').slideUp('fast');
+                if (document.getElementById('sabit_gun').tomselect) {
+                    document.getElementById('sabit_gun').tomselect.setValue('');
+                }
+            }
+        });
     });
 </script>
 <?= $this->endSection() ?>
