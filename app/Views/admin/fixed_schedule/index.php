@@ -240,6 +240,15 @@ function printDay(dayNumber, dayName) {
 }
 
 $(document).ready(function() {
+
+    // YENİ EKLENEN KOD: Popover'ları tüm sayfada etkinleştirir.
+    // Bu yöntem, AJAX ile sonradan eklenen elementlerde de popover'ların çalışmasını sağlar.
+    $('body').popover({
+        selector: '[data-bs-toggle="popover"]',
+        trigger: 'hover',
+        placement: 'top',
+        container: 'body' // Popover'ın tablo sınırları içinde sıkışıp kalmasını engeller.
+    });
     
     const modalElement = document.getElementById('fixedLessonModal');
     const modal = new bootstrap.Modal(modalElement);

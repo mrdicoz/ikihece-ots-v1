@@ -60,17 +60,65 @@ class FixedScheduleController extends BaseController
         return view('admin/fixed_schedule/index', array_merge($this->data, $data));
     }
     
-    public function getSlotContent($teacherId, $day, $hour)
-    {
-        if (! $this->request->isAJAX()) { return $this->response->setStatusCode(403); }
-        $startTime = str_pad((string)$hour, 2, '0', STR_PAD_LEFT) . ':00:00';
-        $lessons = $this->fixedLessonModel
-            ->select('students.adi, students.soyadi')
-            ->join('students', 'students.id = fixed_lessons.student_id')
-            ->where('teacher_id', $teacherId)->where('day_of_week', $day)->where('start_time', $startTime)
-            ->findAll();
-        return view('admin/fixed_schedule/_slot_content', ['lessons' => $lessons]);
+public function getSlotContent($teacherId, $day, $hour)
+{
+    if (! $this->request->isAJAX()) {
+        return $this->response->setStatusCode(403);
     }
+
+    $startTime = str_pad((string)$hour, 2, '0', STR_PAD_LEFT) . ':00:00';
+    
+    // 1. İlgili saat dilimindeki dersleri (öğrencileri) al
+    $lessonsInSlot = $this->fixedLessonModel
+        ->select('students.id as student_id, students.adi, students.soyadi')
+        ->join('students', 'students.id = fixed_lessons.student_id')
+        ->where('teacher_id', $teacherId)
+        ->where('day_of_week', $day)
+        ->where('start_time', $startTime)
+        ->findAll();
+
+    $conflicts = [];
+    if (!empty($lessonsInSlot)) {
+        $studentIds = array_column($lessonsInSlot, 'student_id');
+        $dayNames = ['', 'Pzt', 'Salı', 'Çrş', 'Perş', 'Cuma', 'Cmt', 'Paz'];
+
+        // 2. Bu öğrencilerin *tüm* sabit derslerini, öğretmen bilgisiyle birlikte al
+        $allLessonsForStudents = $this->fixedLessonModel
+            ->select('fixed_lessons.student_id, fixed_lessons.day_of_week, fixed_lessons.start_time, up.first_name, up.last_name')
+            ->join('users', 'users.id = fixed_lessons.teacher_id')
+            ->join('user_profiles up', 'up.user_id = users.id', 'left')
+            ->whereIn('fixed_lessons.student_id', $studentIds)
+            ->findAll();
+        
+        // 3. GÜNCELLENMİŞ ÇAKIŞMA TESPİT MANTIĞI
+        foreach ($studentIds as $studentId) {
+            $studentLessons = array_filter($allLessonsForStudents, fn($l) => $l['student_id'] == $studentId);
+            
+            // Öğrencinin dersi olan günleri unique (tekil) olarak bul
+            $daysWithLessons = array_unique(array_column($studentLessons, 'day_of_week'));
+
+            // Eğer öğrencinin 1'den fazla farklı günde dersi varsa, bu bir çakışmadır.
+            if (count($daysWithLessons) > 1) {
+                $conflictMessages = [];
+                foreach ($studentLessons as $lesson) {
+                    // Popover içeriği için, bakılan mevcut slot dışındaki tüm derslerini listele
+                    if ($lesson['day_of_week'] != $day || $lesson['start_time'] != $startTime) {
+                        $conflictMessages[] = "<b>" . ($dayNames[$lesson['day_of_week']] ?? '') . " " . substr($lesson['start_time'], 0, 5) . "</b><br><small>" . esc($lesson['first_name'] . ' ' . $lesson['last_name']) . "</small>";
+                    }
+                }
+                if (!empty($conflictMessages)) {
+                    $conflicts[$studentId] = implode('<hr class="my-1">', $conflictMessages);
+                }
+            }
+        }
+    }
+    
+    // 4. Veriyi view'e gönder
+    return view('admin/fixed_schedule/_slot_content', [
+        'lessons'   => $lessonsInSlot,
+        'conflicts' => $conflicts
+    ]);
+}
 
     public function getHourDetails($teacherId, $day, $hour)
     {
