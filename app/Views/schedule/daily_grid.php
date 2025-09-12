@@ -35,52 +35,76 @@
                                     <?php endfor; ?>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <?php foreach ($teachers as $teacher): ?>
-                                    <tr>
-                                        <td class="align-middle fw-bold">
-                                            <img src="<?= base_url(ltrim($teacher->profile_photo ?? '/assets/images/user.jpg', '/')) ?>" class="rounded-circle me-2 d-print-none" width="40" height="40" style="object-fit: cover;">
-                                            <br class="d-print-none">
-                                            <?= esc($teacher->first_name . ' ' . $teacher->last_name) ?>
-                                            <?php if (!empty($teacher->branch)): ?>
-                                                <span class="badge bg-secondary d-block mt-1 text-truncate"><?= esc($teacher->branch) ?></span>
-                                            <?php endif; ?>
-                                            <div class="mt-1 btn-group action-buttons d-print-none">
-                                                <button class="btn btn-sm btn-success bildirim-gonder-tek" data-teacher-id="<?= esc($teacher->id) ?>" title="Bildirim Gönder">
-                                                    <i class="bi bi-bell"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-primary add-fixed-lessons" data-teacher-id="<?= esc($teacher->id) ?>" data-date="<?= esc($displayDate) ?>" title="Sabit Dersleri Ekle">
-                                                    <i class="bi bi-calendar-check"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-danger delete-day-lessons" data-teacher-id="<?= esc($teacher->id) ?>" data-date="<?= esc($displayDate) ?>" data-teacher-name="<?= esc($teacher->first_name . ' ' . $teacher->last_name) ?>" title="Günün Derslerini Sil">
-                                                    <i class="bi bi-calendar-x"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                        <?php for ($hour = config('Ots')->scheduleStartHour; $hour < config('Ots')->scheduleEndHour; $hour++): ?>
-                                            <?php
-                                                $timeStr = str_pad($hour, 2, '0', STR_PAD_LEFT) . ':00:00';
-                                                $hourKey = str_pad($hour, 2, '0', STR_PAD_LEFT);
-                                                $lesson = $lessonMap[$teacher->id][$hourKey] ?? null;
-                                            ?>
-                                            <?php if ($lesson): ?>
-                                                <td class="align-middle bg-success-subtle has-lesson" data-lesson-id="<?= $lesson['id'] ?>">
-                                                    <?php
-                                                    $studentNames = explode(',', $lesson['student_names']);
-                                                    foreach ($studentNames as $name) {
-                                                        echo '<span class="badge text-bg-secondary student-badge">' . esc(trim($name)) . '</span>';
-                                                    }
-                                                    ?>
-                                                </td>
-                                            <?php else: ?>
-                                                <td class="align-middle available-slot" data-date="<?= $displayDate ?>" data-time="<?= $timeStr ?>" data-teacher-id="<?= $teacher->id ?>">
-                                                    <i class="bi bi-person-fill-add d-print-none"></i>
-                                                </td>
-                                            <?php endif; ?>
-                                        <?php endfor; ?>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
+<?php foreach ($teachers as $teacher): ?>
+        <tr>
+            <td class="align-middle fw-bold">
+                <img src="<?= base_url(ltrim($teacher->profile_photo ?? '/assets/images/user.jpg', '/')) ?>" class="rounded-circle me-2 d-print-none" width="40" height="40" style="object-fit: cover;">
+                <br class="d-print-none">
+                <?= esc($teacher->first_name . ' ' . $teacher->last_name) ?>
+                <?php if (!empty($teacher->branch)): ?>
+                    <span class="badge bg-secondary d-block mt-1 text-truncate"><?= esc($teacher->branch) ?></span>
+                <?php endif; ?>
+                <div class="mt-1 btn-group action-buttons d-print-none">
+                    <button class="btn btn-sm btn-success bildirim-gonder-tek" data-teacher-id="<?= esc($teacher->id) ?>" title="Bildirim Gönder">
+                        <i class="bi bi-bell"></i>
+                    </button>
+                    <button class="btn btn-sm btn-primary add-fixed-lessons" data-teacher-id="<?= esc($teacher->id) ?>" data-date="<?= esc($displayDate) ?>" title="Sabit Dersleri Ekle">
+                        <i class="bi bi-calendar-check"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger delete-day-lessons" data-teacher-id="<?= esc($teacher->id) ?>" data-date="<?= esc($displayDate) ?>" data-teacher-name="<?= esc($teacher->first_name . ' ' . $teacher->last_name) ?>" title="Günün Derslerini Sil">
+                        <i class="bi bi-calendar-x"></i>
+                    </button>
+                </div>
+            </td>
+            <?php for ($hour = config('Ots')->scheduleStartHour; $hour < config('Ots')->scheduleEndHour; $hour++): ?>
+                <?php
+                    $hourKey = str_pad((string)$hour, 2, '0', STR_PAD_LEFT);
+                    $lesson = $lessonMap[$teacher->id][$hourKey] ?? null;
+                ?>
+                <?php if ($lesson): ?>
+                    <td class="align-middle bg-success-subtle has-lesson" data-lesson-id="<?= $lesson['id'] ?>">
+                        <?php
+                        $studentNames = explode('||', $lesson['student_names']);
+                        $studentIds = explode(',', $lesson['student_ids']);
+                        $currentTimeSlot = $lesson['start_time'];
+
+                        foreach ($studentNames as $index => $name) {
+                            if (empty(trim($name))) continue;
+                            
+                            $studentId = $studentIds[$index] ?? null;
+                            $info = ($studentId && isset($studentInfoMap[$studentId])) ? $studentInfoMap[$studentId] : null;
+
+                            $badgeClass = 'text-bg-secondary';
+                            $popoverAttr = '';
+
+                            if ($info) {
+                                $popoverAttr = 'data-bs-toggle="popover" data-bs-trigger="hover" title="Sabit Ders Bilgisi" data-bs-content="' . esc($info['message']) . '"';
+
+                                $isMatch = false;
+                                if (!empty($info['fixed_lessons'])) {
+                                    foreach ($info['fixed_lessons'] as $fixed) {
+                                        if ($fixed['day_of_week'] == $dayOfWeekForGrid && $fixed['start_time'] == $currentTimeSlot) {
+                                            $isMatch = true;
+                                            break;
+                                        }
+                                    }
+                                    $badgeClass = $isMatch ? 'text-bg-success' : 'text-bg-warning';
+                                }
+                            }
+                            
+                            echo '<span class="badge ' . $badgeClass . ' student-badge" ' . $popoverAttr . '>' . esc(trim($name)) . '</span>';
+                        }
+                        ?>
+                    </td>
+                <?php else: ?>
+                    <td class="align-middle available-slot" data-date="<?= $displayDate ?>" data-time="<?= str_pad($hour, 2, '0', STR_PAD_LEFT) . ':00:00' ?>" data-teacher-id="<?= $teacher->id ?>">
+                        <i class="bi bi-person-fill-add d-print-none"></i>
+                    </td>
+                <?php endif; ?>
+            <?php endfor; ?>
+        </tr>
+    <?php endforeach; ?>
+</tbody>
                         </table>
                     </div>
                 <?php endif; ?>
@@ -185,6 +209,15 @@
 
 <script>
 $(document).ready(function() {
+    // --- YENİ EKLENECEK KOD BAŞLANGICI ---
+    // Bu kod, sayfadaki tüm popover'ları etkinleştirir.
+    $('body').popover({
+        selector: '[data-bs-toggle="popover"]',
+        html: true,       // HTML etiketlerinin görünmesini sağlayan anahtar ayar budur.
+        trigger: 'hover',
+        placement: 'top', // Yönü sağa ayarlayarak daha iyi bir görünüm sağlayabiliriz.
+        container: 'body' // Popover'ın tablo içinde kaybolmasını engeller.
+    });
     // --- YAZDIR BUTONU ---
     $('#printScheduleBtn').on('click', function() {
         window.print();
@@ -212,33 +245,44 @@ $(document).ready(function() {
         return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
     }
 
-    function createTomSelect(options = [], items = []) {
-        if (tomSelect) tomSelect.destroy();
-        tomSelect = new TomSelect('#student-select-modal', {
-            plugins: ['remove_button'], options: options, items: items,
-            placeholder: 'Öğrenci arayın veya seçin...', valueField: 'value',
-            labelField: 'text', searchField: 'text',
-             render: {
-                option: function(data, escape) {
-                    let classes = 'd-flex align-items-center p-2';
-                    let typeLabel = '';
-                    if (data.type === 'fixed') {
-                        classes += ' text-success fw-bold';
-                        typeLabel = '<span class="badge bg-success-subtle text-success-emphasis rounded-pill ms-auto">Sabit Program</span>';
-                    } else if (data.type === 'history') {
-                        classes += ' text-primary';
-                        typeLabel = '<span class="badge bg-primary-subtle text-primary-emphasis rounded-pill ms-auto">Sık Ders</span>';
-                    }
-                    let lessonCounts = `<span class="ms-2"><span class="badge bg-info-subtle text-info-emphasis" title="Bireysel Telafi Hakkı">B: ${escape(data.bireysel ?? 0)}</span><span class="badge bg-warning-subtle text-warning-emphasis" title="Grup Telafi Hakkı">G: ${escape(data.grup ?? 0)}</span></span>`;
-                    return `<div class="${classes}"><div>${escape(data.text)}${lessonCounts}</div>${typeLabel}</div>`;
-                },
-                item: function(data, escape) {
-                     let lessonCounts = `<span class="ms-2"><span class="badge bg-info-subtle text-info-emphasis" title="Bireysel Telafi Hakkı">B: ${escape(data.bireysel ?? 0)}</span><span class="badge bg-warning-subtle text-warning-emphasis" title="Grup Telafi Hakkı">G: ${escape(data.grup ?? 0)}</span></span>`;
-                    return `<div>${escape(data.text)}${lessonCounts}</div>`;
+// daily_grid.php <script> etiketleri içine bu fonksiyonu yapıştırın
+
+function createTomSelect(options = [], items = []) {
+    if (tomSelect) tomSelect.destroy();
+    tomSelect = new TomSelect('#student-select-modal', {
+        plugins: ['remove_button'], options: options, items: items,
+        placeholder: 'Öğrenci arayın veya seçin...', valueField: 'value',
+        labelField: 'text', searchField: 'text',
+        render: {
+            option: function(data, escape) {
+                let classes = 'd-flex align-items-center p-2';
+                let typeLabel = '';
+                let warningIcon = data.warning 
+                    ? '<i class="bi bi-exclamation-triangle-fill text-warning me-2" title="' + escape(data.warning) + '"></i>' 
+                    : '';
+
+                if (data.type === 'fixed') {
+                    classes += ' text-success fw-bold';
+                    typeLabel = '<span class="badge bg-success-subtle text-success-emphasis rounded-pill ms-auto">Sabit Program</span>';
+                } else if (data.type === 'history') {
+                    classes += ' text-primary';
+                    typeLabel = '<span class="badge bg-primary-subtle text-primary-emphasis rounded-pill ms-auto">Sık Ders</span>';
                 }
+                let lessonCounts = `<span class="ms-2"><span class="badge bg-info-subtle text-info-emphasis" title="Bireysel Telafi Hakkı">B: ${escape(data.bireysel ?? 0)}</span><span class="badge bg-warning-subtle text-warning-emphasis" title="Grup Telafi Hakkı">G: ${escape(data.grup ?? 0)}</span></span>`;
+                
+                return `<div class="${classes}"><div>${warningIcon}${escape(data.text)}${lessonCounts}</div>${typeLabel}</div>`;
+            },
+            item: function(data, escape) {
+                let warningIcon = data.warning 
+                    ? '<i class="bi bi-exclamation-triangle-fill text-warning me-2" title="' + escape(data.warning) + '"></i>' 
+                    : '';
+                let lessonCounts = `<span class="ms-2"><span class="badge bg-info-subtle text-info-emphasis" title="Bireysel Telafi Hakkı">B: ${escape(data.bireysel ?? 0)}</span><span class="badge bg-warning-subtle text-warning-emphasis" title="Grup Telafi Hakkı">G: ${escape(data.grup ?? 0)}</span></span>`;
+                
+                return `<div>${warningIcon}${escape(data.text)}${lessonCounts}</div>`;
             }
-        });
-    }
+        }
+    });
+}
 
     // --- YENİ DERS EKLEME MODALI ---
     $('.available-slot').on('click', function() {
