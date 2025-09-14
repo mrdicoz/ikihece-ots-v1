@@ -6,6 +6,8 @@ use App\Controllers\BaseController;
 use App\Models\StudentModel;
 use App\Models\CityModel;
 use App\Models\DistrictModel;
+use App\Models\StudentEvaluationModel;
+
 
 class StudentController extends BaseController
 {
@@ -151,39 +153,62 @@ public function create()
     return redirect()->to(site_url('students'))->with('success', 'Öğrenci başarıyla eklendi.');
 }
 
-    public function show($id = null)
-    {
-        $model = new StudentModel();
-        $user = auth()->user();
+   public function show($id = null)
+{
+    $model = new StudentModel();
+    $evaluationModel = new StudentEvaluationModel(); // YENİ: Değerlendirme modelini çağırıyoruz
+    $user = auth()->user();
 
-        // --- GÜVENLİK KONTROLÜ ---
-        if ($user->inGroup('ogretmen') && !$user->inGroup('admin', 'yonetici', 'mudur', 'sekreter')) {
-            if (!$model->isStudentOfTeacher($id, $user->id)) {
-                return redirect()->to(site_url('my-students'))->with('error', 'Bu öğrencinin detaylarını görme yetkiniz yok.');
+    // --- GÜVENLİK KONTROLÜ (Mevcut yapın korunuyor) ---
+    if ($user->inGroup('ogretmen') && !$user->inGroup('admin', 'yonetici', 'mudur', 'sekreter')) {
+        if (!$model->isStudentOfTeacher($id, $user->id)) {
+            return redirect()->to(site_url('my-students'))->with('error', 'Bu öğrencinin detaylarını görme yetkiniz yok.');
+        }
+    }
+    // --- GÜVENLİK KONTROLÜ SONU ---
+
+    $student = $model
+        ->select('students.*, cities.name as city_name, districts.name as district_name')
+        ->join('cities', 'cities.id = students.city_id', 'left')
+        ->join('districts', 'districts.id = students.district_id', 'left')
+        ->find($id);
+
+    if (empty($student)) {
+        throw new \CodeIgniter\Exceptions\PageNotFoundException('Öğrenci bulunamadı: ' . $id);
+    }
+    
+    $student['egitim_programi'] = !empty($student['egitim_programi']) ? explode(',', $student['egitim_programi']) : [];
+   // --- DEĞİŞEN KISIM BAŞLANGICI ---
+
+    $evaluations = $evaluationModel->getEvaluationsForStudent((int)$id);
+    $canAddEvaluation = $user->inGroup('admin', 'yonetici', 'mudur', 'sekreter', 'ogretmen');
+
+    // YENİ: Filtre için benzersiz öğretmenleri alalım
+    $evaluators = [];
+    if (!empty($evaluations)) {
+        $seenTeachers = [];
+        foreach ($evaluations as $eval) {
+            if (!in_array($eval['teacher_id'], $seenTeachers) && $eval['teacher_id'] !== null) {
+                $evaluators[] = [
+                    'id' => $eval['teacher_id'],
+                    'name' => $eval['teacher_snapshot_name'],
+                ];
+                $seenTeachers[] = $eval['teacher_id'];
             }
         }
-        // --- GÜVENLİK KONTROLÜ SONU ---
-
-        $student = $model
-            ->select('students.*, cities.name as city_name, districts.name as district_name')
-            ->join('cities', 'cities.id = students.city_id', 'left')
-            ->join('districts', 'districts.id = students.district_id', 'left')
-            ->find($id);
-
-        if (empty($student)) {
-            throw new \CodeIgniter\Exceptions\PageNotFoundException('Öğrenci bulunamadı: ' . $id);
-        }
-        
-        $student['egitim_programi'] = !empty($student['egitim_programi']) ? explode(',', $student['egitim_programi']) : [];
-
-        $data = [
-            'title'   => 'Öğrenci Profili',
-            'student' => $student,
-        ];
-        
-        return view('students/show', array_merge($this->data, $data));
     }
 
+    // --- DEĞİŞEN KISIM SONU ---
+$data = [
+        'title'            => 'Öğrenci Profili',
+        'student'          => $student,
+        'evaluations'      => $evaluationModel->getEvaluationsForStudent((int)$id),
+        'canAddEvaluation' => $user->inGroup('admin', 'yonetici', 'mudur', 'sekreter', 'ogretmen'),
+        'evaluators'       => $evaluationModel->getUniqueEvaluators((int)$id), // Yeni ve temiz yöntem
+    ];
+    
+    return view('students/show', array_merge($this->data, $data));
+}
     public function edit($id = null)
     {
         $model = new StudentModel();

@@ -63,8 +63,11 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         // Yönetici ve diğer roller için varsayılan dashboard
         $routes->get('default', 'DashboardController::default', ['filter' => 'group:admin,yonetici,mudur,sekreter', 'as' => 'dashboard.default']);
     });
-
-
+    
+$routes->post('evaluations/create', 'EvaluationController::create', ['as' => 'evaluations.create', 'filter' => 'session']);
+$routes->post('evaluations/delete/(:num)', 'EvaluationController::delete/$1', ['as' => 'evaluations.delete', 'filter' => 'session']);
+$routes->get('evaluations/get/(:num)', 'EvaluationController::get/$1', ['as' => 'evaluations.get', 'filter' => 'session']);       // YENİ
+$routes->post('evaluations/update/(:num)', 'EvaluationController::update/$1', ['as' => 'evaluations.update', 'filter' => 'session']); // YENİ
     /**
      * Özel Yetki Gerektiren Rota Grupları
      */
