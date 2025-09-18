@@ -26,24 +26,36 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">Lisans Durumu</div>
-                <div class="card-body">
-                    <?php if(isset($is_license_active) && $is_license_active): ?>
-                        <div class="alert alert-success">
-                            <h5 class="alert-heading"><i class="bi bi-check-circle-fill"></i> Lisans Aktif!</h5>
-                            <p class="mb-0">Sisteminiz Mantar Yazılım lisans sunucusuna başarıyla bağlandı ve lisansınız doğrulandı.</p>
-                        </div>
-                    <?php else: ?>
-                        <div class="alert alert-danger">
-                            <h5 class="alert-heading"><i class="bi bi-exclamation-triangle-fill"></i> Lisans Aktif Değil!</h5>
-                            <p class="mb-0">Lütfen geçerli bir lisans anahtarı girip kaydedin.</p>
-                        </div>
-                    <?php endif; ?>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Lisans Durumu</div>
+                    <div class="card-body">
+                        <?php if(isset($is_license_active) && $is_license_active): ?>
+                            <div class="alert alert-success">
+                                <h5 class="alert-heading"><i class="bi bi-check-circle-fill"></i> Lisans Aktif!</h5>
+                                <p>Sisteminiz Mantar Yazılım lisans sunucusuna başarıyla bağlandı ve lisansınız doğrulandı.</p>
+                                <hr>
+                                
+                                <?php if(isset($license_info['expiresAt']) && isset($days_remaining)): ?>
+                                    <p class="mb-1">
+                                        <strong>Sona Erme Tarihi:</strong>
+                                        <?= date('d F Y, H:i', strtotime($license_info['expiresAt'])) ?>
+                                    </p>
+                                    <p class="mb-0">
+                                        <strong>Kalan Süre:</strong>
+                                        <?= $days_remaining ?> gün
+                                    </p>
+                                <?php endif; ?>
+                                </div>
+                        <?php else: ?>
+                            <div class="alert alert-danger">
+                                <h5 class="alert-heading"><i class="bi bi-exclamation-triangle-fill"></i> Lisans Aktif Değil!</h5>
+                                <p class="mb-0">Lütfen geçerli bir lisans anahtarı girip kaydedin.</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
-        </div>
     </div>
 </div>
 <?= $this->endSection() ?>

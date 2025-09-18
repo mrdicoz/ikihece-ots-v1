@@ -8,6 +8,28 @@
     <?= $this->include('layouts/partials/_navbar') ?>
 
     <main class="container py-4 mt-5">
+        <?php
+    // Her sayfada lisans servisini ve kalan günleri kontrol edelim.
+    $licenseService = new \App\Libraries\LicenseService();
+    $daysRemaining = $licenseService->getDaysRemaining();
+?>
+
+<div class="container pt-3"> 
+
+    <?php
+        if (auth()->loggedIn() && auth()->user()->inGroup('admin', 'yonetici')) {
+            if (isset($daysRemaining) && $daysRemaining !== null && $daysRemaining <= 10) {
+        ?>
+
+            <div class="alert alert-danger" role="alert">
+<strong>Uyarı!</strong> Lisansınızın sona ermesine sadece <strong><?= $daysRemaining ?> gün</strong> kaldı. Sorun yaşamamak için lütfen lisansınızı <a href="https://mantaryazilim.tr/ikihece-okul-takip-sistemi-v1/" class="alert-link">yenileyin</a>.
+</div>
+        <?php
+            }
+        }
+        ?>
+
+</div>
         <?= $this->renderSection('main') ?>
     </main>
 

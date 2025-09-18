@@ -4,19 +4,28 @@ use App\Controllers\BaseController;
 
 class SettingsController extends BaseController
 {
-    public function index()
-    {
-        $db = db_connect();
-        $query = $db->table('app_settings')->where('key', 'license_key')->get();
-        $this->data['license_key'] = $query->getRow()->value ?? '';
-        $this->data['title'] = 'Lisans Ayarları';
+public function index()
+{
+    $db = db_connect();
+    $query = $db->table('app_settings')->where('key', 'license_key')->get();
+    $this->data['license_key'] = $query->getRow()->value ?? '';
+    $this->data['title'] = 'Lisans Ayarları';
 
-        // Cache'den sadece lisansın geçerli olup olmadığını al
-        $license_valid = cache()->get('license_status');
-        $this->data['is_license_active'] = ($license_valid === true);
+    // --- YAZIM HATALARI DÜZELTİLMİŞ KISIM ---
+    $licenseService = new \App\Libraries\LicenseService();
 
-        return view('admin/settings/index', $this->data);
-    }
+    // Sadece true/false değil, tüm lisans verisini ve kalan gün sayısını alalım
+    $licenseInfo = $licenseService->getLicenseInfo(); // Önbelleğe alınmış tüm veriyi çeker
+    $daysRemaining = $licenseService->getDaysRemaining(); // Kalan gün sayısını hesaplar
+
+    // Bu bilgileri view'e gönderelim
+    $this->data['is_license_active'] = ($daysRemaining !== null && $daysRemaining > 0);
+    $this->data['license_info'] = $licenseInfo;
+    $this->data['days_remaining'] = $daysRemaining;
+    // --- YENİ KISIM BİTTİ ---
+
+    return view('admin/settings/index', $this->data);
+}
 
     public function save()
     {
