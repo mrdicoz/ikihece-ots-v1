@@ -163,22 +163,14 @@ $routes->post('evaluations/update/(:num)', 'EvaluationController::update/$1', ['
     $routes->get('entitlements/import', 'Admin\EntitlementController::importView', ['as' => 'admin.entitlements.import']);
     $routes->post('entitlements/import', 'Admin\EntitlementController::processImport', ['as' => 'admin.entitlements.process']);
 
-  // --- SABİT DERS PROGRAMI ROTLARI ---
-        $routes->group('fixed-schedule', ['namespace' => 'App\Controllers\Admin'], static function ($routes) {
-        $routes->get('/', 'FixedScheduleController::index', ['as' => 'admin.fixed_schedule.index']);
-        // AJAX işlemleri için rotaları daha sonra buraya ekleyeceğiz
-
- 
-        // --- YENİ EKLENEN AJAX ROTALARI ---
-        $routes->get('get-day-details/(:num)/(:num)', 'FixedScheduleController::getDayDetails/$1/$2', ['as' => 'admin.fixed_schedule.get_details']);
-        $routes->post('save', 'FixedScheduleController::saveLesson', ['as' => 'admin.fixed_schedule.save']);
-        $routes->post('delete', 'FixedScheduleController::deleteLesson', ['as' => 'admin.fixed_schedule.delete']);
-        $routes->get('get-cell-content/(:num)/(:num)', 'FixedScheduleController::getCellContent/$1/$2', ['as' => 'admin.fixed_schedule.get_cell']);
-    // --- YENİ EKLENECEK ROTALAR ---
-    $routes->get('get-slot-content/(:num)/(:num)/(:num)', 'FixedScheduleController::getSlotContent/$1/$2/$3', ['as' => 'admin.fixed_schedule.get_slot_content']);
-    $routes->get('get-hour-details/(:num)/(:num)/(:num)', 'FixedScheduleController::getHourDetails/$1/$2/$3', ['as' => 'admin.fixed_schedule.get_hour_details']);
-    $routes->get('search-students', 'FixedScheduleController::searchStudents', ['as' => 'admin.fixed_schedule.search_students']);
-
+    // SABİT DERS PROGRAMI (YENİ EKLENEN GRUP)
+    $routes->group('fixed-schedule', static function ($routes) {
+        $routes->get('/', 'Admin\FixedScheduleController::index', ['as' => 'admin.fixed_schedule.index']);
+        $routes->get('get-data', 'Admin\FixedScheduleController::getScheduleData', ['as' => 'admin.fixed_schedule.get_data']);
+        $routes->post('save-slot', 'Admin\FixedScheduleController::saveSlot', ['as' => 'admin.fixed_schedule.save_slot']);
+        // Not: Öğrenci arama rotası, başka bir modülde zaten varsa (örn: Ana Ders Programı),
+        // tekrar eklemeye gerek olmayabilir. Şimdilik bu kadar yeterli.
+    
     });
         
         // Kullanıcı Yönetimi

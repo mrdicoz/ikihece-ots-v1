@@ -11,45 +11,59 @@ class FixedLessonModel extends Model
     protected $useAutoIncrement = true;
     protected $returnType       = 'array';
     protected $protectFields    = true;
+    
     protected $allowedFields    = [
         'teacher_id',
         'student_id',
+        'week_type',
         'day_of_week',
         'start_time',
         'end_time',
     ];
 
     // Dates
-    protected $useTimestamps = false; // Bu tabloda created_at/updated_at kullanmıyoruz.
+    protected $useTimestamps = false;
 
     /**
-     * YENİ FONKSİYON
-     * Bir öğretmenin tüm sabit ders programını, öğrenci isimleriyle birlikte getirir.
+     * Belirtilen öğretmenler ve günler için tüm sabit ders verilerini
+     * öğrenci bilgileriyle (fotoğraf, lokasyon dahil) birlikte çeker.
      *
-     * @param int $teacherId Öğretmenin kullanıcı ID'si
+     * @param array $teacherIds Öğretmen ID'leri dizisi
+     * @param array $dayNumbers Gün numaraları dizisi (1=Pzt, 2=Salı...)
      * @return array
      */
-    public function getFixedScheduleForTeacher(int $teacherId): array
+    public function getStructuredSchedule(array $teacherIds, array $dayNumbers): array
     {
-        return $this->select('fixed_lessons.day_of_week, fixed_lessons.start_time, fixed_lessons.end_time, s.adi, s.soyadi')
-            ->join('students s', 's.id = fixed_lessons.student_id')
-            ->where('fixed_lessons.teacher_id', $teacherId)
-            ->orderBy('fixed_lessons.day_of_week', 'ASC')
-            ->orderBy('fixed_lessons.start_time', 'ASC')
-            ->findAll();
-    }
+        if (empty($teacherIds) || empty($dayNumbers)) {
+            return [];
+        }
 
-    /**
-     * Belirli bir öğretmenin, belirli bir gündeki sabit ders programını
-     * öğrenci bilgileriyle birlikte getirir.
-     */
-    public function getScheduleForTeacher(int $teacherId, int $dayOfWeek)
-    {
-        return $this->select('fixed_lessons.start_time, students.adi, students.soyadi')
-                    ->join('students', 'students.id = fixed_lessons.student_id', 'left') // Öğrencisiz dersler için left join
-                    ->where('fixed_lessons.teacher_id', $teacherId)
-                    ->where('fixed_lessons.day_of_week', $dayOfWeek)
-                    ->orderBy('fixed_lessons.start_time', 'ASC')
-                    ->findAll();
+        // --- DÜZELTME BURADA: Popover için city ve district tablolarını da dahil ediyoruz ---
+        $results = $this->select('fixed_lessons.*, s.adi, s.soyadi, s.profile_image, c.name as city_name, d.name as district_name')
+            ->join('students s', 's.id = fixed_lessons.student_id')
+            ->join('cities c', 'c.id = s.city_id', 'left')
+            ->join('districts d', 'd.id = s.district_id', 'left')
+            ->whereIn('fixed_lessons.teacher_id', $teacherIds)
+            ->whereIn('fixed_lessons.day_of_week', $dayNumbers)
+            ->findAll();
+
+        $structuredData = [];
+
+        foreach ($results as $lesson) {
+            $hour = date('H', strtotime($lesson['start_time']));
+            $slotId = $lesson['teacher_id'] . '-' . $lesson['day_of_week'] . '-' . $hour;
+            $weekType = $lesson['week_type'];
+
+            // --- DÜZELTME BURADA: Gelen yeni verileri de diziye ekliyoruz ---
+            $structuredData[$slotId][$weekType][] = [
+                'student_id'    => $lesson['student_id'],
+                'name'          => $lesson['adi'] . ' ' . $lesson['soyadi'],
+                'photo'         => $lesson['profile_image'] ?? 'assets/images/user.jpg',
+                'city'          => $lesson['city_name'],
+                'district'      => $lesson['district_name'],
+            ];
+        }
+
+        return $structuredData;
     }
 }

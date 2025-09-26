@@ -3,404 +3,297 @@
 <?= $this->section('title') ?><?= esc($title ?? 'Sabit Ders Programı') ?><?= $this->endSection() ?>
 
 <?= $this->section('main') ?>
-<div class="container-fluid mt-4" id="fixed-schedule-page">
-
-    <div class="d-sm-flex align-items-center justify-content-between mb-4 d-print-none">
-        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-pin-angle-fill"></i> Sabit Ders Programı Yönetimi</h1>
+<div class="container-fluid mt-4">
+    <h2 class="mb-4 d-print-none"><i class="bi bi-pin-angle-fill"></i> Sabit Ders Programı Planlama</h2>
+    
+    <div class="card shadow-sm mb-4 d-print-none">
+        <div class="card-body">
+            <div class="row align-items-end">
+                <div class="col-lg-8">
+                    <div class="row">
+                         <div class="col-md-6 mb-3 mb-md-0">
+                             <label class="form-label fw-bold"><i class="bi bi-calendar3-week me-2"></i>Görüntülenecek Günler</label>
+                             <div class="btn-group w-100" id="day-selector" role="group">
+                                 <button type="button" class="btn btn-outline-secondary" data-day="1">Pzt</button>
+                                 <button type="button" class="btn btn-outline-secondary" data-day="2">Sal</button>
+                                 <button type="button" class="btn btn-outline-secondary" data-day="3">Çrş</button>
+                                 <button type="button" class="btn btn-outline-secondary" data-day="4">Per</button>
+                                 <button type="button" class="btn btn-outline-secondary" data-day="5">Cum</button>
+                                 <button type="button" class="btn btn-outline-secondary" data-day="6">Cmt</button>
+                                 <button type="button" class="btn btn-outline-secondary" data-day="7">Paz</button>
+                             </div>
+                         </div>
+                         <div class="col-md-6">
+                             <label for="teacher-filter" class="form-label fw-bold"><i class="bi bi-person-video3 me-2"></i>Öğretmen Filtrele</label>
+                             <select id="teacher-filter" multiple placeholder="Tüm öğretmenler gösteriliyor..."></select>
+                         </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                    <label class="form-label fw-bold d-block mb-2"><i class="bi bi-palette-fill me-2"></i>Görüntülenecek Haftalar</label>
+                    <div class="btn-group" id="week-selector" role="group">
+                         <button type="button" class="btn btn-outline-danger active" data-week-id="A">A</button>
+                         <button type="button" class="btn btn-outline-primary" data-week-id="B">B</button>
+                         <button type="button" class="btn btn-outline-success" data-week-id="C">C</button>
+                         <button type="button" class="btn btn-outline-warning" data-week-id="D">D</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="card shadow">
-        <div class="card-body">
-            <div class="alert alert-info d-print-none">
-                Bu ekrandan, öğretmenlerin haftalık standart program şablonunu oluşturabilirsiniz. Burada eklenen dersler, ana ders programı oluşturulurken size bir "öneri" olarak sunulacaktır.
+    <div id="schedule-display-area">
+        <div class="text-center p-5">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Yükleniyor...</span>
             </div>
-            
-            <?php if (empty($teachers)): ?>
-                <div class="alert alert-warning text-center">Yönetilecek öğretmen bulunamadı. Lütfen önce "Sorumlu Atama" panelinden kendinize öğretmen atayın.</div>
-            <?php else: ?>
-                
-                <ul class="nav nav-pills nav-pills-success mb-4 d-print-none" id="dayTabs" role="tablist">
-                    <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#day1" type="button">Pazartesi</button></li>
-                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#day2" type="button">Salı</button></li>
-                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#day3" type="button">Çarşamba</button></li>
-                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#day4" type="button">Perşembe</button></li>
-                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#day5" type="button">Cuma</button></li>
-                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#day6" type="button">Cumartesi</button></li>
-                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#day7" type="button">Pazar</button></li>
-                </ul>
-
-                <div class="tab-content" id="dayTabsContent">
-                    <?php 
-                    $dayNames = ['', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
-                    for ($dayNum = 1; $dayNum <= 7; $dayNum++): 
-                    ?>
-                        <div class="tab-pane fade <?= $dayNum === 1 ? 'show active' : '' ?>" id="day<?= $dayNum ?>" role="tabpanel">
-                            
-                            <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
-                                <h4><?= $dayNames[$dayNum] ?> Sabit Ders Programı</h4>
-                                <button class="btn btn-secondary btn-sm" onclick="printDay(<?= $dayNum ?>, '<?= $dayNames[$dayNum] ?>')">
-                                    <i class="bi bi-printer"></i> <?= $dayNames[$dayNum] ?>'yi Yazdır
-                                </button>
-                            </div>
-
-                            <div id="printableArea<?= $dayNum ?>">
-                                <h3 class="text-center d-none d-print-block mb-3"><?= $dayNames[$dayNum] ?> Sabit Ders Programı</h3>
-                                
-                                <div class="table-responsive">
-                                    <table class="table table-bordered schedule-grid text-center" style="min-width: 900px;">
-                                        <thead class="bg-light">
-                                            <tr>
-                                                <th style="width: 200px;">Öğretmen</th>
-                                                <?php for ($hour = config('Ots')->scheduleStartHour ?? 10; $hour < (config('Ots')->scheduleEndHour ?? 18); $hour++): ?>
-                                                    <th><?= str_pad((string)$hour, 2, '0', STR_PAD_LEFT) ?>:00</th>
-                                                <?php endfor; ?>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php foreach ($teachers as $teacher): ?>
-                                                <tr>
-                                                    <td class="align-middle fw-bold">
-                                                        <img src="<?= base_url(ltrim($teacher->profile_photo ?? '/assets/images/user.jpg', '/')) ?>" class="rounded-circle me-2 d-print-none" width="40" height="40" style="object-fit: cover;">
-                                                        <br class="d-print-none">
-                                                        <?= esc($teacher->first_name . ' ' . $teacher->last_name) ?>
-                                                        <?php if (!empty($teacher->branch)): ?>
-                                                            <span class="badge bg-secondary d-block mt-1 text-truncate"><?= esc($teacher->branch) ?></span>
-                                                        <?php endif; ?>
-                                                        <div class="mt-1 action-buttons d-print-none">
-                                                            <button class="btn btn-sm btn-success add-day-lesson-btn" 
-                                                                    data-teacher-id="<?= $teacher->id ?>" 
-                                                                    data-day-of-week="<?= $dayNum ?>" 
-                                                                    title="Bu Güne Ders Ekle">
-                                                                <i class="bi bi-calendar-plus"></i>
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                    <?php for ($hour = config('Ots')->scheduleStartHour ?? 10; $hour < (config('Ots')->scheduleEndHour ?? 18); $hour++): ?>
-                                                        <td class="align-middle fixed-lesson-slot" data-teacher-id="<?= $teacher->id ?>" data-day="<?= $dayNum ?>" data-hour="<?= $hour ?>">
-                                                            <div class="fixed-lesson-content" id="slot-<?= $teacher->id ?>-<?= $dayNum ?>-<?= $hour ?>">
-                                                                <div class="text-center text-muted small p-2">
-                                                                    <div class="spinner-border spinner-border-sm" role="status">
-                                                                        <span class="visually-hidden">Yükleniyor...</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <button class="btn btn-sm btn-outline-success add-hour-lesson-btn d-print-none" 
-                                                                    data-teacher-id="<?= $teacher->id ?>" 
-                                                                    data-day-of-week="<?= $dayNum ?>" 
-                                                                    data-hour="<?= $hour ?>" 
-                                                                    style="font-size: 10px; padding: 2px 4px; margin-top: 2px;" 
-                                                                    title="<?= $hour ?>:00 Dersini Düzenle">
-                                                                <i class="bi bi-plus-circle"></i>
-                                                            </button>
-                                                        </td>
-                                                    <?php endfor; ?>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endfor; ?>
-                </div>
-            <?php endif; ?>
+            <p class="mt-3">Ders programı yükleniyor...</p>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="fixedLessonModal" tabindex="-1" aria-labelledby="fixedLessonModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<div class="modal fade" id="lessonModal" tabindex="-1" aria-labelledby="lessonModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="fixedLessonModalLabel">Sabit Ders Düzenle</h5>
+                <h5 class="modal-title" id="lessonModalLabel">Ders Düzenle</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="text-center p-4"><div class="spinner-border" role="status"><span class="visually-hidden">Yükleniyor...</span></div></div>
+                <div id="modal-slot-info" class="mb-4"></div>
+                <div id="current-students" class="mb-4">
+                    <h6 class="mb-3">Bu Hafta Kayıtlı Öğrenciler:</h6>
+                    <div id="students-list"></div>
+                </div>
+                <div class="mb-4">
+                    <h6 class="mb-3">Yeni Öğrenci Ekle:</h6>
+                    <select id="new-student-select" placeholder="Eklemek için öğrenci adını yazın..." multiple></select>
+                </div>
+            </div>
+            <div class="modal-footer justify-content-between">
+                <div><button type="button" class="btn btn-outline-danger" id="clear-slot-btn"><i class="bi bi-trash"></i> Bu Saati Temizle</button></div>
+                <div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="button" class="btn btn-primary" id="save-slot-btn"><i class="bi bi-check-circle"></i> Değişiklikleri Kaydet</button>
+                </div>
             </div>
         </div>
     </div>
 </div>
-
-
-
 <?= $this->endSection() ?>
 
 <?= $this->section('pageScripts') ?>
 <style>
-@media print {
-    @page { 
-        size: landscape; /* Sayfayı yatay yap */
-        margin: 1cm;     /* Kenar boşlukları */
-    }
-
-    body { 
-        font-size: 14pt !important; 
-    }
-
-    /* Yazdırılmayacak tüm genel elementleri gizle */
-    body > .navbar, 
-    body > footer, 
-    #fixed-schedule-page > .d-print-none, 
-    .modal, 
-    .d-print-none { 
-        display: none !important; 
-    }
-
-    /* Yazdırma alanını ve içindekileri görünür yap ve tam sayfa yap */
-    [id^="printableArea"] {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        padding: 1cm; /* @page margin ile aynı */
-        box-sizing: border-box;
-    }
-
-    /* Gereksiz kenarlık ve gölgeleri temizle */
-    .card, .card-body, .table-responsive, .table-sticky-container {
-        border: none !important; 
-        box-shadow: none !important; 
-        padding: 0 !important;
-        margin: 0 !important; 
-        overflow: visible !important; 
-        height: auto !important;
-    }
-
-    .sticky-top { position: static !important; }
-    
-    .table-bordered th, .table-bordered td { border: 1px solid #6c757d !important; }
-    
-    /* YENİ EKLENECEK KOD BURAYA */
-    #printableArea .fixed-lesson-content {
-        padding: 4px !important;
-        min-height: 40px !important; /* Yüksekliği koruyalım */
-    }
-    /* YENİ EKLENECEK KOD SONU */
-
-    .fixed-lesson-content.has-lessons { 
-        background-color: #f0f0f0 !important; 
-        color: #000 !important; 
-        -webkit-print-color-adjust: exact !important; 
-        print-color-adjust: exact !important; 
-    }
-
-    .badge, .student-badge {
-        border: 1px solid #333 !important;
-        background-color: transparent !important;
-        color: #000 !important;
-        font-weight: normal !important;
-    }
-    
-    a[href]:after { 
-        content: none !important; 
-    }
-
-    /* Sadece yazdırılan günü göster, diğerlerini gizle */
-    .tab-pane:not(.print-active) {
-        display: none !important;
-    }
-    .tab-pane.print-active {
-        display: block !important;
-    }
-}
-/* Yeşil temalı Nav Pills */
-.nav-pills-success .nav-link {
-    color: var(--bs-success);
-    background-color: transparent;
-    border: 1px solid transparent;
-}
-
-.nav-pills-success .nav-link.active,
-.nav-pills-success .nav-link:hover,
-.nav-pills-success .nav-link:focus {
-    color: #fff;
-    background-color: var(--bs-success);
-    border-color: var(--bs-success);
-}
-
-/* Normal Ekran Stilleri (Değişiklik yok) */
-
-.fixed-lesson-content.has-lessons { background-color: #e8f5e8; border-radius: 4px; }
-.student-badge { display: inline-block; margin: 1px; font-size: 0.7rem; }
-.fixed-lesson-slot:hover .add-hour-lesson-btn { opacity: 1; }
+    .thead-week-A th { background-color: rgba(220, 53, 69, 0.1); } .thead-week-B th { background-color: rgba(13, 110, 253, 0.1); } .thead-week-C th { background-color: rgba(25, 135, 84, 0.1); } .thead-week-D th { background-color: rgba(255, 193, 7, 0.1); }
+    .schedule-table th, .schedule-table td { border: 1px solid #dee2e6; padding: 0; text-align: center; font-size: 12px; }
+    .schedule-table thead th { padding: 10px 8px;  top: 0; z-index: 10; background-clip: padding-box; }
+    .teacher-cell { text-align: left; width: 220px; min-width: 220px; padding: 8px !important; background-color: #fff; vertical-align: middle; }
+    .lesson-slot { height: 70px; vertical-align: top; cursor: pointer; position: relative; background-color: #fff; padding: 4px !important; }
+    .lesson-slot:hover { background-color: #eef5ff; }
+    .student-name { display: block; border-radius: 4px; padding: 4px; font-size: 11px; margin: 2px; font-weight: 500; text-align: left; }
+    .student-week-A { background-color: #f8d7da; color: #721c24; } .student-week-B { background-color: #cce5ff; color: #004085; } .student-week-C { background-color: #d4edda; color: #155724; } .student-week-D { background-color: #fff3cd; color: #856404; }
+    .week-dots { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); display: flex; gap: 3px; }
+    .week-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .week-A-dot { background-color: #dc3545; } .week-B-dot { background-color: #0d6efd; } .week-C-dot { background-color: #198754; } .week-D-dot { background-color: #ffc107; }
+    .add-lesson-icon { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0; transition: opacity 0.3s ease; background: rgba(0, 123, 255, 0.9); color: white; border: none; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; z-index: 5; }
+    .lesson-slot:hover .add-lesson-icon { opacity: 1; }
+    .student-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; margin-bottom: 8px; border-radius: 6px; background-color: #f8f9fa; }
+    .student-item .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+    .student-popover-list { list-style-type: none; padding-left: 0; margin-bottom: 0; font-size: 12px; }
+    .student-popover-list li { display: flex; align-items: center; margin-bottom: 8px; }
+    .student-popover-list li:last-child { margin-bottom: 0; }
+    .student-popover-list .student-info { text-align: left; }
 </style>
 
 <script>
-function printDay(dayNumber, dayName) {
-    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('print-active'));
-    document.getElementById('day' + dayNumber).classList.add('print-active');
-    document.title = dayName + ' Sabit Ders Programı';
-    window.print();
-    setTimeout(() => {
-        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('print-active'));
-        document.title = '<?= esc($title ?? "Sabit Ders Programı") ?>';
-    }, 500);
-}
+    document.addEventListener('DOMContentLoaded', function () {
+        // --- Değişkenler ---
+        const teachersForSelect = <?= json_encode($teachersForSelect) ?>;
+        const allTeachersData = <?= json_encode($teachers) ?>;
+        const allStudentsData = <?= json_encode($students) ?>;
+        const csrfName = '<?= csrf_token() ?>';
+        let csrfHash = '<?= csrf_hash() ?>';
+        const displayArea = document.getElementById('schedule-display-area');
+        const lessonModal = new bootstrap.Modal(document.getElementById('lessonModal'));
+        let scheduleData = {}, currentModalSlotId = '', currentModalWeekType = '';
 
-$(document).ready(function() {
+        // --- TomSelect Tanımlamaları ---
+        const teacherFilter = new TomSelect('#teacher-filter', { options: teachersForSelect, plugins: ['remove_button'], onChange: renderSchedule });
+        const newStudentSelect = new TomSelect('#new-student-select', {
+            options: allStudentsData.map(s => ({ value: s.id, text: `${s.adi} ${s.soyadi}`, subtext: `${s.city_name || ''} / ${s.district_name || ''}` })),
+            placeholder: 'Eklemek için öğrenci adını yazın...', multiple: true, plugins: ['remove_button'],
+            render: { option: (data, esc) => `<div><span class="text-dark">${esc(data.text)}</span><small class="text-muted d-block">${esc(data.subtext)}</small></div>` }
+        });
 
-    // YENİ EKLENEN KOD: Popover'ları tüm sayfada etkinleştirir.
-    // Bu yöntem, AJAX ile sonradan eklenen elementlerde de popover'ların çalışmasını sağlar.
-    $('body').popover({
-        selector: '[data-bs-toggle="popover"]',
-        trigger: 'hover',
-        placement: 'top',
-        container: 'body' // Popover'ın tablo sınırları içinde sıkışıp kalmasını engeller.
-    });
-    
-    const modalElement = document.getElementById('fixedLessonModal');
-    const modal = new bootstrap.Modal(modalElement);
-    const modalBody = modalElement.querySelector('.modal-body');
-    const modalTitle = modalElement.querySelector('.modal-title');
-    let tomSelect;
-
-    function loadSlotContent(teacherId, dayOfWeek, hour) {
-        const slot = $(`#slot-${teacherId}-${dayOfWeek}-${hour}`);
-        const url = `<?= site_url('admin/fixed-schedule/get-slot-content') ?>/${teacherId}/${dayOfWeek}/${hour}`;
-        
-        slot.html('<div class="text-center p-2"><div class="spinner-border spinner-border-sm"></div></div>');
-        
-        $.get(url).done(function(response) {
-            slot.html(response);
-            if (slot.find('.student-badge').length > 0) {
-                slot.addClass('has-lessons');
-            } else {
-                slot.removeClass('has-lessons');
-            }
-        }).fail(function() { slot.html('<div class="text-muted small p-1">-</div>'); });
-    }
-
-    function loadModalContent(teacherId, dayOfWeek, hour = null) {
-        let url = hour ? `<?= site_url('admin/fixed-schedule/get-hour-details') ?>/${teacherId}/${dayOfWeek}/${hour}` : `<?= site_url('admin/fixed-schedule/get-day-details') ?>/${teacherId}/${dayOfWeek}`;
-
-        $.get(url, function(response) {
-            modalBody.innerHTML = response;
-            
-            const dayNames = ['','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
-            let title = dayNames[dayOfWeek];
-            if(hour) { title += ` - ${String(hour).padStart(2,'0')}:00`; }
-            modalTitle.textContent = title + ' Sabit Dersleri';
-            
-            if (tomSelect) tomSelect.destroy();
-
-            const selectEl = document.getElementById('student-select');
-            if (selectEl) {
-                tomSelect = new TomSelect(selectEl, {
-                    valueField: 'value', labelField: 'text', searchField: 'text',
-                    placeholder: 'Öğrenci adını yazın...',
-                    options: <?= json_encode($studentsForSelect) ?>,
-                    load: function(query, callback) {
-                        if (!query.length || query.length < 2) return callback();
-                        const searchUrl = `<?= route_to('admin.fixed_schedule.search_students') ?>?q=${encodeURIComponent(query)}`;
-                        
-                        fetch(searchUrl, {
-                            headers: { "X-Requested-With": "XMLHttpRequest" }
-                        })
-                        .then(response => response.json())
-                        .then(json => callback(json))
-                        .catch((error) => {
-                            console.error("Öğrenci arama hatası:", error);
-                            callback();
-                        });
-                    }, create: false,
-                });
+        // --- Event Listeners ---
+        document.getElementById('day-selector').addEventListener('click', e => toggleButton(e, renderSchedule));
+        document.getElementById('week-selector').addEventListener('click', e => toggleWeekButton(e, renderSchedule));
+        document.getElementById('save-slot-btn').addEventListener('click', saveSlotData);
+        document.getElementById('clear-slot-btn').addEventListener('click', clearSlotData);
+        displayArea.addEventListener('click', e => { if (e.target.closest('.lesson-slot')) openLessonModal(e.target.closest('.lesson-slot')); });
+        displayArea.addEventListener('mouseover', e => {
+            const popoverEl = e.target.closest('.lesson-slot');
+            if (popoverEl && !bootstrap.Popover.getInstance(popoverEl)) {
+                new bootstrap.Popover(popoverEl, { trigger: 'hover', html: true, placement: 'top', container: 'body', content: () => generatePopoverContent(popoverEl), delay: { "show": 200, "hide": 100 } }).show();
             }
         });
-    }
-    
-    function loadActiveTabData() {
-        const activeTabPane = document.querySelector('.tab-pane.active');
-        if (activeTabPane) {
-            activeTabPane.querySelectorAll('.fixed-lesson-content').forEach(function(slot) {
-                const id = slot.id.split('-');
-                loadSlotContent(id[1], id[2], id[3]);
-            });
-            activeTabPane.dataset.loaded = 'true';
-        }
-    }
 
-    loadActiveTabData();
+        // --- Fonksiyonlar ---
+        const toggleButton = (e, cb) => { const btn = e.target.closest('button'); if (!btn) return; btn.classList.toggle('active'); btn.classList.toggle('btn-secondary'); btn.classList.toggle('btn-outline-secondary'); if (cb) cb(); };
+        const toggleWeekButton = (e, cb) => { const btn = e.target.closest('button'); if (!btn) return; btn.classList.toggle('active'); const color = btn.dataset.color; btn.classList.toggle(`btn-${color}`); btn.classList.toggle(`btn-outline-${color}`); if (cb) cb(); };
 
-    $('#dayTabs button[data-bs-toggle="pill"]').on('shown.bs.tab', function (e) {
-        const targetPane = document.querySelector(e.target.getAttribute('data-bs-target'));
-        if (targetPane && !targetPane.dataset.loaded) {
-            loadActiveTabData();
-        }
-    });
-
-    modalElement.addEventListener('hidden.bs.modal', function (event) {
-        const teacherId = $(modalBody).find('input[name="teacher_id"]').val();
-        const dayOfWeek = $(modalBody).find('input[name="day_of_week"]').val();
-        const hour = $(modalBody).find('input[name="hour"]').val();
-        
-        if (teacherId && dayOfWeek) {
-            if (hour) {
-                loadSlotContent(teacherId, dayOfWeek, hour);
-            } else {
-                for (let h = <?= config('Ots')->scheduleStartHour ?? 10 ?>; h < <?= config('Ots')->scheduleEndHour ?? 18 ?>; h++) {
-                    loadSlotContent(teacherId, dayOfWeek, h);
-                }
+        async function fetchScheduleData() {
+            const selectedTeacherIds = teacherFilter.getValue().length > 0 ? teacherFilter.getValue() : teachersForSelect.map(t => t.value);
+            const selectedDayNumbers = [...document.querySelectorAll('#day-selector button.active')].map(b => b.dataset.day);
+            if (selectedTeacherIds.length === 0 || selectedDayNumbers.length === 0) { scheduleData = {}; return; }
+            const params = new URLSearchParams();
+            selectedTeacherIds.forEach(id => params.append('teachers[]', id));
+            selectedDayNumbers.forEach(day => params.append('days[]', day));
+            displayArea.innerHTML = `<div class="text-center p-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Veriler yükleniyor...</p></div>`;
+            try {
+                const response = await fetch(`<?= site_url('admin/fixed-schedule/get-data') ?>?${params.toString()}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!response.ok) throw new Error('Network response');
+                const data = await response.json();
+                scheduleData = data.schedule;
+            } catch (error) {
+                console.error("Fetch Error:", error); scheduleData = {};
+                displayArea.innerHTML = `<div class="alert alert-danger">Veriler yüklenirken bir hata oluştu.</div>`;
             }
         }
-    });
 
-    $(document).on('click', '.add-hour-lesson-btn', function() {
-        const btn = $(this);
-        modalBody.innerHTML = '<div class="text-center p-4"><div class="spinner-border"></div></div>';
-        modal.show();
-        loadModalContent(btn.data('teacher-id'), btn.data('day-of-week'), btn.data('hour'));
-    });
+        async function renderSchedule() {
+            await fetchScheduleData();
+            const selectedDays = [...document.querySelectorAll('#day-selector button.active')];
+            const selectedWeeks = [...document.querySelectorAll('#week-selector button.active')];
+            displayArea.innerHTML = '';
+            if (selectedDays.length === 0 || selectedWeeks.length === 0 || allTeachersData.length === 0) {
+                let msg = 'Lütfen en az bir gün ve bir hafta seçin.';
+                if (allTeachersData.length === 0) msg = 'Sistemde kayıtlı öğretmen bulunmamaktadır.';
+                // DÜZELTME 3: Öğretmen filtresi boşken hata mesajı göstermemek için bu kontrolü kaldırıyoruz.
+                // if (teacherFilter.getValue().length === 0 && teachersForSelect.length > 0) msg = 'Lütfen en az bir öğretmen seçin.';
+                displayArea.innerHTML = `<div class="alert alert-info text-center">${msg}</div>`;
+                return;
+            }
+            selectedDays.forEach(dayBtn => selectedWeeks.forEach(weekBtn => displayArea.insertAdjacentHTML('beforeend', createDayTable(dayBtn.dataset.day, weekBtn.dataset.weekId))));
+        }
+        
+        function createDayTable(dayNum, weekType) {
+            const days = { 1: 'Pazartesi', 2: 'Salı', 3: 'Çarşamba', 4: 'Perşembe', 5: 'Cuma', 6: 'Cumartesi', 7: 'Pazar' };
+            const hours = Array.from({length: (<?= config('Ots')->scheduleEndHour ?? 18 ?> - <?= config('Ots')->scheduleStartHour ?? 10 ?>)}, (_, i) => <?= config('Ots')->scheduleStartHour ?? 10 ?> + i);
+            const selectedTeacherIds = teacherFilter.getValue().length > 0 ? teacherFilter.getValue() : teachersForSelect.map(t => t.value);
+            const filteredTeachers = allTeachersData.filter(t => selectedTeacherIds.includes(String(t.id)));
+            return `<div class="card mb-4 shadow-sm"><div class="card-body p-0"><div class=""><table class="table schedule-table table-hover mb-0">
+                <thead class="thead-week-${weekType}">
+                    <tr><th colspan="${hours.length + 1}">${days[dayNum]} - ${weekType} Haftası</th></tr>
+                    <tr><th class="teacher-cell">Öğretmenler</th>${hours.map(h => `<th>${h}:00</th>`).join('')}</tr>
+                </thead><tbody>${filteredTeachers.map(teacher => `
+                    <tr>
+                        <td class="teacher-cell">
+                            <div class="d-flex align-items-center">
+                                <img src="<?= base_url() ?>${teacher.profile_photo || 'assets/images/user.jpg'}" 
+                                    class="rounded-circle me-3" 
+                                    width="40" 
+                                    height="40" 
+                                    alt="${teacher.first_name}" 
+                                    style="object-fit:cover;">
 
-    $(document).on('click', '.add-day-lesson-btn', function() {
-        const btn = $(this);
-        modalBody.innerHTML = '<div class="text-center p-4"><div class="spinner-border"></div></div>';
-        modal.show();
-        loadModalContent(btn.data('teacher-id'), btn.data('day-of-week'));
-    });
+                                <div class="flex-grow-1 text-start"> <!-- Burayı değiştirdim -->
+                                    <div class="fw-bold text-nowrap text-start">${teacher.first_name} ${teacher.last_name}</div> <!-- text-start eklendi -->
+                                    <small class="text-muted d-block text-truncate text-start" style="max-width: 150px;">${teacher.branch || ''}</small> <!-- text-start eklendi -->
+                                </div>
+                            </div>
+                        </td>
+                        ${hours.map(hour => {
+                            const slotId = `${teacher.id}-${dayNum}-${hour}`;
+                            const slotData = scheduleData[slotId] || {};
+                            const dots = Object.keys(slotData).map(wt => `<div class="week-dot week-${wt}-dot" title="${wt} Haftası"></div>`).join('');
+                            const studentList = slotData[weekType] || [];
+                            const studentElements = studentList.map(s => `<span class="student-name student-week-${weekType}">${s.name}</span>`).join('');
+                            return `<td class="lesson-slot" data-slot-id="${slotId}" data-week-type="${weekType}">${studentElements}<button class="add-lesson-icon" title="Ders ekle/düzenle"><i class="bi bi-pencil-fill"></i></button><div class="week-dots">${dots}</div></td>`;
+                        }).join('')}
+                    </tr>`).join('')}
+                </tbody></table></div></div></div>`;
+        }
 
-    $(modalBody).on('submit', '#add-fixed-lesson-form', function(e) {
-        e.preventDefault();
-        const form = $(this);
-        const btn = form.find('button[type="submit"]');
-        const originalHtml = btn.html();
-        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
-
-        $.post('<?= route_to("admin.fixed_schedule.save") ?>', form.serialize())
-            .done(function(response) {
-                if (response.success) {
-                    const hour = form.find('input[name="hour"]').val();
-                    loadModalContent(form.find('input[name="teacher_id"]').val(), form.find('input[name="day_of_week"]').val(), hour);
-                } else {
-                    alert(response.message || 'Hata oluştu.');
+        // DÜZELTME 2: Popover içeriğini oluşturan fonksiyon güncellendi
+        function generatePopoverContent(element) {
+            const slotId = element.dataset.slotId;
+            const data = scheduleData[slotId] || {};
+            let content = '', hasLesson = false;
+            const weekColors = { 'A': 'danger', 'B': 'primary', 'C': 'success', 'D': 'warning' };
+            ['A', 'B', 'C', 'D'].forEach(weekType => {
+                const studentList = data[weekType] || [];
+                if (studentList.length > 0) {
+                    hasLesson = true;
+                    content += `<h6><span class="badge bg-${weekColors[weekType]}">${weekType} Haftası</span></h6><ul class="student-popover-list">`;
+                    studentList.forEach(student => {
+                        content += `<li>
+                            <img src="<?= base_url() ?>${student.photo}" class="rounded-circle me-2" width="24" height="24" style="object-fit:cover;" alt="${student.name}">
+                            <div class="student-info">
+                                <strong>${student.name}</strong>
+                                <div class="text-muted" style="font-size: 0.8em;"><i class="bi bi-geo-alt-fill"></i> ${student.city || ''} / ${student.district || ''}</div>
+                            </div>
+                        </li>`;
+                    });
+                    content += `</ul><hr class="my-1">`;
                 }
-            })
-            .fail(function() { alert('Sunucu hatası.'); })
-            .always(function() { btn.prop('disabled', false).html(originalHtml); });
-    });
+            });
+            if (!hasLesson) return 'Bu saat diliminde planlanmış ders bulunmuyor.';
+            return content.slice(0, -18);
+        }
 
-    $(modalBody).on('click', '.delete-fixed-lesson-btn', function(e) {
-        e.preventDefault();
-        if (!confirm('Bu dersi silmek istediğinizden emin misiniz?')) return;
-        
-        const btn = $(this);
-        const lessonId = btn.data('id');
-        
-        $.post('<?= route_to("admin.fixed_schedule.delete") ?>', { id: lessonId, '<?= csrf_token() ?>': '<?= csrf_hash() ?>' })
-        .done(function(response) {
-            if (response.success) {
-                btn.closest('li').fadeOut(300, function() { 
-                    $(this).remove(); 
-                    if ($('#fixed-lesson-list').children('li').length === 0) {
-                        $('#fixed-lesson-list').html('<li class="list-group-item text-muted">Bu gün/saat için kayıtlı sabit ders bulunmamaktadır.</li>');
-                    }
-                });
-            } else { alert(response.message); }
-        })
-        .fail(function() { alert('Sunucu hatası.'); });
-    });
+        function openLessonModal(slotElement) {
+            currentModalSlotId = slotElement.dataset.slotId;
+            currentModalWeekType = slotElement.dataset.weekType;
+            const [teacherId, dayNum, hour] = currentModalSlotId.split('-');
+            const teacher = allTeachersData.find(t => t.id == teacherId);
+            const days = { 1: 'Pzt', 2: 'Sal', 3: 'Çrş', 4: 'Per', 5: 'Cum', 6: 'Cmt', 7: 'Paz' };
+            const weekColors = { 'A': 'danger', 'B': 'primary', 'C': 'success', 'D': 'warning' };
+            document.getElementById('modal-slot-info').innerHTML = `<div class="alert alert-light border"><strong>${teacher.first_name} ${teacher.last_name}</strong> - ${days[dayNum]}, ${hour}:00<span class="badge bg-${weekColors[currentModalWeekType]} float-end">${currentModalWeekType} Haftası</span></div>`;
+            const studentsInSlot = (scheduleData[currentModalSlotId] || {})[currentModalWeekType] || [];
+            document.getElementById('students-list').innerHTML = studentsInSlot.length > 0 ? studentsInSlot.map(createStudentItemHTML).join('') : '<p class="text-muted">Bu hafta için kayıtlı öğrenci yok.</p>';
+            newStudentSelect.clear();
+            lessonModal.show();
+        }
 
-});
+        function createStudentItemHTML(student) {
+            return `<div class="student-item" data-student-id="${student.student_id}"><img src="<?= base_url() ?>${student.photo}" alt="${student.name}" class="rounded-circle me-2" width="32" height="32" style="object-fit:cover;"><span class="flex-grow-1">${student.name}</span><button type="button" class="btn btn-outline-danger btn-sm remove-student-btn"><i class="bi bi-trash"></i></button></div>`;
+        }
+        
+        document.getElementById('students-list').addEventListener('click', e => { if (e.target.closest('.remove-student-btn')) e.target.closest('.student-item').remove(); });
+
+        async function saveSlotData() {
+            const newStudentIds = newStudentSelect.getValue();
+            let currentStudentIds = [...document.querySelectorAll('#students-list .student-item')].map(item => item.dataset.studentId);
+            newStudentIds.forEach(id => { if (!currentStudentIds.includes(id)) currentStudentIds.push(id); });
+            const formData = new FormData();
+            formData.append('slotId', currentModalSlotId);
+            formData.append('weekType', currentModalWeekType);
+            currentStudentIds.forEach(id => formData.append('studentIds[]', id));
+            formData.append(csrfName, csrfHash);
+            try {
+                const response = await fetch('<?= site_url('admin/fixed-schedule/save-slot') ?>', { method: 'POST', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!response.ok) throw new Error('Server response');
+                const result = await response.json();
+                if (result.success) { await renderSchedule(); lessonModal.hide(); } 
+                else { alert(result.message || 'Hata.'); }
+            } catch (error) { console.error("Save error:", error); alert('Sunucu hatası.'); }
+        }
+        
+        async function clearSlotData() {
+            if (!confirm('Bu saate ait tüm dersleri temizlemek istediğinizden emin misiniz?')) return;
+            document.getElementById('students-list').innerHTML = '';
+            newStudentSelect.clear();
+            await saveSlotData();
+        }
+
+        // --- Başlangıç ---
+        document.querySelectorAll('#week-selector button').forEach(button => {
+            const color = (button.className.match(/btn-(?:outline-)?(\w+)/) || [])[2];
+            button.dataset.color = color;
+        });
+        
+        renderSchedule();
+    });
 </script>
 <?= $this->endSection() ?>

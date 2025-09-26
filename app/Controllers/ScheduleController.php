@@ -4,16 +4,14 @@ namespace App\Controllers;
 
 use App\Controllers\BaseController;
 use App\Models\AssignmentModel;
+use App\Models\FixedLessonModel;
+use App\Models\LessonHistoryModel;
 use App\Models\LessonModel;
 use App\Models\LessonStudentModel;
-use App\Models\FixedLessonModel; // Bu modeli ekliyoruz
 use App\Models\StudentModel;
+use App\Models\UserProfileModel;
 use CodeIgniter\I18n\Time;
 use CodeIgniter\Shield\Models\UserModel;
-// YENİ EKLENECEK SATIRLAR BAŞLANGIÇ
-use App\Models\LessonHistoryModel;
-use App\Models\UserProfileModel;
-// YENİ EKLENECEK SATIRLAR BİTİŞ
 
 class ScheduleController extends BaseController
 {
@@ -35,139 +33,142 @@ class ScheduleController extends BaseController
      */
     // Sadece getLessonsForMonth metodunu güncelliyoruz
 
-    public function getLessonsForMonth()
+public function getLessonsForMonth()
     {
         $lessonModel = new LessonModel();
         $start = $this->request->getVar('start');
         $end   = $this->request->getVar('end');
-
         $db_lessons = $lessonModel
             ->select("lesson_date, COUNT(id) as lesson_count")
             ->where('lesson_date >=', date('Y-m-d', strtotime($start)))
             ->where('lesson_date <=', date('Y-m-d', strtotime($end)))
             ->groupBy("lesson_date")
             ->findAll();
-
         $events = [];
         foreach ($db_lessons as $day) {
             $events[] = [
-                // DEĞİŞİKLİK: Başlık artık sadece sayı olacak, örn: "3"
                 'title' => $day['lesson_count'], 
                 'start' => $day['lesson_date'],
                 'url'   => route_to('schedule.daily', $day['lesson_date']),
-                // Bu event'in bir "arka plan olayı" olmadığını belirtiyoruz.
                 'display' => 'list-item', 
             ];
         }
-
         return $this->response->setJSON($events);
     }
-
 // app/Controllers/ScheduleController.php
 
 public function dailyGrid($date = null)
-{
-    if (is_null($date) || !strtotime($date)) {
-        return redirect()->to(route_to('schedule.index'))->with('error', 'Geçersiz tarih.');
-    }
+    {
+        if (is_null($date) || !strtotime($date)) {
+            return redirect()->to(route_to('schedule.index'))->with('error', 'Geçersiz tarih.');
+        }
 
-    $userModel = new UserModel();
-    $loggedInUser = auth()->user();
-    
-    $teacherQuery = $userModel
-        ->select('users.id, user_profiles.first_name, user_profiles.last_name, user_profiles.profile_photo, user_profiles.branch')
-        ->join('auth_groups_users', 'auth_groups_users.user_id = users.id')
-        ->join('user_profiles', 'user_profiles.user_id = users.id', 'left')
-        ->where('auth_groups_users.group', 'ogretmen')
-        ->where('users.active', 1);
+        $userModel = new UserModel();
+        $loggedInUser = auth()->user();
+        
+        $teacherQuery = $userModel
+            ->select('users.id, user_profiles.first_name, user_profiles.last_name, user_profiles.profile_photo, user_profiles.branch')
+            ->join('auth_groups_users', 'auth_groups_users.user_id = users.id')
+            ->join('user_profiles', 'user_profiles.user_id = users.id', 'left')
+            ->where('auth_groups_users.group', 'ogretmen')
+            ->where('users.active', 1);
 
-    if ($loggedInUser->inGroup('sekreter') && !$loggedInUser->inGroup('admin', 'mudur')) {
-        $assignmentModel = new AssignmentModel();
-        $assignedTeacherIds = $assignmentModel->where('manager_user_id', $loggedInUser->id)->findColumn('managed_user_id');
-        if (empty($assignedTeacherIds)) { $teachers = []; } 
-        else {
-            $teacherQuery->whereIn('users.id', $assignedTeacherIds);
+        if ($loggedInUser->inGroup('sekreter') && !$loggedInUser->inGroup('admin', 'mudur')) {
+            $assignmentModel = new AssignmentModel();
+            $assignedTeacherIds = $assignmentModel->where('manager_user_id', $loggedInUser->id)->findColumn('managed_user_id');
+            if (empty($assignedTeacherIds)) { $teachers = []; } 
+            else {
+                $teacherQuery->whereIn('users.id', $assignedTeacherIds);
+                $teachers = $teacherQuery->orderBy('user_profiles.first_name', 'ASC')->asObject()->findAll();
+            }
+        } else {
             $teachers = $teacherQuery->orderBy('user_profiles.first_name', 'ASC')->asObject()->findAll();
         }
-    } else {
-        $teachers = $teacherQuery->orderBy('user_profiles.first_name', 'ASC')->asObject()->findAll();
-    }
 
-    $lessonModel = new LessonModel();
-    $lessons = $lessonModel
-        ->select('lessons.*, GROUP_CONCAT(s.id) as student_ids, GROUP_CONCAT(CONCAT(s.adi, " ", s.soyadi) SEPARATOR "||") as student_names')
-        ->join('lesson_students ls', 'ls.lesson_id = lessons.id', 'left')
-        ->join('students s', 's.id = ls.student_id', 'left')
-        ->where('lesson_date', $date)
-        ->groupBy('lessons.id')
-        ->findAll();
-        
-    // --- BİLGİ HARİTASI MANTIĞI ---
-    $allStudentIdsOnPage = [];
-    foreach ($lessons as $lesson) {
-        if (!empty($lesson['student_ids'])) {
-            $allStudentIdsOnPage = array_merge($allStudentIdsOnPage, explode(',', $lesson['student_ids']));
-        }
-    }
-    $allStudentIdsOnPage = array_unique(array_filter($allStudentIdsOnPage));
-
-    $studentInfoMap = [];
-    if (!empty($allStudentIdsOnPage)) {
-        $fixedLessonModel = new FixedLessonModel();
-        $dayNames = ['', 'Pzt', 'Salı', 'Çrş', 'Perş', 'Cuma', 'Cmt', 'Paz'];
-
-        $allFixedLessons = $fixedLessonModel
-            ->select('fixed_lessons.student_id, fixed_lessons.day_of_week, fixed_lessons.start_time, up.first_name, up.last_name')
-            ->join('users u', 'u.id = fixed_lessons.teacher_id')
-            ->join('user_profiles up', 'up.user_id = u.id', 'left')
-            ->whereIn('student_id', $allStudentIdsOnPage)
+        $lessonModel = new LessonModel();
+        $lessons = $lessonModel
+            ->select('lessons.*, GROUP_CONCAT(s.id) as student_ids, GROUP_CONCAT(CONCAT(s.adi, " ", s.soyadi) SEPARATOR "||") as student_names')
+            ->join('lesson_students ls', 'ls.lesson_id = lessons.id', 'left')
+            ->join('students s', 's.id = ls.student_id', 'left')
+            ->where('lesson_date', $date)
+            ->groupBy('lessons.id')
             ->findAll();
-
-        $studentFixedLessons = [];
-        foreach ($allFixedLessons as $fl) {
-            $studentFixedLessons[$fl['student_id']][] = $fl;
+            
+        $allStudentIdsOnPage = [];
+        foreach ($lessons as $lesson) {
+            if (!empty($lesson['student_ids'])) {
+                $allStudentIdsOnPage = array_merge($allStudentIdsOnPage, explode(',', $lesson['student_ids']));
+            }
         }
-        
-        foreach($allStudentIdsOnPage as $studentId) {
-            if (isset($studentFixedLessons[$studentId])) {
-                $lessonsForStudent = $studentFixedLessons[$studentId];
+        $allStudentIdsOnPage = array_unique(array_filter($allStudentIdsOnPage));
+
+        $studentInfoMap = [];
+        if (!empty($allStudentIdsOnPage)) {
+            $fixedLessonModel = new FixedLessonModel();
+            $studentModel = new StudentModel();
+            $dayNames = ['', 'Pzt', 'Salı', 'Çrş', 'Perş', 'Cuma', 'Cmt', 'Paz'];
+
+            $studentDetails = $studentModel
+                ->select('students.id, students.profile_image, c.name as city_name, d.name as district_name')
+                ->join('cities c', 'c.id = students.city_id', 'left')
+                ->join('districts d', 'd.id = students.district_id', 'left')
+                ->whereIn('students.id', $allStudentIdsOnPage)
+                ->findAll();
+            $studentDetailsMap = array_column($studentDetails, null, 'id');
+
+            $allFixedLessons = $fixedLessonModel
+                ->select('fixed_lessons.student_id, fixed_lessons.day_of_week, fixed_lessons.start_time, up.first_name, up.last_name')
+                ->join('users u', 'u.id = fixed_lessons.teacher_id')
+                ->join('user_profiles up', 'up.user_id = u.id', 'left')
+                ->whereIn('student_id', $allStudentIdsOnPage)
+                ->findAll();
+
+            $studentFixedLessons = [];
+            foreach ($allFixedLessons as $fl) {
+                $studentFixedLessons[$fl['student_id']][] = $fl;
+            }
+            
+            foreach($allStudentIdsOnPage as $studentId) {
+                $studentInfo = $studentDetailsMap[$studentId] ?? [];
+                $fixedInfo = $studentFixedLessons[$studentId] ?? [];
+
                 $messageParts = [];
-                foreach($lessonsForStudent as $lessonInfo) {
-                    $dayName = $dayNames[$lessonInfo['day_of_week']] ?? '?';
-                    $time = substr($lessonInfo['start_time'], 0, 5);
-                    $teacherName = esc(trim($lessonInfo['first_name'] . ' ' . $lessonInfo['last_name']));
-                    $messageParts[] = "<b>{$dayName} {$time}</b> - {$teacherName}";
+                if (!empty($fixedInfo)) {
+                    foreach($fixedInfo as $lessonInfo) {
+                        $dayName = $dayNames[$lessonInfo['day_of_week']] ?? '?';
+                        $time = substr($lessonInfo['start_time'], 0, 5);
+                        $teacherName = esc(trim($lessonInfo['first_name'] . ' ' . $lessonInfo['last_name']));
+                        $messageParts[] = "<b>{$dayName} {$time}</b> - {$teacherName}";
+                    }
                 }
                 
                 $studentInfoMap[$studentId] = [
-                    'message' => implode('<br>', $messageParts),
-                    'fixed_lessons' => $lessonsForStudent 
-                ];
-            } else {
-                $studentInfoMap[$studentId] = [
-                    'message' => 'Bu öğrencinin sabit dersi yok.',
-                    'fixed_lessons' => []
+                    'photo'         => $studentInfo['profile_image'] ?? 'assets/images/user.jpg',
+                    'city'          => $studentInfo['city_name'],
+                    'district'      => $studentInfo['district_name'],
+                    'message'       => !empty($messageParts) ? implode('<br>', $messageParts) : 'Bu öğrencinin sabit dersi yok.',
+                    'fixed_lessons' => $fixedInfo 
                 ];
             }
         }
-    }
 
-    $lessonMap = [];
-    foreach ($lessons as $lesson) {
-        $hourKey = date('H', strtotime($lesson['start_time']));
-        $lessonMap[$lesson['teacher_id']][$hourKey] = $lesson;
-    }
+        $lessonMap = [];
+        foreach ($lessons as $lesson) {
+            $hourKey = date('H', strtotime($lesson['start_time']));
+            $lessonMap[$lesson['teacher_id']][$hourKey] = $lesson;
+        }
 
-    $data = [
-        'title'           => Time::parse($date)->toLocalizedString('d MMMM yyyy') . ' Ders Programı',
-        'displayDate'     => $date,
-        'dayOfWeekForGrid'=> date('N', strtotime($date)),
-        'teachers'        => $teachers,
-        'lessonMap'       => $lessonMap,
-        'studentInfoMap'  => $studentInfoMap,
-    ];
-    return view('schedule/daily_grid', array_merge($this->data, $data));
-}
+        $data = [
+            'title'           => Time::parse($date)->toLocalizedString('d MMMM yyyy EEEE') . ' Ders Programı',
+            'displayDate'     => $date,
+            'dayOfWeekForGrid'=> date('N', strtotime($date)),
+            'teachers'        => $teachers,
+            'lessonMap'       => $lessonMap,
+            'studentInfoMap'  => $studentInfoMap,
+        ];
+        return view('schedule/daily_grid', array_merge($this->data, $data));
+    }
+    
     /**
      * Tom-Select için tüm öğrencileri formatlanmış bir şekilde döndürür.
      */
@@ -452,165 +453,130 @@ public function dailyGrid($date = null)
 // app/Controllers/ScheduleController.php İÇİNE YAPIŞTIRILACAK NİHAİ KOD
 
 public function getStudentSuggestions()
-{
-    if (!$this->request->isAJAX()) {
-        return $this->response->setStatusCode(403, 'Forbidden');
-    }
+    {
+        if (!$this->request->isAJAX()) { return $this->response->setStatusCode(403, 'Forbidden'); }
 
-    try {
-        $teacherId = $this->request->getGet('teacher_id');
-        $date = $this->request->getGet('date');
-        $startTime = $this->request->getGet('start_time');
+        try {
+            $teacherId = $this->request->getGet('teacher_id');
+            $date = $this->request->getGet('date');
+            $startTime = $this->request->getGet('start_time');
 
-        if (empty($teacherId) || empty($date) || empty($startTime)) {
-            return $this->response->setStatusCode(400, 'Eksik parametre.');
-        }
-
-        $studentModel = new \App\Models\StudentModel();
-        $fixedLessonModel = new \App\Models\FixedLessonModel();
-        $lessonHistoryModel = new \App\Models\LessonHistoryModel();
-        $teacherProfile = model(\App\Models\UserProfileModel::class)->where('user_id', $teacherId)->first();
-        
-        $dayOfWeekForGrid = date('N', strtotime($date));
-        $dayNames = ['', 'Pzt', 'Salı', 'Çrş', 'Perş', 'Cuma', 'Cmt', 'Paz'];
-
-        // --- YENİ: UYARI MANTIĞI ---
-        // Tüm öğrencilerin sabit ders günlerini tek seferde alıp bir harita oluşturalım.
-        $warningMap = [];
-        $allFixedLessonsRaw = $fixedLessonModel->select('student_id, day_of_week')->findAll();
-        $studentFixedDays = [];
-        foreach($allFixedLessonsRaw as $fl) {
-            $studentFixedDays[$fl['student_id']][] = $fl['day_of_week'];
-        }
-
-        // Sabit günü bugünden farklı olan öğrenciler için uyarı mesajı oluştur.
-        foreach ($studentFixedDays as $studentId => $days) {
-            $uniqueDays = array_unique($days);
-            if (!in_array($dayOfWeekForGrid, $uniqueDays)) {
-                $fixedDayNames = array_map(fn($d) => $dayNames[$d], $uniqueDays);
-                $warningMap[$studentId] = 'Sabit dersi: ' . implode(', ', $fixedDayNames);
+            if (empty($teacherId) || empty($date) || empty($startTime)) {
+                return $this->response->setStatusCode(400, 'Eksik parametre.');
             }
-        }
-        // --- YENİ MANTIK SONU ---
 
-        $suggestions = [];
-        $existingStudentIds = [];
-        
-        // --- KATMAN 0: SABİT DERSLER (Mevcut kodunuz) ---
-        $fixedLessonStudentIds = $fixedLessonModel
-            ->where('teacher_id', $teacherId)
-            ->where('day_of_week', $dayOfWeekForGrid) // Değişken adı düzeltildi
-            ->where('start_time', $startTime)
-            ->findColumn('student_id');
+            // Gerekli Modeller
+            $fixedLessonModel = new FixedLessonModel();
+            $studentModel = new StudentModel();
+            $lessonHistoryModel = new LessonHistoryModel();
+            $teacherProfile = model(UserProfileModel::class)->where('user_id', $teacherId)->first();
 
-        if (!empty($fixedLessonStudentIds)) {
-            $fixedStudents = $studentModel->withDeleted()->find($fixedLessonStudentIds);
-            if (!empty($fixedStudents)) {
+            // Gerekli Değişkenler
+            $dayOfWeek = date('N', strtotime($date));
+            $dayNames = ['', 'Pzt', 'Salı', 'Çrş', 'Perş', 'Cuma', 'Cmt', 'Paz'];
+            $suggestions = [];
+            $existingStudentIds = [];
+            
+            // --- HAFTA MATEMATİĞİ ---
+            $time = Time::parse($date);
+            $weekOfMonth = (int)ceil($time->getDay() / 7);
+            $weekMap = [1 => 'A', 2 => 'B', 3 => 'C', 4 => 'D', 5 => 'A'];
+            $targetWeekType = $weekMap[$weekOfMonth];
+            
+            // --- UYARI MANTIĞI ---
+            $allFixedForWarning = $fixedLessonModel->select('student_id, day_of_week')->findAll();
+            $warningMap = [];
+            foreach ($allFixedForWarning as $fl) {
+                if ($fl['day_of_week'] != $dayOfWeek) {
+                    $warningMap[$fl['student_id']][] = $dayNames[$fl['day_of_week']];
+                }
+            }
+            foreach ($warningMap as $studentId => $days) {
+                $warningMap[$studentId] = 'Sabit dersi: ' . implode(', ', array_unique($days));
+            }
+
+            // --- ÖNERİ KATMANLARI ---
+
+            // KATMAN 0: SABİT DERSLER (A/B/C/D Matematiği ile)
+            $allFixedLessonsRaw = $fixedLessonModel
+                ->where('teacher_id', $teacherId)
+                ->where('day_of_week', $dayOfWeek)
+                ->where('start_time', $startTime)
+                ->findAll();
+
+            $fixedLessonsByWeekType = [];
+            foreach ($allFixedLessonsRaw as $fl) {
+                $fixedLessonsByWeekType[$fl['week_type']][] = $fl['student_id'];
+            }
+            $fixedStudentIds = $fixedLessonsByWeekType[$targetWeekType] ?? $fixedLessonsByWeekType['A'] ?? [];
+            
+            if (!empty($fixedStudentIds)) {
+                $fixedStudents = $studentModel->withDeleted()->find($fixedStudentIds);
                 foreach ($fixedStudents as $student) {
-                    $suggestions[] = [
-                        'id'       => $student['id'],
-                        'name'     => trim($student['adi'] . ' ' . $student['soyadi']),
-                        'type'     => 'fixed',
-                        'bireysel' => $student['telafi_bireysel_hak'] ?? 0,
-                        'grup'     => $student['telafi_grup_hak'] ?? 0,
-                        'warning'  => $warningMap[$student['id']] ?? null, // Uyarı eklendi
-                    ];
+                    $suggestions[] = ['id' => $student['id'], 'name' => trim($student['adi'] . ' ' . $student['soyadi']), 'type' => 'fixed', 'bireysel' => $student['telafi_bireysel_hak'] ?? 0, 'grup' => $student['telafi_grup_hak'] ?? 0, 'warning' => $warningMap[$student['id']] ?? null];
                     $existingStudentIds[] = $student['id'];
                 }
             }
-        }
 
-        // --- KATMAN 1 & 2: AKILLI ÖNERİLER (Mevcut kodunuz) ---
-        if ($teacherProfile) {
-            $teacherFullName = trim($teacherProfile->first_name . ' ' . $teacherProfile->last_name);
-            if (!empty($teacherFullName)) {
-                $historySuggestionsData = [];
-                if ($lessonHistoryModel->teacherHasHistory($teacherFullName)) {
-                    $historySuggestionsData = $lessonHistoryModel->getSuggestionsByTeacherHistory($teacherFullName, (int)$dayOfWeekForGrid, $startTime);
-                } elseif (!empty($teacherProfile->branch)) {
-                    $historySuggestionsData = $lessonHistoryModel->getSuggestionsByBranch($teacherProfile->branch, (int)$dayOfWeekForGrid, $startTime);
+            // KATMAN 1 & 2: AKILLI ÖNERİLER (Ders Geçmişi)
+            if ($teacherProfile) {
+                $teacherFullName = trim($teacherProfile->first_name . ' ' . $teacherProfile->last_name);
+                if (!empty($teacherFullName)) {
+                    $historySuggestionsData = [];
+                    if ($lessonHistoryModel->teacherHasHistory($teacherFullName)) {
+                        $historySuggestionsData = $lessonHistoryModel->getSuggestionsByTeacherHistory($teacherFullName, (int)$dayOfWeek, $startTime);
+                    } elseif (!empty($teacherProfile->branch)) {
+                        $historySuggestionsData = $lessonHistoryModel->getSuggestionsByBranch($teacherProfile->branch, (int)$dayOfWeek, $startTime);
+                    }
+                    $this->_addHistorySuggestions($historySuggestionsData, $suggestions, $existingStudentIds, 'history', $warningMap);
                 }
-                // Yardımcı fonksiyona uyarı haritasını da gönderiyoruz
-                $this->_addHistorySuggestions($historySuggestionsData, $suggestions, $existingStudentIds, 'history', $warningMap);
             }
-        }
-        
-        // --- KATMAN 3: DİĞER TÜM ÖĞRENCİLER (Mevcut kodunuz) ---
-        $otherStudentsQuery = $studentModel->withDeleted()
-            ->select('id, adi, soyadi, telafi_bireysel_hak, telafi_grup_hak');
+            
+            // KATMAN 3: DİĞER TÜM ÖĞRENCİLER
+            $otherStudentsQuery = $studentModel->withDeleted()->select('id, adi, soyadi, telafi_bireysel_hak, telafi_grup_hak');
+            if (!empty($existingStudentIds)) {
+                $otherStudentsQuery->whereNotIn('id', $existingStudentIds);
+            }
+            $otherStudents = $otherStudentsQuery->orderBy('adi', 'ASC')->findAll();
 
-        if (!empty($existingStudentIds)) {
-            $otherStudentsQuery->whereNotIn('id', $existingStudentIds);
-        }
+            foreach ($otherStudents as $student) {
+                $suggestions[] = ['id' => $student['id'], 'name' => trim($student['adi'] . ' ' . $student['soyadi']), 'type' => 'other', 'bireysel' => $student['telafi_bireysel_hak'] ?? 0, 'grup' => $student['telafi_grup_hak'] ?? 0, 'warning' => $warningMap[$student['id']] ?? null];
+            }
 
-        $otherStudents = $otherStudentsQuery->orderBy('adi', 'ASC')
-            ->orderBy('soyadi', 'ASC')
+            return $this->response->setJSON($suggestions);
+
+        } catch (\Exception $e) {
+            log_message('error', '[ScheduleController] HATA: ' . $e->getMessage() . ' | DOSYA: ' . $e->getFile() . ' | SATIR: ' . $e->getLine());
+            return $this->response->setStatusCode(500)->setJSON(['message' => 'Sunucu hatası oluştu.']);
+        }
+    }
+
+    // --- BU YARDIMCI FONKSİYON DA GÜNCELLENDİ ---
+    private function _addHistorySuggestions(array $historyData, array &$suggestions, array &$existingStudentIds, string $type, array $warningMap)
+    {
+        if (empty($historyData)) { return; }
+        $studentModel = new StudentModel();
+        $studentNames = array_column($historyData, 'student_name');
+        if (empty($studentNames)) { return; }
+
+        $studentDetails = $studentModel->withDeleted()
+            ->select('id, adi, soyadi, telafi_bireysel_hak, telafi_grup_hak')
+            ->whereIn('CONCAT(adi, " ", soyadi)', $studentNames)
             ->findAll();
 
-        foreach ($otherStudents as $student) {
-            $suggestions[] = [
-                'id'       => $student['id'],
-                'name'     => trim($student['adi'] . ' ' . $student['soyadi']),
-                'type'     => 'other',
-                'bireysel' => $student['telafi_bireysel_hak'] ?? 0,
-                'grup'     => $student['telafi_grup_hak'] ?? 0,
-                'warning'  => $warningMap[$student['id']] ?? null, // Uyarı eklendi
-            ];
+        $nameToDetailsMap = [];
+        foreach($studentDetails as $student) {
+            $nameToDetailsMap[trim($student['adi'] . ' ' . $student['soyadi'])] = $student;
         }
 
-        return $this->response->setJSON($suggestions);
-
-    } catch (\Exception $e) {
-        log_message('error', '[ScheduleController] HATA: ' . $e->getMessage() . ' | DOSYA: ' . $e->getFile() . ' | SATIR: ' . $e->getLine());
-        return $this->response->setStatusCode(500)->setJSON([
-            'success' => false,
-            'message' => 'SUNUCU HATASI: ' . $e->getMessage(),
-            'file'    => $e->getFile(),
-            'line'    => $e->getLine()
-        ]);
-    }
-}
-
-// YARDIMCI FONKSİYON GÜNCELLENDİ: $warningMap parametresi eklendi
-private function _addHistorySuggestions(array $historyData, array &$suggestions, array &$existingStudentIds, string $type, array $warningMap)
-{
-    if (empty($historyData)) {
-        return;
-    }
-
-    $studentModel = new \App\Models\StudentModel();
-    $studentNames = array_column($historyData, 'student_name');
-
-    if (empty($studentNames)) {
-        return;
-    }
-
-    $studentDetails = $studentModel->withDeleted()
-        ->select('id, adi, soyadi, telafi_bireysel_hak, telafi_grup_hak')
-        ->whereIn('CONCAT(adi, " ", soyadi)', $studentNames)
-        ->findAll();
-
-    $nameToDetailsMap = [];
-    foreach($studentDetails as $student) {
-        $nameToDetailsMap[trim($student['adi'] . ' ' . $student['soyadi'])] = $student;
-    }
-
-    foreach ($historyData as $hist) {
-        $studentDetail = $nameToDetailsMap[$hist['student_name']] ?? null;
-
-        if ($studentDetail && !in_array($studentDetail['id'], $existingStudentIds)) {
-            $suggestions[] = [
-                'id'       => $studentDetail['id'],
-                'name'     => $hist['student_name'],
-                'type'     => $type,
-                'bireysel' => $studentDetail['telafi_bireysel_hak'] ?? 0,
-                'grup'     => $studentDetail['telafi_grup_hak'] ?? 0,
-                'warning'  => $warningMap[$studentDetail['id']] ?? null, // Uyarı eklendi
-            ];
-            $existingStudentIds[] = $studentDetail['id'];
+        foreach ($historyData as $hist) {
+            $studentDetail = $nameToDetailsMap[$hist['student_name']] ?? null;
+            if ($studentDetail && !in_array($studentDetail['id'], $existingStudentIds)) {
+                $suggestions[] = ['id' => $studentDetail['id'], 'name' => $hist['student_name'], 'type' => $type, 'bireysel' => $studentDetail['telafi_bireysel_hak'] ?? 0, 'grup' => $studentDetail['telafi_grup_hak'] ?? 0, 'warning' => $warningMap[$studentDetail['id']] ?? null];
+                $existingStudentIds[] = $studentDetail['id'];
+            }
         }
     }
-}
 
 
 public function addFixedLessonsForDay()
