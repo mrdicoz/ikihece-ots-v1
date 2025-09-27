@@ -6,208 +6,238 @@ use CodeIgniter\Router\RouteCollection;
  * @var RouteCollection $routes
  */
 
-// --------------------------------------------------------------------
-// 1. HERKESE AÇIK (PUBLIC) ROTALAR
-// --------------------------------------------------------------------
+// ====================================================================
+// TEMEL KURALLAR (Herkese Açık Alan)
+// ====================================================================
 service('auth')->routes($routes);
+
+// Herkese açık rotalar
 $routes->get('maintenance', 'Home::maintenance', ['as' => 'maintenance']);
 $routes->post('notifications/unsubscribe', 'NotificationController::unsubscribe');
 
 
-// Bu rota artık sadece yönlendirme yapacak olan Home controller'ını çağırır.
-$routes->get('/', 'Home::index', ['filter' => 'session']);
-
-// Dashboard için yeni bir rota tanımlıyoruz.
-$routes->get('/dashboard', 'DashboardController::index', ['filter' => 'session', 'as' => 'dashboard']);
-
-// Rol değiştirme rotası doğru yerde.
-$routes->get('user/switch-role/(:segment)', 'ProfileController::switchRole/$1', ['filter' => 'session', 'as' => 'user.switchRole']);
-
-// Rol seçim ve profil tamamlama adımlarını yöneten OnboardingController'ı kullanıyoruz
-$routes->group('onboarding', ['filter' => 'session'], static function ($routes) {
-    $routes->get('role', 'OnboardingController::showRoleSelection');
-    $routes->post('role', 'OnboardingController::processRoleSelection');
-    $routes->get('profile', 'OnboardingController::showProfileForm');
-    $routes->post('profile', 'OnboardingController::processProfileForm');
-});
-
-// --------------------------------------------------------------------
-// 2. GİRİŞ YAPMIŞ KULLANICI GEREKTİREN TÜM ROTALAR
-// --------------------------------------------------------------------
+// ====================================================================
+// GİRİŞ GEREKTİREN ALAN (Güvenlik Duvarımız)
+// ====================================================================
 $routes->group('', ['filter' => 'session'], static function ($routes) {
 
-    /**
-     * Ana Yönlendirme ve Genel Rotalar
-     * Giriş yapan kullanıcıyı rolüne göre doğru dashboard'a yönlendirir.
-     */
+    // --- ANA GİRİŞ KAPISI ---
     $routes->get('/', 'DashboardController::index', ['as' => 'home']);
-    $routes->get('duyurular', 'AnnouncementController::index', ['as' => 'announcements.index']);
 
-    // Profil Rotaları
-    $routes->get('profile', 'ProfileController::index', ['as' => 'profile']);
-    $routes->post('profile/update', 'ProfileController::update', ['as' => 'profile.update']);
-    $routes->get('profile/get-districts/(:num)', 'ProfileController::getDistricts/$1', ['as' => 'profile.getDistricts']);
     
-    // Bildirim Abonelik Rotaları
-    $routes->post('notifications/subscribe', 'NotificationController::saveSubscription', ['as' => 'notifications.subscribe']);
-    $routes->get('notifications/vapid-key', 'NotificationController::getVapidKey', ['as' => 'notifications.vapidKey']);
-
-    /**
-     * Role Özel Dashboard Rotaları
-     */
+    // --- YÖNLENDİRME HEDEFLERİ ---
     $routes->group('dashboard', static function ($routes) {
-        // Öğretmen Dashboard'ı (Admin de görebilir)
-        $routes->get('teacher', 'DashboardController::teacher', ['filter' => 'group:admin,ogretmen', 'as' => 'dashboard.teacher']);
-        // Veli Dashboard'ı (Admin de görebilir)
-        $routes->get('parent', 'DashboardController::parent', ['filter' => 'group:admin,veli', 'as' => 'dashboard.parent']);
-        // Yönetici ve diğer roller için varsayılan dashboard
-        $routes->get('default', 'DashboardController::default', ['filter' => 'group:admin,yonetici,mudur,sekreter', 'as' => 'dashboard.default']);
+        $routes->get('admin', 'DashboardController::admin', ['as' => 'dashboard.admin', 'filter' => 'group:admin']);
+        $routes->get('yonetici', 'DashboardController::yonetici', ['as' => 'dashboard.yonetici', 'filter' => 'group:admin,yonetici']);
+        $routes->get('mudur', 'DashboardController::mudur', ['as' => 'dashboard.mudur', 'filter' => 'group:admin,mudur']);
+        $routes->get('sekreter', 'DashboardController::sekreter', ['as' => 'dashboard.sekreter', 'filter' => 'group:admin,sekreter']);
+        $routes->get('teacher', 'DashboardController::teacher', ['as' => 'dashboard.teacher', 'filter' => 'group:admin,ogretmen']);
+        $routes->get('parent', 'DashboardController::parent', ['as' => 'dashboard.parent', 'filter' => 'group:admin,veli']);
+        $routes->get('servis', 'DashboardController::servis', ['as' => 'dashboard.servis', 'filter' => 'group:admin,servis']);
+        
+        // Veli için özel rotalar
+        $routes->post('set-active-child', 'DashboardController::setActiveChild', ['filter' => 'group:veli']);
+    });
+
+
+    // --- KULLANICI PROFİL YÖNETİMİ ---
+    // Yeni kullanıcıların profil tamamlama adımları
+    $routes->group('onboarding', static function ($routes) {
+        $routes->get('role', 'OnboardingController::showRoleSelection', ['as' => 'onboarding.role']);
+        $routes->post('role', 'OnboardingController::processRoleSelection');
+        $routes->get('profile', 'OnboardingController::showProfileForm', ['as' => 'onboarding.profile']);
+        $routes->post('profile', 'OnboardingController::processProfileForm');
+    });
+
+    // Mevcut kullanıcıların profil yönetimi
+    $routes->group('profile', static function ($routes) {
+        $routes->get('/', 'ProfileController::index', ['as' => 'profile']);
+        $routes->post('update', 'ProfileController::update');
+        $routes->get('get-districts/(:num)', 'ProfileController::getDistricts/$1');
     });
     
-$routes->post('evaluations/create', 'EvaluationController::create', ['as' => 'evaluations.create', 'filter' => 'session']);
-$routes->post('evaluations/delete/(:num)', 'EvaluationController::delete/$1', ['as' => 'evaluations.delete', 'filter' => 'session']);
-$routes->get('evaluations/get/(:num)', 'EvaluationController::get/$1', ['as' => 'evaluations.get', 'filter' => 'session']);       // YENİ
-$routes->post('evaluations/update/(:num)', 'EvaluationController::update/$1', ['as' => 'evaluations.update', 'filter' => 'session']); // YENİ
-    /**
-     * Özel Yetki Gerektiren Rota Grupları
-     */
+    // Rol değiştirme
+    $routes->get('user/switch-role/(:segment)', 'ProfileController::switchRole/$1', ['as' => 'user.switchRole']);
 
-    // Öğrenci Yönetimi Rotaları (Genel)
-    $routes->group('', ['filter' => 'group:admin,yonetici,mudur,sekreter,ogretmen'], static function ($routes) {
-        $routes->get('students/view-ram-report/(:num)', 'StudentController::viewRamReport/$1', ['as' => 'students.viewRamReport']);
-        $routes->resource('students', ['controller' => 'StudentController']);
 
+    // --- BİLDİRİM YÖNETİMİ ---
+    $routes->group('notifications', static function ($routes) {
+        $routes->post('subscribe', 'NotificationController::saveSubscription', ['as' => 'notifications.subscribe']);
+        $routes->get('vapid-key', 'NotificationController::getVapidKey', ['as' => 'notifications.vapidKey']);
+        $routes->post('send-manual', 'NotificationController::sendManualNotification', 
+            ['filter' => 'group:admin,yonetici,mudur,sekreter', 'as' => 'notifications.sendManual']);
+    });
+
+
+    // --- DUYURU SİSTEMİ ---
+    // Herkese açık duyuru görüntüleme
+    $routes->get('duyurular', 'AnnouncementController::index', ['as' => 'announcements.index']);
     
+
+    // --- ÖĞRENCİ YÖNETİMİ ---
+    // Bu grup, aşağıdaki tüm öğrenci rotalarının sadece yetkili roller tarafından erişilmesini sağlar.
+    $routes->group('students', ['filter' => 'group:admin,yonetici,mudur,sekreter,ogretmen'], static function ($routes) {
+        // Öğrenci listesi
+        $routes->get('/', 'StudentController::index');
+        // Yeni öğrenci ekleme formu
+        $routes->get('new', 'StudentController::new');
+        // Tek bir öğrencinin detay sayfası
+        $routes->get('(:num)', 'StudentController::show/$1');
+        // Yeni öğrenciyi veritabanına kaydetme
+        $routes->post('/', 'StudentController::create');
+        // Öğrenci düzenleme formu
+        $routes->get('(:num)/edit', 'StudentController::edit/$1');
+        // Öğrenci bilgilerini güncelleme (formdan _method ile PUT olarak gelir)
+        $routes->post('(:num)', 'StudentController::update/$1');
+        // Öğrenci bilgilerini silme (formdan _method ile DELETE olarak gelir)
+        $routes->post('delete/(:num)', 'StudentController::delete/$1'); 
+        
+        // RAM Raporu görüntüleme
+        $routes->get('view-ram-report/(:num)', 'StudentController::viewRamReport/$1', ['as' => 'students.viewRamReport']);
     });
 
-    // Veli Paneli Rotaları
-    $routes->group('dashboard', ['filter' => 'group:veli'], static function ($routes) {
-        $routes->get('parent', 'DashboardController::parent');
-        $routes->post('set-active-child', 'DashboardController::setActiveChild');
-        $routes->get('programim', 'ScheduleController::parentSchedule', ['as' => 'parent.schedule','filter' => 'group:veli']);
-    });
-
-    // Öğretmene Özel Öğrenci Listesi
+    // Öğretmenin kendi öğrencilerini göreceği sayfa
     $routes->get('my-students', 'StudentController::myStudents', ['filter' => 'group:admin,ogretmen', 'as' => 'students.my']);
-    
-    // Ders Programı Rotaları
-    $routes->group('schedule', ['filter' => 'group:admin,yonetici,mudur,sekreter,ogretmen'], static function ($routes) {
-        $routes->get('/', 'ScheduleController::index', ['as' => 'schedule.index']);
+
+
+    // --- DEĞERLENDİRME SİSTEMİ ---
+    $routes->group('evaluations', ['filter' => 'group:admin,yonetici,mudur,sekreter,ogretmen'], static function ($routes) {
+        $routes->post('create', 'EvaluationController::create', ['as' => 'evaluations.create']);
+        $routes->post('delete/(:num)', 'EvaluationController::delete/$1', ['as' => 'evaluations.delete']);
+        $routes->get('get/(:num)', 'EvaluationController::get/$1', ['as' => 'evaluations.get']);
+        $routes->post('update/(:num)', 'EvaluationController::update/$1', ['as' => 'evaluations.update']);
+    });
+
+
+    // --- DERS PROGRAMI ---
+    // Bu grup, ders programı ile ilgili tüm rotaları içerir ve yetki kontrolü yapar.
+    $routes->group('schedule', ['filter' => 'group:admin,yonetici,mudur,sekreter,ogretmen,veli'], static function ($routes) {
+        
+        // Rol bazlı ana takvim sayfaları
+        $routes->get('/', 'ScheduleController::index', ['as' => 'schedule.index', 'filter' => 'group:admin,yonetici,mudur,sekreter']);
         $routes->get('my-schedule', 'ScheduleController::mySchedule', ['filter' => 'group:admin,ogretmen', 'as' => 'schedule.my']);
-        $routes->get('get-month-lessons', 'ScheduleController::getLessonsForMonth', ['as' => 'schedule.get_month_lessons']);
+        $routes->get('parent', 'ScheduleController::parentSchedule', ['as' => 'parent.schedule', 'filter' => 'group:veli']);
+        
+        // Günlük programı gösteren sayfa
         $routes->get('daily/(:segment)', 'ScheduleController::dailyGrid/$1', ['as' => 'schedule.daily']);
+
+        // Takvimin arka planda (AJAX) kullandığı rotalar
+        $routes->get('get-month-lessons', 'ScheduleController::getLessonsForMonth', ['as' => 'schedule.get_month_lessons']);
         $routes->get('get-students', 'ScheduleController::getStudentsForSelect', ['as' => 'schedule.get_students']);
+        $routes->get('suggestions', 'ScheduleController::getStudentSuggestions', ['as' => 'schedule.suggestions']);
         $routes->post('create-lesson', 'ScheduleController::createLesson', ['as' => 'schedule.create']);
         $routes->get('get-lesson-details/(:num)', 'ScheduleController::getLessonDetails/$1', ['as' => 'schedule.get_details']);
         $routes->post('delete-lesson/(:num)', 'ScheduleController::deleteLesson/$1', ['as' => 'schedule.delete_lesson']);
         $routes->get('get-lesson-dates', 'ScheduleController::getLessonDates', ['as' => 'schedule.get_lesson_dates']);
+        $routes->post('update-lesson/(:num)', 'ScheduleController::updateLesson/$1', ['as' => 'schedule.update']);
+        
+        // Toplu ders işlemleri
         $routes->post('add-fixed-lessons', 'ScheduleController::addFixedLessonsForDay', ['as' => 'schedule.addFixed']);
         $routes->post('delete-day-lessons', 'ScheduleController::deleteLessonsForDay', ['as' => 'schedule.deleteForDay']);
         $routes->post('add-all-fixed', 'ScheduleController::addAllFixedLessonsForDay', ['as' => 'schedule.addAllFixed']);
         $routes->post('delete-all-day', 'ScheduleController::deleteAllLessonsForDay', ['as' => 'schedule.deleteAllForDay']);
-        $routes->post('update-lesson/(:num)', 'ScheduleController::updateLesson/$1', ['as' => 'schedule.update']); // YENİ EKLENEN ROTA
-
-        
-    });
-    
-    // ...
-    $routes->get('schedule/suggestions', 'ScheduleController::getStudentSuggestions', ['as' => 'schedule.suggestions']);
-    // ...
-    // Duyuru Yönetimi Rotaları
-    $routes->group('admin/announcements', ['filter' => 'group:admin,yonetici,mudur,sekreter'], static function ($routes) {
-        $routes->get('/', 'Admin\AnnouncementController::index', ['as' => 'admin.announcements.index']);
-        $routes->get('new', 'Admin\AnnouncementController::new', ['as' => 'admin.announcements.new']);
-        $routes->post('create', 'Admin\AnnouncementController::create', ['as' => 'admin.announcements.create']);
-        $routes->get('edit/(:num)', 'Admin\AnnouncementController::edit/$1', ['as' => 'admin.announcements.edit']);
-        $routes->post('update/(:num)', 'Admin\AnnouncementController::update/$1', ['as' => 'admin.announcements.update']);
-        $routes->post('delete/(:num)', 'Admin\AnnouncementController::delete/$1', ['as' => 'admin.announcements.delete']);
     });
 
-    // Bildirim Gönderme Rotası
-    $routes->post('notifications/send-manual', 'NotificationController::sendManualNotification', ['filter' => 'group:admin,yonetici,mudur,sekreter', 'as' => 'notifications.sendManual']);
-    
-    // --------------------------------------------------------------------
-    // YAPAY ZEKÂ GRUBU (Sadece 'admin,yonetici,mudur,sekreter,ogretmen' grubundakiler erişebilir)
-    // --------------------------------------------------------------------
+
+    // --- YAPAY ZEKA ASİSTANI ---
     $routes->group('ai', ['filter' => 'group:admin,yonetici,mudur,sekreter,ogretmen'], static function ($routes) {
-    // Yapay Zeka Asistanı sayfası için GET rotası
-    $routes->get('assistant', 'AIController::assistantView', ['as' => 'ai.assistant']);
-    // Kullanıcının mesajını işlemek için POST rotası
-    $routes->post('assistant', 'AIController::processMessage', ['as' => 'ai.processMessage']);
-    // AJAX işlemleri için POST rotası
-    $routes->post('ai/process', 'AIController::processAjax', ['as' => 'ai.process']);
-});
+        $routes->get('assistant', 'AIController::assistantView', ['as' => 'ai.assistant']);
+        $routes->post('assistant', 'AIController::processMessage', ['as' => 'ai.processMessage']);
+        $routes->post('process', 'AIController::processAjax', ['as' => 'ai.process']);
+    });
 
 
-    // --------------------------------------------------------------------
-    // ADMİN GRUBU (Sadece 'admin' grubundakiler erişebilir)
-    // --------------------------------------------------------------------
+    // --- YÖNETİM GRUBU ROTALARI (admin, yonetici, mudur, sekreter) ---
+    // Bu grup, birden fazla yönetimsel rolün erişebileceği özellikleri barındırır.
+    $routes->group('admin', ['filter' => 'group:admin,yonetici,mudur,sekreter'], static function($routes) {
+            
+        // DUYURU YÖNETİMİ
+        $routes->group('announcements', static function ($routes) {
+            $routes->get('/', 'Admin\AnnouncementController::index', ['as' => 'admin.announcements.index']);
+            $routes->get('new', 'Admin\AnnouncementController::new', ['as' => 'admin.announcements.new']);
+            $routes->post('create', 'Admin\AnnouncementController::create', ['as' => 'admin.announcements.create']);
+            $routes->get('edit/(:num)', 'Admin\AnnouncementController::edit/$1', ['as' => 'admin.announcements.edit']);
+            $routes->post('update/(:num)', 'Admin\AnnouncementController::update/$1', ['as' => 'admin.announcements.update']);
+            $routes->post('delete/(:num)', 'Admin\AnnouncementController::delete/$1', ['as' => 'admin.announcements.delete']);
+        });
+
+        // SABİT DERS PROGRAMI
+        $routes->group('fixed-schedule', static function ($routes) {
+            $routes->get('/', 'Admin\FixedScheduleController::index', ['as' => 'admin.fixed_schedule.index']);
+            $routes->get('get-data', 'Admin\FixedScheduleController::getScheduleData', ['as' => 'admin.fixed_schedule.get_data']);
+            $routes->post('save-slot', 'Admin\FixedScheduleController::saveSlot', ['as' => 'admin.fixed_schedule.save_slot']);
+        });
+
+        // RAPORLAR
+        $routes->match(['get', 'post'], 'reports/monthly', 'Admin\ReportController::monthly', ['as' => 'admin.reports.monthly']);
+    });
+
+
+    // --- SADECE ADMİN ROTALARI ---
+    // Bu bölüm sadece 'admin' rolüne sahip kullanıcılar için
     $routes->group('admin', ['filter' => 'group:admin'], static function ($routes) {
 
-          $routes->get('import', 'Admin\StudentController::importView', ['as' => 'admin.students.importView']);
-        $routes->post('import-mapping', 'Admin\StudentController::importMapping', ['as' => 'admin.students.importMapping']);
-        $routes->post('import-process', 'Admin\StudentController::importProcess', ['as' => 'admin.students.importProcess']);
+        // KULLANICI YÖNETİMİ
+        $routes->group('users', static function ($routes) {
+            $routes->get('/', 'Admin\UserController::index', ['as' => 'admin.users.index']);
+            $routes->get('new', 'Admin\UserController::new', ['as' => 'admin.users.new']);
+            $routes->post('create', 'Admin\UserController::create', ['as' => 'admin.users.create']);
+            $routes->get('show/(:num)', 'Admin\UserController::show/$1', ['as' => 'admin.users.show']);
+            $routes->get('edit/(:num)', 'Admin\UserController::edit/$1', ['as' => 'admin.users.edit']);
+            $routes->post('update/(:num)', 'Admin\UserController::update/$1', ['as' => 'admin.users.update']);
+            $routes->post('delete/(:num)', 'Admin\UserController::delete/$1', ['as' => 'admin.users.delete']);
+            $routes->get('(:any)', 'Admin\UserController::index/$1', ['as' => 'admin.users.index.filtered']);
+        });
 
-        
+        // İÇE AKTARMA İŞLEMLERİ
+        $routes->group('import', static function ($routes) {
+            // Öğrenci içe aktarma
+            $routes->get('students', 'Admin\StudentController::importView', ['as' => 'admin.students.importView']);
+            $routes->post('students-mapping', 'Admin\StudentController::importMapping', ['as' => 'admin.students.importMapping']);
+            $routes->post('students-process', 'Admin\StudentController::importProcess', ['as' => 'admin.students.importProcess']);
+            
+            // Ders hakları içe aktarma
+            $routes->get('entitlements', 'Admin\EntitlementController::importView', ['as' => 'admin.entitlements.import']);
+            $routes->post('entitlements', 'Admin\EntitlementController::processImport', ['as' => 'admin.entitlements.process']);
+        });
 
-        // --- YENİ GÜNCELLEME ROTLARI ---
-        $routes->get('update', 'Admin\UpdateController::index', ['as' => 'admin.update.index']);
-        $routes->get('update/check', 'Admin\UpdateController::check', ['as' => 'admin.update.check']);
-        $routes->get('update/run', 'Admin\UpdateController::runUpdate', ['as' => 'admin.update.run']);
+        // YAPAY ZEKA EĞİTİMİ
+        $routes->group('ai-trainer', static function ($routes) {
+            $routes->get('/', 'Admin\DataImportController::history', ['as' => 'admin.ai.trainer']);
+            $routes->post('/', 'Admin\DataImportController::processUpload', ['as' => 'admin.ai.processUpload']);
+        });
 
-
-        $routes->get('ai-trainer', 'Admin\DataImportController::history', ['as' => 'admin.ai.trainer']);
-        $routes->post('ai-trainer', 'Admin\DataImportController::processUpload', ['as' => 'admin.ai.processUpload']);
-
-        // Ders Hakları Yönetimi
-    $routes->get('entitlements/import', 'Admin\EntitlementController::importView', ['as' => 'admin.entitlements.import']);
-    $routes->post('entitlements/import', 'Admin\EntitlementController::processImport', ['as' => 'admin.entitlements.process']);
-
-    // SABİT DERS PROGRAMI (YENİ EKLENEN GRUP)
-    $routes->group('fixed-schedule', static function ($routes) {
-        $routes->get('/', 'Admin\FixedScheduleController::index', ['as' => 'admin.fixed_schedule.index']);
-        $routes->get('get-data', 'Admin\FixedScheduleController::getScheduleData', ['as' => 'admin.fixed_schedule.get_data']);
-        $routes->post('save-slot', 'Admin\FixedScheduleController::saveSlot', ['as' => 'admin.fixed_schedule.save_slot']);
-        // Not: Öğrenci arama rotası, başka bir modülde zaten varsa (örn: Ana Ders Programı),
-        // tekrar eklemeye gerek olmayabilir. Şimdilik bu kadar yeterli.
-    
-    });
-        
-        // Kullanıcı Yönetimi
-        $routes->get('users', 'Admin\UserController::index', ['as' => 'admin.users.index']);
-        $routes->get('users/new', 'Admin\UserController::new', ['as' => 'admin.users.new']);
-        $routes->post('users/create', 'Admin\UserController::create', ['as' => 'admin.users.create']);
-        $routes->get('users/show/(:num)', 'Admin\UserController::show/$1', ['as' => 'admin.users.show']);
-        $routes->get('users/edit/(:num)', 'Admin\UserController::edit/$1', ['as' => 'admin.users.edit']);
-        $routes->post('users/update/(:num)', 'Admin\UserController::update/$1', ['as' => 'admin.users.update']);
-        $routes->post('users/delete/(:num)', 'Admin\UserController::delete/$1', ['as' => 'admin.users.delete']);
-        $routes->get('users/(:any)', 'Admin\UserController::index/$1', ['as' => 'admin.users.index.filtered']);
-
-        
-        
-        // Loglar
+        // SİSTEM YÖNETİMİ
         $routes->get('logs', 'Admin\LogController::index', ['as' => 'admin.logs.index']);
         
+        // KURUM AYARLARI
+        $routes->group('institution', static function ($routes) {
+            $routes->get('/', 'Admin\InstitutionController::index', ['as' => 'admin.institution.index']);
+            $routes->post('save', 'Admin\InstitutionController::save', ['as' => 'admin.institution.save']);
+        });
         
-        // Kurum Ayarları
-        $routes->get('institution', 'Admin\InstitutionController::index', ['as' => 'admin.institution.index']);
-        $routes->post('institution/save', 'Admin\InstitutionController::save', ['as' => 'admin.institution.save']);
+        // ATAMALAR
+        $routes->group('assignments', static function ($routes) {
+            $routes->get('/', 'Admin\AssignmentController::index', ['as' => 'admin.assignments.index']);
+            $routes->post('save', 'Admin\AssignmentController::save', ['as' => 'admin.assignments.save']);
+            $routes->get('get-assigned/(:num)', 'Admin\AssignmentController::getAssigned/$1', ['as' => 'admin.assignments.getAssigned']);
+        });
         
-        // Atamalar
-        $routes->get('assignments', 'Admin\AssignmentController::index', ['as' => 'admin.assignments.index']);
-        $routes->post('assignments/save', 'Admin\AssignmentController::save', ['as' => 'admin.assignments.save']);
-        $routes->get('assignments/get-assigned/(:num)', 'Admin\AssignmentController::getAssigned/$1', ['as' => 'admin.assignments.getAssigned']);
+        // GENEL AYARLAR
+        $routes->group('settings', static function ($routes) {
+            $routes->get('/', 'Admin\SettingsController::index', ['as' => 'admin.settings.index']);
+            $routes->post('/', 'Admin\SettingsController::save', ['as' => 'admin.settings.save']);
+        });
+
+        // SİSTEM GÜNCELLEMELERİ
+        $routes->group('update', static function ($routes) {
+            $routes->get('/', 'Admin\UpdateController::index', ['as' => 'admin.update.index']);
+            $routes->get('check', 'Admin\UpdateController::check', ['as' => 'admin.update.check']);
+            $routes->get('run', 'Admin\UpdateController::runUpdate', ['as' => 'admin.update.run']);
+        });
         
-        // Genel Ayarlar
-        $routes->get('settings', 'Admin\SettingsController::index', ['as' => 'admin.settings.index']);
-        $routes->post('settings', 'Admin\SettingsController::save', ['as' => 'admin.settings.save']);
-        
-        // Web Push anahtar üretme
+        // WEB PUSH ANAHTAR ÜRETİMİ
         $routes->get('generate-keys', 'VapidController::generateKeys', ['as' => 'admin.generateKeys']);
-
-        // Raporlar
-        $routes->match(['get', 'post'], 'reports/monthly', 'Admin\ReportController::monthly', ['as' => 'admin.reports.monthly']);
-
     });
-    
+
 });

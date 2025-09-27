@@ -19,27 +19,45 @@ public function index()
         $activeRole = session()->get('active_role');
 
         // YÖNLENDİRME MANTIĞINI 'active_role' DEĞİŞKENİNE GÖRE YAPIYORUZ
-        if (in_array($activeRole, ['admin', 'yonetici', 'mudur', 'sekreter'])) {
-            return redirect()->to(route_to('dashboard.default'));
+        if (in_array($activeRole, ['admin'])) {
+            return redirect()->to(route_to('dashboard.admin'));
         }
-        
+
+        if (in_array($activeRole, ['yonetici'])) {
+            return redirect()->to(route_to('dashboard.yonetici'));
+        }
+
+        if (in_array($activeRole, ['mudur'])) {
+            return redirect()->to(route_to('dashboard.mudur'));
+        }
+
+        if (in_array($activeRole, ['sekreter'])) {
+            return redirect()->to(route_to('dashboard.sekreter'));
+        }
+
         if ($activeRole === 'ogretmen') {
             return redirect()->to(route_to('dashboard.teacher'));
         }
+
+        
+        if (in_array($activeRole, ['servis'])) {
+            return redirect()->to(route_to('dashboard.servis'));
+        }
+
 
         if ($activeRole === 'veli') {
             return redirect()->to(route_to('dashboard.parent'));
         }
         
         // Hiçbir koşul eşleşmezse varsayılan panele gitsin.
-        return redirect()->to(route_to('dashboard.default'));
+        return redirect()->to(route_to('dashboard.parent'));
     }
 
     /**
      * Yönetici, Müdür, Sekreter gibi roller için varsayılan dashboard'u gösterir.
      * Bu metot, yonetici.php view'i için gerekli tüm verileri hazırlar.
      */
-    public function default()
+    public function admin()
     {
         // Gerekli Modelleri Yükle
         $studentModel = new StudentModel();
@@ -72,9 +90,28 @@ public function index()
         $this->data['latestAnnouncements'] = $latestAnnouncements;
         $this->data['students'] = $students;
 
+        return view('dashboard/admin', $this->data);
+    }
+
+        public function yonetici()
+    {
+
         return view('dashboard/yonetici', $this->data);
     }
+
+        public function mudur()
+    {
+
+
+        return view('dashboard/mudur', $this->data);
+    }
     
+        public function sekreter()
+    {
+
+        return view('dashboard/sekreter', $this->data);
+    }
+
     /**
      * Öğretmen Dashboard'ını gösterir.
      */
@@ -97,6 +134,12 @@ public function index()
         $this->data['duyurular'] = $announcementModel->getLatestAnnouncementsForGroups(['all', 'ogretmen'], 5);
         
         return view('dashboard/teacher', $this->data);
+    }
+
+        public function servis()
+    {
+        
+        return view('dashboard/servis', $this->data);
     }
     
     /**

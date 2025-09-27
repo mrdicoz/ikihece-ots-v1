@@ -1,5 +1,5 @@
 <?= $this->extend('layouts/app') ?>
 
 <?= $this->section('main') ?>
-<h1>Yönetici Paneli</h1>
+<h1>Servis Paneli</h1>
 <?= $this->endSection() ?>
