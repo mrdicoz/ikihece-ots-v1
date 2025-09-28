@@ -118,7 +118,7 @@ class ReportModel extends Model
         $builder->join("({$classifiedLessons->getCompiledSelect()}) as cl", 'cl.teacher_id = u.id');
         $builder->where('agu.group', 'ogretmen');
         $builder->groupBy('u.id, up.first_name, up.last_name, up.profile_photo');
-        $builder->orderBy('up.first_name', 'ASC');
+        $builder->orderBy('total_hours', 'ASC');
 
         return $builder->get()->getResultArray();
     }
@@ -143,4 +143,51 @@ class ReportModel extends Model
             ->orderBy('student_name', 'ASC')
             ->get()->getResultArray();
     }
+
+    public function getMonthlyLessonChart(int $monthCount = 6): array
+{
+    $data = [];
+    
+    for ($i = $monthCount - 1; $i >= 0; $i--) {
+        $date = new \DateTime();
+        $date->modify("-{$i} months");
+        $year = $date->format('Y');
+        $month = $date->format('n');
+        $monthName = $date->format('M Y'); // "Jan 2025" formatında
+        
+        $summary = $this->getMonthlySummary($year, $month);
+        
+        $data[] = [
+            'month' => $monthName,
+            'total_hours' => $summary['total_hours'],
+            'individual_lessons' => $summary['total_individual'],
+            'group_lessons' => $summary['total_group'],
+        ];
+    }
+    
+    return $data;
+}
+public function getTopStudentsThisMonth(int $year, int $month, int $limit = 6): array
+{
+    return $this->db->table('students s')
+        ->select('
+            s.id, 
+            s.adi, 
+            s.soyadi, 
+            s.profile_image,
+            COUNT(l.id) as total_lessons,
+            SUM(CASE WHEN (SELECT COUNT(*) FROM lesson_students ls_count WHERE ls_count.lesson_id = l.id) = 1 THEN 1 ELSE 0 END) as individual_lessons,
+            SUM(CASE WHEN (SELECT COUNT(*) FROM lesson_students ls_count WHERE ls_count.lesson_id = l.id) > 1 THEN 1 ELSE 0 END) as group_lessons
+        ')
+        ->join('lesson_students ls', 'ls.student_id = s.id')
+        ->join('lessons l', 'l.id = ls.lesson_id')
+        ->where('YEAR(l.lesson_date)', $year)
+        ->where('MONTH(l.lesson_date)', $month)
+        ->where('s.deleted_at', null)
+        ->groupBy('s.id')
+        ->orderBy('total_lessons', 'DESC')
+        ->limit($limit)
+        ->get()
+        ->getResultArray();
+}
 }

@@ -10,7 +10,8 @@ class StudentModel extends Model
     protected $primaryKey       = 'id';
     protected $useAutoIncrement = true;
     protected $returnType       = 'array';
-    protected $useSoftDeletes   = false;
+    protected $deletedField  = 'deleted_at';
+    protected $useSoftDeletes   = true;
     protected $protectFields    = true;
     
     // VERİTABANI İLE BİREBİR UYUMLU, GÜNCEL SÜTUN LİSTESİ
@@ -168,4 +169,31 @@ public function isTcAvailable($tc, $exceptId = null): bool
             ->where('students.id', $studentId)
             ->findAll();
     }
+
+    /**
+ * Belirtilen ayda silinen öğrencileri getirir (Soft Delete)
+ */
+public function getDeletedStudentsThisMonth(int $year, int $month): array
+{
+    return $this->select('id, adi, soyadi, deleted_at')
+                ->where('YEAR(deleted_at)', $year)
+                ->where('MONTH(deleted_at)', $month)
+                ->where('deleted_at IS NOT NULL')
+                ->withDeleted()
+                ->orderBy('deleted_at', 'DESC')
+                ->findAll();
+}
+
+/**
+ * Belirtilen ayda yeni kayıt olan öğrencileri getirir
+ */
+public function getNewStudentsThisMonth(int $year, int $month): array
+{
+    return $this->select('id, adi, soyadi, created_at')
+                ->where('YEAR(created_at)', $year)
+                ->where('MONTH(created_at)', $month)
+                ->where('deleted_at IS NULL')
+                ->orderBy('created_at', 'DESC')
+                ->findAll();
+}
 }

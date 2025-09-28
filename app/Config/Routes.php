@@ -89,8 +89,9 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->get('(:num)/edit', 'StudentController::edit/$1');
         // Öğrenci bilgilerini güncelleme (formdan _method ile PUT olarak gelir)
         $routes->post('(:num)', 'StudentController::update/$1');
-        // Öğrenci bilgilerini silme (formdan _method ile DELETE olarak gelir)
-        $routes->post('delete/(:num)', 'StudentController::delete/$1'); 
+        // ✅ DÜZELTME: Öğrenci silme rotası
+        $routes->delete('(:num)', 'StudentController::delete/$1');
+        $routes->post('(:num)/delete', 'StudentController::delete/$1'); // Form compatibility için
         
         // RAM Raporu görüntüleme
         $routes->get('view-ram-report/(:num)', 'StudentController::viewRamReport/$1', ['as' => 'students.viewRamReport']);

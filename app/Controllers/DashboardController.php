@@ -93,11 +93,54 @@ public function index()
         return view('dashboard/admin', $this->data);
     }
 
-        public function yonetici()
-    {
-
-        return view('dashboard/yonetici', $this->data);
+public function yonetici()
+{
+    // Gerekli modelleri yükle
+    $studentModel = new StudentModel();
+    $reportModel = new \App\Models\ReportModel();
+    $announcementModel = class_exists(\App\Models\AnnouncementModel::class) ? new \App\Models\AnnouncementModel() : null;
+    
+    // Mevcut ay ve yıl
+    $currentYear = date('Y');
+    $currentMonth = date('n');
+    
+    // 1. Ana İstatistikler (Kart Alanları)
+    $monthlyStats = [
+        'total_lesson_hours' => $reportModel->getMonthlySummary($currentYear, $currentMonth)['total_hours'],
+        'students_with_lessons' => $reportModel->getMonthlySummary($currentYear, $currentMonth)['total_students'],
+        'new_students' => count($studentModel->getNewStudentsThisMonth($currentYear, $currentMonth)),
+        'deleted_students' => count($studentModel->getDeletedStudentsThisMonth($currentYear, $currentMonth)),
+    ];
+    
+    // 2. Detaylı Listeler
+    $detailedData = [
+        'new_students_list' => $studentModel->getNewStudentsThisMonth($currentYear, $currentMonth),
+        'deleted_students_list' => $studentModel->getDeletedStudentsThisMonth($currentYear, $currentMonth),
+        'teachers_report' => array_reverse($reportModel->getDetailedTeacherReport($currentYear, $currentMonth)),
+        'students_no_lessons' => $reportModel->getStudentsWithNoLessons($currentYear, $currentMonth),
+        'top_students' => $reportModel->getTopStudentsThisMonth($currentYear, $currentMonth, 6), // YENİ SATIR
+    ];
+    
+    // 3. Duyurular
+    $latestAnnouncements = [];
+    if ($announcementModel) {
+        $latestAnnouncements = $announcementModel->orderBy('created_at', 'DESC')->findAll(5);
     }
+
+    // 4. Grafik verileri (YENİ)
+    $chartData = $reportModel->getMonthlyLessonChart(6);
+    
+    // Verileri view'e gönder
+    $this->data['title'] = 'Yönetici Paneli - Aylık Raporlar';
+    $this->data['monthlyStats'] = $monthlyStats;
+    $this->data['detailedData'] = $detailedData;
+    $this->data['latestAnnouncements'] = $latestAnnouncements;
+    $this->data['chartData'] = $chartData; // YENİ SATIR
+    $this->data['currentMonth'] = $currentMonth;
+    $this->data['currentYear'] = $currentYear;
+    
+    return view('dashboard/yonetici', $this->data);
+}
 
         public function mudur()
     {
