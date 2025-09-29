@@ -93,65 +93,169 @@ public function index()
         return view('dashboard/admin', $this->data);
     }
 
-public function yonetici()
-{
-    // Gerekli modelleri yükle
-    $studentModel = new StudentModel();
-    $reportModel = new \App\Models\ReportModel();
-    $announcementModel = class_exists(\App\Models\AnnouncementModel::class) ? new \App\Models\AnnouncementModel() : null;
-    
-    // Mevcut ay ve yıl
-    $currentYear = date('Y');
-    $currentMonth = date('n');
-    
-    // 1. Ana İstatistikler (Kart Alanları)
-    $monthlyStats = [
-        'total_lesson_hours' => $reportModel->getMonthlySummary($currentYear, $currentMonth)['total_hours'],
-        'students_with_lessons' => $reportModel->getMonthlySummary($currentYear, $currentMonth)['total_students'],
-        'new_students' => count($studentModel->getNewStudentsThisMonth($currentYear, $currentMonth)),
-        'deleted_students' => count($studentModel->getDeletedStudentsThisMonth($currentYear, $currentMonth)),
-    ];
-    
-    // 2. Detaylı Listeler
-    $detailedData = [
-        'new_students_list' => $studentModel->getNewStudentsThisMonth($currentYear, $currentMonth),
-        'deleted_students_list' => $studentModel->getDeletedStudentsThisMonth($currentYear, $currentMonth),
-        'teachers_report' => array_reverse($reportModel->getDetailedTeacherReport($currentYear, $currentMonth)),
-        'students_no_lessons' => $reportModel->getStudentsWithNoLessons($currentYear, $currentMonth),
-        'top_students' => $reportModel->getTopStudentsThisMonth($currentYear, $currentMonth, 6), // YENİ SATIR
-    ];
-    
-    // 3. Duyurular
-    $latestAnnouncements = [];
-    if ($announcementModel) {
-        $latestAnnouncements = $announcementModel->orderBy('created_at', 'DESC')->findAll(5);
+    public function yonetici()
+    {
+        // Gerekli modelleri yükle
+        $studentModel = new StudentModel();
+        $reportModel = new \App\Models\ReportModel();
+        $announcementModel = class_exists(\App\Models\AnnouncementModel::class) ? new \App\Models\AnnouncementModel() : null;
+        
+        // Mevcut ay ve yıl
+        $currentYear = date('Y');
+        $currentMonth = date('n');
+        
+        // 1. Ana İstatistikler (Kart Alanları)
+        $monthlyStats = [
+            'total_lesson_hours' => $reportModel->getMonthlySummary($currentYear, $currentMonth)['total_hours'],
+            'students_with_lessons' => $reportModel->getMonthlySummary($currentYear, $currentMonth)['total_students'],
+            'new_students' => count($studentModel->getNewStudentsThisMonth($currentYear, $currentMonth)),
+            'deleted_students' => count($studentModel->getDeletedStudentsThisMonth($currentYear, $currentMonth)),
+        ];
+        
+        // 2. Detaylı Listeler
+        $detailedData = [
+            'new_students_list' => $studentModel->getNewStudentsThisMonth($currentYear, $currentMonth),
+            'deleted_students_list' => $studentModel->getDeletedStudentsThisMonth($currentYear, $currentMonth),
+            'teachers_report' => array_reverse($reportModel->getDetailedTeacherReport($currentYear, $currentMonth)),
+            'students_no_lessons' => $reportModel->getStudentsWithNoLessons($currentYear, $currentMonth),
+            'top_students' => $reportModel->getTopStudentsThisMonth($currentYear, $currentMonth, 6), // YENİ SATIR
+        ];
+        
+        // 3. Duyurular
+        $latestAnnouncements = [];
+        if ($announcementModel) {
+            $latestAnnouncements = $announcementModel->orderBy('created_at', 'DESC')->findAll(5);
+        }
+
+        // 4. Grafik verileri (YENİ)
+        $chartData = $reportModel->getMonthlyLessonChart(6);
+        
+        // Verileri view'e gönder
+        $this->data['title'] = 'Yönetici Paneli - Aylık Raporlar';
+        $this->data['monthlyStats'] = $monthlyStats;
+        $this->data['detailedData'] = $detailedData;
+        $this->data['latestAnnouncements'] = $latestAnnouncements;
+        $this->data['chartData'] = $chartData; // YENİ SATIR
+        $this->data['currentMonth'] = $currentMonth;
+        $this->data['currentYear'] = $currentYear;
+        
+        return view('dashboard/yonetici', $this->data);
     }
 
-    // 4. Grafik verileri (YENİ)
-    $chartData = $reportModel->getMonthlyLessonChart(6);
-    
-    // Verileri view'e gönder
-    $this->data['title'] = 'Yönetici Paneli - Aylık Raporlar';
-    $this->data['monthlyStats'] = $monthlyStats;
-    $this->data['detailedData'] = $detailedData;
-    $this->data['latestAnnouncements'] = $latestAnnouncements;
-    $this->data['chartData'] = $chartData; // YENİ SATIR
-    $this->data['currentMonth'] = $currentMonth;
-    $this->data['currentYear'] = $currentYear;
-    
-    return view('dashboard/yonetici', $this->data);
-}
-
-        public function mudur()
+    public function mudur()
     {
-
-
+        $studentModel = new StudentModel();
+        $reportModel = new \App\Models\ReportModel();
+        
+        $currentYear = date('Y');
+        $currentMonth = date('n');
+        
+        // Aylık özet
+        $summary = $reportModel->getMonthlySummary($currentYear, $currentMonth);
+        
+        // Widget verileri
+        $this->data['monthlyStats'] = [
+            'total_lesson_hours' => $summary['total_hours'],
+            'students_with_lessons' => $summary['total_students'],
+            'students_no_lessons' => count($reportModel->getStudentsWithNoLessons($currentYear, $currentMonth)),
+            'new_students' => count($studentModel->getNewStudentsThisMonth($currentYear, $currentMonth)),
+            'deleted_students' => count($studentModel->getDeletedStudentsThisMonth($currentYear, $currentMonth)),
+        ];
+        
+        // Öğrenci detay raporu (ders saatine göre)
+        $this->data['studentReport'] = $reportModel->getDetailedStudentReport($currentYear, $currentMonth);
+        $this->data['title'] = 'Müdür Paneli';
+        
         return view('dashboard/mudur', $this->data);
     }
     
-        public function sekreter()
+    public function sekreter()
     {
-
+        $studentModel = new StudentModel();
+        $lessonModel = new \App\Models\LessonModel();
+        
+        $today = date('Y-m-d');
+        
+        // 1. Üst Widget Verileri
+        $todayLessons = $lessonModel->where('lesson_date', $today)->countAllResults();
+        
+        // Bugün ders alan benzersiz öğrenci sayısı
+        $studentsWithLessonsToday = $lessonModel
+            ->select('COUNT(DISTINCT lesson_students.student_id) as count')
+            ->join('lesson_students', 'lesson_students.lesson_id = lessons.id')
+            ->where('lessons.lesson_date', $today)
+            ->get()
+            ->getRow()
+            ->count ?? 0;
+        
+        // Eksik bilgili öğrenciler
+        $incompleteStudents = $studentModel
+            ->where('deleted_at', null)
+            ->groupStart()
+                ->where('ram_raporu', null)
+                ->orWhere('ram_raporu', '')
+                ->orWhere('veli_anne_telefon', null)
+                ->orWhere('veli_anne_telefon', '')
+                ->orGroupStart()
+                    ->where('veli_baba_telefon', null)
+                    ->orWhere('veli_baba_telefon', '')
+                ->groupEnd()
+            ->groupEnd()
+            ->countAllResults();
+        
+        // Bugün doğum günü olanlar
+        $birthdaysToday = $studentModel
+            ->where('deleted_at', null)
+            ->where('DAY(dogum_tarihi)', date('d'))
+            ->where('MONTH(dogum_tarihi)', date('m'))
+            ->countAllResults();
+        
+        $this->data['widgetStats'] = [
+            'today_lessons' => $todayLessons,
+            'today_students' => $studentsWithLessonsToday,
+            'incomplete_students' => $incompleteStudents,
+            'birthdays_today' => $birthdaysToday,
+        ];
+        
+        // 2. Bugünkü Ders Programı (saat bazlı gruplu)
+        $this->data['todaySchedule'] = $lessonModel
+            ->select('lessons.*, students.adi, students.soyadi, user_profiles.first_name, user_profiles.last_name')
+            ->join('lesson_students', 'lesson_students.lesson_id = lessons.id')
+            ->join('students', 'students.id = lesson_students.student_id')
+            ->join('users', 'users.id = lessons.teacher_id')
+            ->join('user_profiles', 'user_profiles.user_id = users.id', 'left')
+            ->where('lessons.lesson_date', $today)
+            ->orderBy('lessons.start_time', 'ASC')
+            ->findAll();
+        
+        // 3. Eksik Bilgiler Listesi
+        $this->data['incompleteList'] = $studentModel
+            ->select('students.id, students.adi, students.soyadi, students.ram_raporu, students.veli_anne_telefon, students.veli_baba_telefon')
+            ->where('deleted_at', null)
+            ->groupStart()
+                ->where('ram_raporu', null)
+                ->orWhere('ram_raporu', '')
+                ->orWhere('veli_anne_telefon', null)
+                ->orWhere('veli_anne_telefon', '')
+                ->orGroupStart()
+                    ->where('veli_baba_telefon', null)
+                    ->orWhere('veli_baba_telefon', '')
+                ->groupEnd()
+            ->groupEnd()
+            ->orderBy('adi', 'ASC')
+            ->findAll();
+        
+        // 4. Doğum Günü Listesi
+        $this->data['birthdayList'] = $studentModel
+            ->select('id, adi, soyadi, dogum_tarihi, veli_anne_telefon, veli_baba_telefon')
+            ->where('deleted_at', null)
+            ->where('DAY(dogum_tarihi)', date('d'))
+            ->where('MONTH(dogum_tarihi)', date('m'))
+            ->orderBy('adi', 'ASC')
+            ->findAll();
+        
+        $this->data['title'] = 'Sekreter Paneli';
+        
         return view('dashboard/sekreter', $this->data);
     }
 
@@ -179,8 +283,48 @@ public function yonetici()
         return view('dashboard/teacher', $this->data);
     }
 
-        public function servis()
+    public function servis()
     {
+        $lessonModel = new \App\Models\LessonModel();
+        $studentModel = new StudentModel();
+        
+        $today = date('Y-m-d');
+        
+        // Bugün ders alan öğrencileri çek (benzersiz)
+$todayStudents = $studentModel
+    ->select('students.id, students.adi, students.soyadi, students.profile_image, students.servis, students.mesafe, students.adres_detayi as adres, students.veli_anne_telefon, students.veli_baba_telefon, students.google_konum, cities.name as city_name, districts.name as district_name, lessons.start_time, lessons.end_time')
+    ->distinct()
+    ->join('lesson_students', 'lesson_students.student_id = students.id')
+    ->join('lessons', 'lessons.id = lesson_students.lesson_id')
+    ->join('cities', 'cities.id = students.city_id', 'left')
+    ->join('districts', 'districts.id = students.district_id', 'left')
+    ->where('lessons.lesson_date', $today)
+    ->where('students.deleted_at', null)
+    ->orderBy('students.adi', 'ASC')
+    ->findAll();
+        
+        // İstatistikler
+        $stats = [
+            'total_students' => count($todayStudents),
+            'with_service' => 0,
+            'civar' => 0,
+            'yakin' => 0,
+            'uzak' => 0,
+        ];
+        
+        foreach ($todayStudents as $student) {
+            if ($student['servis'] === 'var') {
+                $stats['with_service']++;
+            }
+            
+            if ($student['mesafe'] === 'civar') $stats['civar']++;
+            elseif ($student['mesafe'] === 'yakın') $stats['yakin']++;
+            elseif ($student['mesafe'] === 'uzak') $stats['uzak']++;
+        }
+        
+        $this->data['stats'] = $stats;
+        $this->data['todayStudents'] = $todayStudents;
+        $this->data['title'] = 'Servis Paneli';
         
         return view('dashboard/servis', $this->data);
     }
