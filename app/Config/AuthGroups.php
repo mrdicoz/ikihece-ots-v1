@@ -98,11 +98,15 @@ class AuthGroups extends ShieldAuthGroups
             'ogrenciler.*',
             'dersprogrami.yonet',
             'servis.listele',
+            'ayarlar.*',
         ],
         // Müdür, kritik işlemler yapamaz ama çoğu şeyi görür.
         'mudur' => [
             'ogrenciler.listele',
             'ogrenciler.detay',
+            'ogrenciler.ekle',
+            'ogrenciler.duzenle',
+            'ogrenciler.sil',
             'dersprogrami.goruntule',
             'servis.listele',
         ],
