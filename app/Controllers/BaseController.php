@@ -78,6 +78,11 @@ abstract class BaseController extends Controller
             $this->data['activeRole'] = $activeRole;
             // --- YENİ KOD SONU ---
 
+            // 🦇 MENÜ SİSTEMİ ENTEGRASYONU - YENİ EKLENEN
+            $menuBuilder = new \App\Libraries\MenuBuilder();
+            $this->data['menuData'] = $menuBuilder->buildMenu($activeRole);
+            // 🦇 MENÜ SİSTEMİ SONU
+
             // --- LİSANS KONTROL MANTIĞI BURAYA EKLENDİ ---
             $this->checkLicenseStatus();
         }
@@ -87,7 +92,7 @@ abstract class BaseController extends Controller
         //$this->response->setBody(view('layouts/app', $this->data));
     }
     
-/**
+    /**
      * Lisans durumunu kontrol eder ve kullanıcıyı rolüne göre yönlendirir.
      * Bu fonksiyon, "beyaz liste" dışındaki tüm sayfalarda çalışır.
      */

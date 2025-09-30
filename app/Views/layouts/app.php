@@ -4,7 +4,7 @@
     <?= $this->include('layouts/partials/_head') ?>
 </head>
 <body>
-    
+    <?= $this->include('layouts/partials/_session_messages') ?>
     <?= $this->include('layouts/partials/_navbar') ?>
 
     <main class="container py-4 mt-5">

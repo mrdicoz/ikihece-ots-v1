@@ -16,67 +16,13 @@ if ($isLoggedIn) {
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             
-            <?php if ($isLoggedIn && isset($activeRole)): ?>
-            
-            <ul class="navbar-nav">
-                <?php // --- LİNKLERİN TAMAMI DÜZELTİLDİ --- ?>
-
-                <?php if (in_array($activeRole, ['admin', 'yonetici', 'mudur', 'sekreter'])): ?>
-                    <li class="nav-item"><a class="nav-link" href="<?= site_url('students') ?>"><i class="bi bi-backpack2"></i> Öğrenci Yönetimi</a></li>
-                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-calendar3"></i> Ders Programı
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="<?= route_to('schedule.index') ?>"><i class="bi bi-calendar-plus"></i> Program Oluştur</a></li>
-                            <li><a class="dropdown-item" href="<?= route_to('admin.fixed_schedule.index') ?>"><i class="bi bi-pin-angle-fill"></i> Sabitler</a></li>
-                        </ul>
-                    
-                    </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="<?= route_to('ai.assistant') ?>"><i class="bi bi-robot"></i> Yapay Zeka Asistanı</a>
-                </li>
-                <?php endif; ?>
-
-                <?php if ($activeRole === 'ogretmen'): ?>
-                    <li class="nav-item"><a class="nav-link" href="<?= route_to('schedule.my') ?>"><i class="bi bi-calendar-week"></i> Ders Programım</a></li>
-                    <li class="nav-item"><a class="nav-link" href="<?= route_to('students.my') ?>"><i class="bi bi-people"></i> Öğrencilerim</a></li>
-                                <li class="nav-item">
-                    <a class="nav-link" href="<?= route_to('ai.assistant') ?>"><i class="bi bi-robot"></i> Yapay Zeka Asistanı</a>
-                </li>
-                    <?php endif; ?>
-                
-                <?php if ($activeRole === 'veli'): ?>
-                    <li class="nav-item"><a class="nav-link" href="<?= route_to('parent.schedule') ?>"><i class="bi bi-calendar-check"></i> Çocuğumun Programı</a></li>
-                    <?php // Bu rotalar henüz tanımlı değil, şimdilik '#' kalabilir ?>
-                    <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-chat-dots-fill"></i> Mesajlar</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#"><i class="bi bi-bus-front"></i> Servis</a></li>
-                <?php endif; ?>
-                
-                <li class="nav-item"><a class="nav-link" href="<?= route_to('announcements.index') ?>"><i class="bi bi-megaphone"></i> Duyurular</a></li>
-
-                <?php if ($activeRole === 'admin'): ?>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-sliders"></i> Sistem Yönetimi
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="<?= route_to('admin.users.index') ?>"><i class="bi bi-people"></i> Kullanıcılar</a></li>
-                            <li><a class="dropdown-item" href="<?= route_to('admin.institution.index') ?>"><i class="bi bi-building"></i> Kurum Ayarları</a></li>
-                            <li><a class="dropdown-item" href="<?= route_to('admin.reports.monthly') ?>"><i class="bi bi-bar-chart-fill"></i> Aylık Raporlar</a></li>
-                            <li><a class="dropdown-item" href="<?= route_to('admin.assignments.index') ?>"><i class="bi bi-person-rolodex"></i> Atamalar</a></li>
-                            <li><a class="dropdown-item" href="<?= route_to('admin.announcements.index') ?>"><i class="bi bi-megaphone"></i> Duyuru Yap</a></li>               
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="<?= route_to('admin.update.index') ?>"><i class="bi bi-cloud-arrow-down-fill"></i> Sistemi Güncelle</a></li>
-                            <li><a class="dropdown-item" href="<?= route_to('admin.logs.index') ?>"><i class="bi bi-journal-text"></i> Log Kayıtları</a></li>
-                            <li><a class="dropdown-item" href="<?= route_to('admin.ai.trainer') ?>"><i class="bi bi-robot"></i> Model Eğitimi</a></li>
-                            <li><a class="dropdown-item" href="<?= route_to('admin.students.importView') ?>"><i class="bi bi-cloud-upload-fill"></i> İçe Aktar</a></li>
-                            <li><a class="dropdown-item" href="<?= route_to('admin.entitlements.import') ?>"><i class="bi bi-person-check"></i> Ders Hakları Yükle</a></li>
-                            <li><a class="dropdown-item" href="<?= route_to('admin.settings.index') ?>"><i class="bi bi-gear-wide-connected"></i> Genel Ayarlar</a></li>
-                        </ul>
-                    </li>
-                <?php endif; ?>
-            </ul>
+            <?php if ($isLoggedIn && isset($activeRole) && isset($menuData)): ?>
+<ul class="navbar-nav">
+    <?php foreach ($menuData as $groupName => $items): ?>
+        <?php echo view('layouts/partials/_menu_items', ['items' => $items]); ?>
+    <?php endforeach; ?>
+</ul>
+<?php endif; ?>
 
             <ul class="navbar-nav ms-auto align-items-lg-center">
                 <li class="nav-item dropdown">
@@ -112,8 +58,6 @@ if ($isLoggedIn) {
                     </ul>
                 </li>
             </ul>
-
-            <?php endif; ?>
         </div>
     </div>
 </nav>

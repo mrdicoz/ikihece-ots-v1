@@ -12,9 +12,8 @@ class DatabaseSeeder extends Seeder
 
         $this->call(\App\Database\Seeds\CitiesSeeder::class);
         $this->call(\App\Database\Seeds\DistrictsSeeder::class);
-        
-        // Burası sadece ShieldSeeder'ı çağırır, onu tanımlamaz.
         $this->call(\App\Database\Seeds\ShieldSeeder::class); 
+        $this->call(\App\Database\Seeds\MenuSeeder::class); 
 
         $this->db->enableForeignKeyChecks();
 

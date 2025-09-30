@@ -239,6 +239,15 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         
         // WEB PUSH ANAHTAR ÜRETİMİ
         $routes->get('generate-keys', 'VapidController::generateKeys', ['as' => 'admin.generateKeys']);
+
+        // MENÜ YÖNETİMİ - DÜZELTİLMİŞ
+        $routes->group('menu', static function ($routes) {
+            $routes->get('/', 'Admin\MenuController::index', ['as' => 'admin.menu.index']);
+            $routes->match(['GET', 'POST'], 'group/create', 'Admin\MenuController::createGroup', ['as' => 'admin.menu.group.create']);
+            $routes->match(['GET', 'POST'], 'item/create', 'Admin\MenuController::createItem', ['as' => 'admin.menu.item.create']);
+            $routes->match(['GET', 'POST'], 'item/(:num)', 'Admin\MenuController::updateItem/$1', ['as' => 'admin.menu.item.update']);
+            $routes->delete('item/(:num)', 'Admin\MenuController::deleteItem/$1', ['as' => 'admin.menu.item.delete']);
+        });
     });
 
 });
