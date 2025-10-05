@@ -7,6 +7,7 @@ use App\Models\StudentModel;
 use App\Models\CityModel;
 use App\Models\DistrictModel;
 use App\Models\StudentEvaluationModel;
+use App\Models\RamReportAnalysisModel;
 
 
 class StudentController extends BaseController
@@ -136,6 +137,9 @@ public function create()
         $newName = $reportFile->getRandomName();
         $reportFile->move(WRITEPATH . 'uploads/ram_reports', $newName);
         $data['ram_raporu'] = $newName;
+        // RAM raporu analizi
+        $filePath = WRITEPATH . 'uploads/ram_reports/' . $newName;
+        $this->analyzeAndSaveRamReport($id, $filePath);
     }
 
     // Tek insert işlemi ve sonucunu kontrol et
@@ -325,6 +329,11 @@ public function update($id = null)
         if (!$silinecekOgrenci) {
             return redirect()->back()->with('error', 'Silinecek öğrenci bulunamadı.');
         }
+        
+        // RAM analiz verilerini sil (öğrenci silinmeden ÖNCE)
+        $analysisModel = new RamReportAnalysisModel();
+        $analysisModel->where('student_id', $id)->delete();
+        
         if ($model->delete($id)) {
             \CodeIgniter\Events\Events::trigger('student.deleted', $silinecekOgrenci, auth()->user());
             return redirect()->to(site_url('students'))->with('success', 'Öğrenci başarıyla silindi.');
@@ -372,5 +381,156 @@ public function update($id = null)
         ];
 
         return view('students/my_students', array_merge($this->data, $data));
+    }
+
+        private function analyzeAndSaveRamReport($studentId, $filePath)
+    {
+        if (!file_exists($filePath)) {
+            return false;
+        }
+        
+        $analysisModel = new RamReportAnalysisModel();
+        
+        // PDF içeriğini text olarak çıkar (OgretmenAIController'daki readPdfContent metodunu kullan)
+        $content = $this->extractPdfText($filePath);
+        
+        if (empty(trim($content))) {
+            return false;
+        }
+        
+        // RAM bilgilerini parse et
+        $data = [
+            'student_id' => $studentId,
+            'ram_text_content' => $content,
+            'total_memory' => $this->extractTotalMemory($content),
+            'available_memory' => $this->extractAvailableMemory($content),
+            'memory_info' => $this->extractMemoryInfo($content),
+            'analyzed_at' => date('Y-m-d H:i:s')
+        ];
+        
+        // Varsa güncelle, yoksa oluştur
+        $existing = $analysisModel->where('student_id', $studentId)->first();
+        
+        if ($existing) {
+            $analysisModel->update($existing['id'], $data);
+        } else {
+            $analysisModel->insert($data);
+        }
+        
+        return true;
+    }
+
+    // Linux için düzenlenmiş hali
+    private function extractPdfText($filePath)
+    {
+        try {
+            $parser = new \Smalot\PdfParser\Parser();
+            $pdf = $parser->parseFile($filePath);
+            $text = $pdf->getText();
+            
+            if (strlen(trim($text)) > 50) {
+                return $text;
+            }
+        } catch (\Exception $e) {
+            log_message('info', 'Smalot başarısız, OCR deneniyor: ' . basename($filePath));
+        }
+        
+        try {
+            $imagePath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid() . '.png';
+            
+            // İşletim sistemine göre yol
+            $convertCmd = (DIRECTORY_SEPARATOR === '\\') 
+                ? 'C:\\laragon\\bin\\imagemagick\\convert.exe' 
+                : 'convert'; // Linux
+            
+            exec("\"$convertCmd\" -density 300 " . escapeshellarg($filePath) . "[0] " . escapeshellarg($imagePath) . " 2>&1", $output, $code);
+            
+            if (file_exists($imagePath)) {
+                $ocr = new \thiagoalessio\TesseractOCR\TesseractOCR($imagePath);
+                $text = $ocr->lang('tur')->run();
+                @unlink($imagePath);
+                
+                if (strlen(trim($text)) > 10) {
+                    return $text;
+                }
+            }
+        } catch (\Exception $e) {
+            log_message('error', 'OCR hatası: ' . $e->getMessage());
+        }
+        
+        return '';
+    }
+
+    private function extractTotalMemory($content)
+    {
+        // Windows komut çıktısından bellek bilgisi çıkarma
+        if (preg_match('/TotalPhysicalMemory\s*:\s*(\d+)/i', $content, $matches)) {
+            $bytes = $matches[1];
+            return round($bytes / (1024 * 1024 * 1024), 2) . ' GB';
+        }
+        return null;
+    }
+
+    private function extractAvailableMemory($content)
+    {
+        if (preg_match('/AvailablePhysicalMemory\s*:\s*(\d+)/i', $content, $matches)) {
+            $bytes = $matches[1];
+            return round($bytes / (1024 * 1024 * 1024), 2) . ' GB';
+        }
+        return null;
+    }
+
+    private function extractMemoryInfo($content)
+    {
+        $info = [];
+        
+        // Üretici
+        if (preg_match('/Manufacturer\s*:\s*(.+)/i', $content, $matches)) {
+            $info['manufacturer'] = trim($matches[1]);
+        }
+        
+        // Part Number
+        if (preg_match('/PartNumber\s*:\s*(.+)/i', $content, $matches)) {
+            $info['part_number'] = trim($matches[1]);
+        }
+        
+        // Hız
+        if (preg_match('/Speed\s*:\s*(\d+)/i', $content, $matches)) {
+            $info['speed'] = $matches[1] . ' MHz';
+        }
+        
+        return !empty($info) ? json_encode($info, JSON_UNESCAPED_UNICODE) : null;
+    }
+
+    public function bulkAnalyzeRamReports()
+    {
+        $studentModel = new StudentModel();
+        $students = $studentModel->select('id, ram_raporu')
+                                ->where('ram_raporu IS NOT NULL')
+                                ->where('ram_raporu !=', '')
+                                ->findAll();
+        
+        $processed = 0;
+        $failed = 0;
+        
+        foreach ($students as $student) {
+            $filePath = WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu'];
+            if (file_exists($filePath)) {
+                if ($this->analyzeAndSaveRamReport($student['id'], $filePath)) {
+                    $processed++;
+                } else {
+                    $failed++;
+                }
+            } else {
+                $failed++;
+            }
+        }
+        
+        return $this->response->setJSON([
+            'success' => true, 
+            'message' => "{$processed} rapor başarıyla analiz edildi" . ($failed > 0 ? ", {$failed} rapor başarısız" : ""),
+            'processed' => $processed,
+            'failed' => $failed
+        ]);
     }
 }

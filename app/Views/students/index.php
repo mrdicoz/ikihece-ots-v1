@@ -98,6 +98,12 @@
 
     <div class="card shadow">
         <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>Öğrenci Listesi</h4>
+    <button type="button" class="btn btn-success" id="bulkAnalyzeBtn">
+        <i class="bi bi-cpu-fill"></i> Tüm RAM Raporlarını Analiz Et
+    </button>
+</div>
             <div class="table-responsive">
                 <table class="table table-striped table-hover" id="studentsTable" width="100%" cellspacing="0">
                     <thead>
@@ -309,5 +315,36 @@
             }
         });
     });
+
+    $('#bulkAnalyzeBtn').on('click', function() {
+    if(confirm('Sistemdeki tüm RAM raporları analiz edilecek. Bu işlem biraz zaman alabilir. Onaylıyor musunuz?')) {
+        const btn = $(this);
+        btn.prop('disabled', true)
+           .html('<span class="spinner-border spinner-border-sm me-2"></span>Analiz ediliyor...');
+        
+        $.ajax({
+            url: '<?= site_url('students/bulk-analyze-ram') ?>',
+            type: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            },
+            success: function(response) {
+                if(response.success) {
+                    alert(response.message);
+                } else {
+                    alert('Bir hata oluştu!');
+                }
+            },
+            error: function() {
+                alert('İstek sırasında bir hata oluştu!');
+            },
+            complete: function() {
+                btn.prop('disabled', false)
+                   .html('<i class="bi bi-cpu-fill"></i> Tüm RAM Raporlarını Analiz Et');
+            }
+        });
+    }
+});
 </script>
 <?= $this->endSection() ?>

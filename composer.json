@@ -16,7 +16,8 @@
         "guzzlehttp/guzzle": "^7.9",
         "minishlink/web-push": "^9.0",
         "phpoffice/phpspreadsheet": "^4.4",
-        "smalot/pdfparser": "^2.12"
+        "smalot/pdfparser": "^2.12",
+        "thiagoalessio/tesseract_ocr": "^2.13"
     },
     "require-dev": {
         "fakerphp/faker": "^1.9",

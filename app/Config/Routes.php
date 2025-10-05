@@ -96,6 +96,7 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         
         // RAM Raporu görüntüleme
         $routes->get('view-ram-report/(:num)', 'StudentController::viewRamReport/$1', ['as' => 'students.viewRamReport']);
+        $routes->post('bulk-analyze-ram', 'StudentController::bulkAnalyzeRamReports', ['filter' => 'group:admin,yonetici,mudur,sekreter,ogretmen']);
     });
 
     // Öğretmenin kendi öğrencilerini göreceği sayfa
