@@ -109,33 +109,29 @@ abstract class BaseAIController extends Controller
      * Mesajdan öğrenci ID'sini bulur (STUDENTS TABLOSUNDAN)
      */
     protected function findStudentIdInMessage(string $msg): ?int
-    {
-        log_message('debug', '[findStudentIdInMessage] ÇAĞRILDI');
-        
-        $studentModel = new \App\Models\StudentModel();
+{
+    $studentModel = new \App\Models\StudentModel();
+    
+    // Tüm öğrencileri çek
+    $students = $studentModel
+        ->select('id, adi, soyadi')
+        ->where('deleted_at', null)
+        ->asArray()
+        ->findAll();
+    
+    // RAM raporu analizi ile AYNI MANTIK
+    foreach ($students as $s) {
+        $fullName = $s['adi'] . ' ' . $s['soyadi'];
+        $lowerName = $this->turkish_strtolower($fullName);
         $msgLower = $this->turkish_strtolower($msg);
         
-        $students = $studentModel
-            ->select('id, adi, soyadi')
-            ->where('deleted_at', null)
-            ->asArray()
-            ->findAll();
-        
-        log_message('debug', '[findStudentIdInMessage] Toplam öğrenci: ' . count($students));
-        
-        foreach ($students as $student) {
-            $fullName = $student['adi'] . ' ' . $student['soyadi'];
-            $fullNameLower = $this->turkish_strtolower($fullName);
-            
-            if (str_contains($msgLower, $fullNameLower)) {
-                log_message('debug', '[findStudentIdInMessage] BULUNDU: ' . $fullName);
-                return $student['id'];
-            }
+        if (str_contains($msgLower, $lowerName)) {
+            return $s['id'];
         }
-        
-        log_message('debug', '[findStudentIdInMessage] HİÇ EŞLEŞME YOK');
-        return null;
     }
+    
+    return null;
+}
     
     /**
      * DÜZELTME: Hem object hem array desteği
@@ -180,6 +176,21 @@ abstract class BaseAIController extends Controller
             $context .= "Vergi Dairesi: " . ($institution->kurum_vergi_dairesi ?? '-') . "\n";
             $context .= "Vergi No: " . ($institution->kurum_vergi_no ?? '-') . "\n";
         }
+    }
+
+    /**
+     * Referans menü formatı oluşturur (AI yanıtlarında kullanılır)
+     */
+    protected function createReferenceMenu(string $title, array $options): string
+    {
+        $menu = "\n### 📌 {$title}\n\n";
+        $menu .= "Aşağıdaki sorulardan birini seçebilir veya benzer şekilde sorabilirsiniz:\n\n";
+        
+        foreach ($options as $i => $option) {
+            $menu .= ($i + 1) . ". {$option}\n";
+        }
+        
+        return $menu;
     }
     
     /**

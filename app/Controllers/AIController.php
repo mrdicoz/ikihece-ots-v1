@@ -20,92 +20,29 @@ class AIController extends BaseController
 
         if ($currentUser && $currentUser->inGroup('admin', 'yonetici', 'mudur')) {
             $samplePrompts = [
-                // 🤖 Havadan Sudan Sohbet
+                // Havadan Sudan Sohbet
                 'Merhaba asistan, nasılsın?',
                 'Bugün nasıl gidiyor?',
                 
-                // 📚 Sistem Kullanımı
-                'Öğrenci nasıl eklenir?',
-                'Ders nasıl eklenir?',
-                'RAM raporu nasıl yüklenir?',
-                'Toplu öğrenci nasıl yüklenir?',
-                'Duyuru nasıl yapılır?',
-                'Sabit program nedir ve nasıl kullanılır?',
-                'Ders hakkı nasıl güncellenir?',
-                'Gelişim notu nasıl yazılır?',
+                // Ana Menüler (Her biri alt menü gösterir)
+                'Sistem nasıl kullanılır?',
+                'Sistem istatistikleri',
+                'Sistem raporları',
+                'Veritabanı sorgula',
+                'Sabit program',
+                'Gelmesi muhtemel öğrenciler',
                 
-                // 📢 Duyuru Taslakları
+                // Duyuru Taslakları
                 'Tatil duyurusu yaz',
                 'Veli toplantısı duyurusu yaz',
-                'Etkinlik duyurusu yaz',
                 
-                // 👨‍🏫 Öğretmen Detaylı Analizleri
-                '[Öğretmen Adı Soyadı]\'nın detaylı analizini oluştur',
-                'Branşlara göre öğretmen dağılımı',
-                'Bu ay en çok ders veren öğretmenler',
+                // İsim Tabanlı Sorgular
+                '[Öğretmen ismi yazın - örn: Hilal Varol]',
+                '[Öğrenci ismi yazın - örn: Bilal Akyıldız]',
                 
-                // 🎯 AKILLI ÖNERİ SİSTEMİ - Sadece Tarih
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel öğrenciler',
-                
-                // 🎯 AKILLI ÖNERİ SİSTEMİ - Eğitim Programı Filtreleri
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel otizm tanılı öğrenciler',
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel zihinsel öğrenciler',
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel dil ve konuşma öğrencileri',
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel öğrenme güçlüğü öğrencileri',
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel bedensel öğrenciler',
-                
-                // 🎯 AKILLI ÖNERİ SİSTEMİ - Mesafe Filtreleri
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel civar mesafedeki öğrenciler',
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel yakın mesafedeki öğrenciler',
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel uzak mesafedeki öğrenciler',
-                
-                // 🎯 AKILLI ÖNERİ SİSTEMİ - Ders Hakkı Filtreleri
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel ders hakkı azalan öğrenciler',
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel 10 saatten az hakkı olan öğrenciler',
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel 5 saatten az hakkı olan öğrenciler',
-                
-                // 🎯 AKILLI ÖNERİ SİSTEMİ - Kombine Örnekler
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel otizm tanılı ve civar mesafedeki öğrenciler',
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel zihinsel ve ders hakkı azalan öğrenciler',
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel yakın mesafedeki ve 5 saatten az hakkı olan öğrenciler',
-                '[Bugün/Yarın/gg.aa.yyyy] gelmesi muhtemel dil ve konuşma öğrencileri ve civar mesafede olanlar',
-                
-                // 📅 Sabit Program ve Planlama
-                'Sabit programı olan öğrenciler kimler?',
-                '[Bugün/Yarın/gg.aa.yyyy] tarihinin sabit programını göster',
-                '[Bugün/Yarın/gg.aa.yyyy] tarihinde boş saatler için öğrenci tavsiyesinde bulun',
-                '[Öğretmen Adı Soyadı]\'nın [Bugün/Yarın/gg.aa.yyyy] tarihinde saat [14:00] dersi için alternatif öner',
-                '[Bugün/Yarın/gg.aa.yyyy] tarihinde saat [15:00]\'de hangi öğrencileri çağırabilirim?',
-                
-                // 👨‍🎓 Öğrenci Detaylı Analizleri
-                '[Öğrenci Adı Soyadı]\'nın detaylı analizini oluştur',
-                '[Öğrenci Adı Soyadı]\'nın gelişim günlüğünü göster',
-                '[Öğrenci Adı Soyadı]\'nın RAM raporu analizi',
-                
-                // 📊 Sistem İstatistikleri
-                'Sistem istatistiklerini görüntüle',
-                'Toplam öğrenci ve öğretmen sayımız nedir?',
-                'Mesafe dağılımı nasıl?',
-                'Eğitim programlarına göre öğrenci dağılımı',
-                
-                // 📄 RAM Raporu
-                'RAM raporu olmayan öğrencileri listele',
-                'RAM raporu eksik olan öğrenciler',
-                
-                // ⚠️ Ders Hakkı Uyarıları
+                // Hızlı Sorgular (Direkt cevap, menü yok)
                 'Ders hakkı 10 saatin altında olan öğrenciler',
-                'Ders hakkı 5 saatin altında olan öğrenciler (ACİL)',
-                'Ders hakkı bitmek üzere olan öğrencileri listele',
-                
-                // 📈 Raporlar ve Loglar
-                'Bu ayın genel raporunu ver',
-                'Geçen ayın raporunu göster',
-                'Son 10 sistem işlemini göster',
-                
-                // 🔍 Veritabanı Sorguları (İleri Seviye)
-                'Veritabanı tablolarını göster',
-                'Students tablosunda kaç kayıt var?',
-                'Bu ay kaç ders yapıldı?',
+                'RAM raporu olmayan öğrenciler',
             ];
         }
         elseif ($currentUser && $currentUser->inGroup('ogretmen')) {

@@ -9,238 +9,370 @@ use App\Models\LogModel;
 class AdminAIController extends BaseAIController
 {
     public function process(string $userMessage, object $user): string
-    {
-        $userMessageLower = $this->turkish_strtolower($userMessage);
-        
-        // 1️⃣ HAVADAN SUDAN SOHBET KONTROLLERİ (En önce!)
-        $casualResponse = $this->checkCasualConversation($userMessageLower);
-        if ($casualResponse !== null) {
-            return $casualResponse;
-        }
-        
-        // 2️⃣ SİSTEM KULLANIMI REHBERİ
-        if ($this->containsKeywords($userMessageLower, ['nasıl', 'nerede', 'nereden', 'kullanım', 'rehber', 'yardım'])) {
-            $guideResponse = $this->handleSystemGuide($userMessageLower);
-            if ($guideResponse !== null) {
-                return $guideResponse;
+        {
+            $userMessageLower = $this->turkish_strtolower($userMessage);
+            
+            // 1️⃣ HAVADAN SUDAN SOHBET (En önce!)
+            $casualResponse = $this->checkCasualConversation($userMessageLower);
+            if ($casualResponse !== null) {
+                return $casualResponse;
             }
-        }
-        
-        // 3️⃣ DUYURU YAZMA YARDIMI
-        if ($this->containsKeywords($userMessageLower, ['duyuru yaz', 'duyuru oluştur', 'duyuru taslağı', 'duyuru hazırla'])) {
-            return $this->handleAnnouncementDraft($userMessageLower);
-        }
-        
-        // 4️⃣ ÖĞRETMEN DETAYLI ANALİZİ
-        if ($this->containsKeywords($userMessageLower, ['detaylı analiz', 'detayli analiz']) && 
-            $this->containsKeywords($userMessageLower, ['öğretmen', 'hoca'])) {  // ← ÖĞRETMEN ARASIN!
             
-            $context = "[BAĞLAM BAŞLANGICI]\n";
-            $this->buildUserContext($context, $user, 'Admin');
-            $this->buildTeacherDetailedAnalysis($context, $userMessage);  // ← TEACHER FONKSİYONU!
-            $context .= "[BAĞLAM SONU]\n";
+            // 2️⃣ SİSTEM KULLANIMI REHBERİ
+            if ($this->containsKeywords($userMessageLower, ['sistem nasıl kullanılır', 'nasıl kullanırım', 'kullanım rehberi'])) {
+                return $this->createReferenceMenu(
+                    "Sistem Kullanımı",
+                    [
+                        "Öğrenci nasıl eklenir?",
+                        "Ders nasıl eklenir?",
+                        "RAM raporu nasıl yüklenir?",
+                        "Toplu öğrenci nasıl yüklenir?",
+                        "Duyuru nasıl yapılır?",
+                        "Sabit program nedir ve nasıl kullanılır?",
+                        "Ders hakkı nasıl güncellenir?",
+                        "Gelişim notu nasıl yazılır?"
+                    ]
+                );
+            }
             
-            $systemPrompt = "Sen İkihece'nin yapay zeka asistanısın.
-
-            Öğretmen detaylı analiz verilerini kullanıcıya NET ve PROFESYONEL bir şekilde sun:
-
-            **SUNUM STİLİ:**
-            - Kategorilere göre başlıklar kullan (KİŞİSEL BİLGİLER, DERS İSTATİSTİKLERİ vb.)
-            - Önemli sayıları **kalın** yaz
-            - Pozitif gelişmeleri vurgula
-            - İyileştirme alanlarını yapıcı şekilde belirt
-            - Öneriler bölümünü mutlaka ekle
-
-            Profesyonel, net ve veri odaklı ol.";
-
-            $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
-            return $this->aiService->getChatResponse($userPrompt, $systemPrompt);
-        }
-        
-        // 5️⃣ ÖĞRENCİ DETAYLI ANALİZİ
-        if ($this->containsKeywords($userMessageLower, ['detaylı analiz', 'detayli analiz']) && 
-            $this->containsKeywords($userMessageLower, ['öğrenci', 'ogrenci'])) {
+            // Sistem kullanımı alt soruları için rehber göster
+            if ($this->containsKeywords($userMessageLower, ['nasıl', 'nerede', 'nereden', 'kullanım', 'rehber', 'yardım'])) {
+                $guideResponse = $this->handleSystemGuide($userMessageLower);
+                if ($guideResponse !== null) {
+                    return $guideResponse;
+                }
+            }
             
-            log_message('debug', '===== ÖĞRENCİ ANALİZİ BAŞLADI =====');
-            log_message('debug', 'Mesaj: ' . $userMessage);
+            // 3️⃣ DUYURU YAZMA YARDIMI
+            if ($this->containsKeywords($userMessageLower, ['duyuru yaz', 'duyuru oluştur', 'duyuru taslağı'])) {
+                return "Duyuru yazmak için size yardımcı olabilirim!\n\n" .
+                    "✏️ Ne tür bir duyuru yazmak istersiniz?\n" .
+                    "📝 Varolan bir metni düzenlememi ister misiniz?\n\n" .
+                    "Lütfen detay verin, size yardımcı olayım.";
+            }
+
+                            // 6️⃣ ÖĞRETMEN İSMİ TESPİTİ → REFERANS MENU
+                $teacherName = $this->extractTeacherName($userMessage);
+                if ($teacherName && !$this->containsKeywords($userMessageLower, ['detaylı analiz', 'branş', 'ders sayı'])) {
+                    return $this->createReferenceMenu(
+                        "{$teacherName} hakkında ne öğrenmek istersiniz?",
+                        [
+                            "{$teacherName} hoca'nın detaylı analizini oluştur",
+                            "{$teacherName} hoca'nın bu ayki ders sayısı",
+                            "{$teacherName} hoca'nın iletişim bilgileri"
+                        ]
+                    );
+                }
+
+                // 7️⃣ ÖĞRETMEN DETAYLI ANALİZ
+                if ($this->containsKeywords($userMessageLower, ['öğretmen', 'hoca', 'öğretmenin']) && 
+                    $this->containsKeywords($userMessageLower, ['detaylı analiz', 'detayli analiz'])) {
+                    
+                    $context = "[BAĞLAM BAŞLANGICI]\n";
+                    $this->buildUserContext($context, $user, 'Admin');
+                    $this->buildTeacherDetailedAnalysis($context, $userMessage);
+                    $context .= "[BAĞLAM SONU]\n";
+                    
+                    $systemPrompt = "Sen İkihece'nin yapay zeka asistanısın.
+
+                Öğretmen detaylı analiz verilerini NET ve PROFESYONEL şekilde sun:
+
+                **SUNUM STİLİ:**
+                - Kategorilere göre başlıklar kullan (KİŞİSEL BİLGİLER, DERS İSTATİSTİKLERİ)
+                - Önemli sayıları **kalın** yaz
+                - Pozitif performansı vurgula
+                - Geliştirme önerileri sun
+
+                Profesyonel ve saygılı ol.";
+                    
+                    $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
+                    
+                    return $this->aiService->getChatResponse($userPrompt, $systemPrompt);
+                }
+                    
+
             
-            $context = "[BAĞLAM BAŞLANGICI]\n";
-            $this->buildUserContext($context, $user, 'Admin');
-            $this->buildStudentDetailedAnalysis($context, $userMessage); // ORİJİNAL MESAJ
-            $context .= "[BAĞLAM SONU]\n";
+            // 4️⃣ ÖĞRENCİ İSMİ TESPİTİ → REFERANS MENU
+            $studentName = $this->extractStudentName($userMessage);
+            if ($studentName && !$this->containsKeywords($userMessageLower, ['detaylı analiz', 'gelişim', 'ram rapor'])) {
+                return $this->createReferenceMenu(
+                    "{$studentName} hakkında ne öğrenmek istersiniz?",
+                    [
+                        "{$studentName}'nın detaylı analizini oluştur",
+                        "{$studentName}'nın gelişim günlüğünü göster",
+                        "{$studentName}'nın RAM raporu analizi"
+                    ]
+                );
+            }
             
-            log_message('debug', 'Context hazırlandı, uzunluk: ' . strlen($context));
+// 5️⃣ ÖĞRENCİ DETAYLI ANALİZ
+if ($this->containsKeywords($userMessageLower, ['detaylı analiz', 'detayli analiz'])) {
+    
+    log_message('debug', '===== ÖĞRENCİ ANALİZİ TETİKLENDİ =====');
+    
+    $context = "[BAĞLAM BAŞLANGICI]\n";
+    $this->buildUserContext($context, $user, 'Admin');
+    $this->buildStudentDetailedAnalysis($context, $userMessage);
+    $context .= "[BAĞLAM SONU]\n";
+    
+    // DEBUG: Context'i kontrol et
+    log_message('debug', 'CONTEXT: ' . substr($context, 0, 1000));
+    
+    $systemPrompt = "Sen İkihece Özel Eğitim Kurumu'nun yapay zeka asistanısın.
+
+**ÖNEMLİ:** Sana verilen BAĞLAM içindeki verileri AYNEN kullan. Hiçbir şeyi hayal etme veya uydurma!
+
+Öğrenci detaylı analiz verilerini şu formatta sun:
+
+## 👤 KİŞİSEL BİLGİLER
+[Bağlamdaki verileri kullan]
+
+## 📞 İLETİŞİM BİLGİLERİ
+[Bağlamdaki verileri kullan]
+
+## 🎓 DERS HAKKI
+[Bağlamdaki verileri kullan]
+
+## 📊 DERS İSTATİSTİKLERİ
+[Bağlamdaki verileri kullan]
+
+## 👨‍🏫 ÇALIŞILAN ÖĞRETMENLER
+[Bağlamdaki verileri kullan]
+
+## 📄 RAM RAPORU DURUMU
+[Bağlamdaki verileri kullan]
+
+## 📝 GELİŞİM NOTLARI
+[Bağlamdaki verileri kullan]
+
+## 💡 ÖNERİLER
+[Verilere dayanarak önerilerde bulun]
+
+**KURALLLAR:**
+- Sadece bağlamdaki gerçek verileri kullan
+- [...] işaretli yerler YASAK
+- Tüm sayılar gerçek olmalı
+- Eğer bir veri yoksa 'Yok' veya 'Belirtilmemiş' yaz";
+
+    $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
+    
+    return $this->aiService->getChatResponse($userPrompt, $systemPrompt);
+}
             
-            $systemPrompt = "Sen İkihece'nin yapay zeka asistanısın.
-
-            Öğrenci detaylı analiz verilerini kullanıcıya KAPSAMLI ve ANLAŞILIR bir şekilde sun.";
-
-            $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
-            return $this->aiService->getChatResponse($userPrompt, $systemPrompt);
-        }
         
-        // 6️⃣ AKILLI ÖNERİ SİSTEMİ (Eğitim Programı + History Analizi)
-        if ($this->containsKeywords($userMessageLower, ['gelmesi muhtemel'])) {
-            $context = "[BAĞLAM BAŞLANGICI]\n";
-            $this->buildUserContext($context, $user, 'Admin');
-            $this->buildSmartSuggestions($context, $userMessageLower);
-            $context .= "[BAĞLAM SONU]\n";
-            
-            $systemPrompt = "Sen İkihece'nin yapay zeka asistanısın.
+// 7️⃣ SİSTEM İSTATİSTİKLERİ → REFERANS MENU
+if ($this->containsKeywords($userMessageLower, ['sistem istatistik', 'genel istatistik', 'istatistikleri göster'])) {
+    return $this->createReferenceMenu(
+        "Sistem İstatistikleri",
+        [
+            "Toplam öğrenci ve öğretmen sayımız nedir?",
+            "Mesafe dağılımı nasıl?",
+            "Eğitim programlarına göre öğrenci dağılımı",
+            "Branşlara göre öğretmen dağılımı"
+        ]
+    );
+}
 
-            Akıllı öneri sisteminden gelen verileri kullanıcıya NET ve DETAYLI bir şekilde sun:
-
-            **SUNUM STİLİ:**
-            - Önce detaylı bilgi ver (kaç öğrenci, hangi kategoriler)
-            - Yüksek olasılıklıları öne çıkar
-            - ACİL durumları (ders hakkı azalan) vurgula
-            - Telefon numaralarını ekle (aramak için)
-            - Mesafe bilgisini belirt (ulaşım planlaması için)
-
-            **ÖNEMLİ:**
-            - Emoji kullanma (sistem zaten emoji eklemiş)
-            - Actionable (eyleme dönük) öneriler sun
-
-            Pozitif, yardımsever ve aksiyona dönük ol.";
-
-            $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
-            return $this->aiService->getChatResponse($userPrompt, $systemPrompt);
-        }
-        
-        // 7️⃣ NORMAL CONTEXT VE ANALİZ
-        $context = "[BAĞLAM BAŞLANGICI]\n";
-        $this->buildUserContext($context, $user, 'Admin');
-        $this->buildInstitutionContext($context);
-        
-        // SQL sorgusu varsa çalıştır
-        $sqlQuery = $this->extractSQLFromMessage($userMessage);
-        if ($sqlQuery) {
-            $this->executeSQLQuery($sqlQuery, $context);
-        }
-        
-        // Veritabanı şeması talebi
-        if ($this->containsKeywords($userMessageLower, ['veritabanı', 'database', 'tablo', 'sql', 'şema'])) {
-            $this->buildDatabaseSchemaContext($context);
-        }
-        
-        // Öğretmen analizleri
-        if ($this->containsKeywords($userMessageLower, ['öğretmen', 'hoca']) && 
-            $this->containsKeywords($userMessageLower, ['ders sayı', 'kaç ders', 'listele', 'en çok'])) {
-            $this->buildTeacherLessonStatsContext($context, $userMessageLower);
-        }
-        
-        // Mesafe bazlı öğrenci analizleri
-        if ($this->containsKeywords($userMessageLower, ['mesafe', 'civar', 'yakın', 'uzak']) && 
-            !$this->containsKeywords($userMessageLower, ['gelmesi muhtemel'])) {
-            $this->buildDistanceBasedStudentsContext($context, $userMessageLower);
-        }
-        
-        // Eğitim programı analizleri (SADECE gelmesi muhtemel yoksa)
-        if (!$this->containsKeywords($userMessageLower, ['gelmesi muhtemel']) &&
-            $this->containsKeywords($userMessageLower, ['program', 'bedensel', 'dil ve konuşma', 'zihinsel', 'öğrenme güçlüğü', 'otizm'])) {
-            $this->buildEducationProgramStatsContext($context, $userMessageLower);
-        }
-        
-        // Sabit program analizleri
-        if ($this->containsKeywords($userMessageLower, ['sabit program', 'düzenli gelen', 'sabit ders'])) {
-            $this->buildFixedProgramAnalysisContext($context, $userMessageLower);
-        }
-        
-        // Yarın için alternatif öneriler
-        if ($this->containsKeywords($userMessageLower, ['yarın', 'boşluk', 'alternatif', 'öner']) && 
-            !$this->containsKeywords($userMessageLower, ['gelmesi muhtemel'])) {
-            $this->buildTomorrowAlternativesContext($context, $userMessageLower);
-        }
-
-        // Yarın için boş saat analizi
-        if ($this->containsKeywords($userMessageLower, ['boş saat', 'boş saatler', 'tavsiye']) && 
-            !$this->containsKeywords($userMessageLower, ['gelmesi muhtemel'])) {
-            $this->buildTomorrowEmptySlotsSuggestions($context, $userMessageLower);
-        }
-
-        // Öğretmen + saat bazlı öğrenci önerisi
-        if ($this->containsKeywords($userMessageLower, ['saat', 'dersi için', 'için alternatif']) && 
-            ($this->containsKeywords($userMessageLower, ['öğretmen', 'hoca', 'öğretmenin', 'hocanın']) || 
-            $this->findTeacherNameInMessage($userMessageLower) !== null)) {
-            $this->buildTeacherTimeBasedSuggestions($context, $userMessageLower);
-        }
-        
-        // Ders hakkı analizleri
-        if ($this->containsKeywords($userMessageLower, ['ders hak', 'hak azal', 'hak bit'])) {
-            $this->buildEntitlementAnalysisContext($context, $userMessageLower);
-        }
-
-        // RAM raporu analizi
-        if ($this->containsKeywords($userMessageLower, ['ram', 'rapor'])) {
-            $this->buildRAMReportAnalysisContext($context, $userMessageLower);
-        }
-
-        // Rapor talebi
-        if ($this->containsKeywords($userMessageLower, ['rapor', 'özet', 'faaliyet'])) {
-            $this->buildReportContext($context, $userMessageLower);
-        }
-        
-        // Sistem istatistikleri
-        if ($this->containsKeywords($userMessageLower, ['sistem', 'istatistik', 'toplam', 'kaç', 'sayı'])) {
-            $this->buildSystemStatisticsContext($context);
-        }
-
-
-        // Log talebi
-        if ($this->containsKeywords($userMessageLower, ['log', 'işlem', 'sistem'])) {
-            $this->buildLogContext($context);
-        }
-        
-        // Branş dağılımı
-        if ($this->containsKeywords($userMessageLower, ['branş', 'dal', 'uzmanlık']) && 
-            $this->containsKeywords($userMessageLower, ['dağılım', 'listele', 'göster'])) {
-            $this->buildTeacherBranchDistribution($context);
-        }
-        
-        // Öğretmen iletişim bilgileri
-        if ($this->containsKeywords($userMessageLower, ['öğretmen', 'hoca']) && 
-            $this->containsKeywords($userMessageLower, ['telefon', 'iletişim', 'adres', 'email', 'bilgi']) &&
-            !$this->containsKeywords($userMessageLower, ['detaylı analiz'])) {
-            $this->buildTeacherContactInfo($context, $userMessageLower);
-        }
-        
-        // Gelişim günlüğü analizi
-        if ($this->containsKeywords($userMessageLower, ['gelişim', 'günlük', 'değerlendirme', 'not']) &&
-            !$this->containsKeywords($userMessageLower, ['detaylı analiz'])) {
-            $this->buildStudentProgressAnalysis($context, $userMessageLower);
-        }
-        
-        $context .= "[BAĞLAM SONU]\n";
-        
-        $systemPrompt = "Sen İkihece Özel Eğitim Kurumu'nun yapay zeka asistanısın.
-
-            **KİŞİLİK:**
-            - Arkadaş canlısı ama profesyonel
-            - Sıkmayacak kadar espirili
-            - Pozitif ve motive edici
-            - Teknik terimleri sade Türkçe'ye çevirebilen
-            - İnsan gibi konuşan (makine olduğun belli olmasın)
-
-            **KRİTİK KURAL: ASLA UYDURMA YAPMA!**
-            - Sadece [BAĞLAM BAŞLANGICI] ve [BAĞLAM SONU] arasındaki bilgileri kullan
-            - Eğer veri yoksa 'Bu bilgi sistemde kayıtlı değil' de
-            - Sahte isim, sayı veya veri ÜRETME
-            - SQL sorgusu hata verirse gerçek hatayı söyle
-
-            **Şu an bir ADMİN ile konuşuyorsun.**
-
-            **YANIT STİLİ:**
-            - Kısa ve öz cevaplar ver (gereksiz uzatma)
-            - Önemli sayıları **kalın** yaz
-            - Eğer liste gerekiyorsa madde madde yaz
-            - Soruya direkt cevap ver, sonra ek bilgi ekle
-            - Emoji kullanabilirsin ama abartma (max 1-2)
-
-            Profesyonel, net ve veri odaklı cevaplar ver.";
-        
-        $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
-        return $this->aiService->getChatResponse($userPrompt, $systemPrompt);
+// 7️⃣-A SİSTEM İSTATİSTİKLERİ - DETAYLI SORGULAR
+if ($this->containsKeywords($userMessageLower, ['toplam öğrenci', 'toplam öğretmen', 'kaç öğrenci', 'kaç öğretmen', 'mesafe dağılım', 'eğitim program', 'branş'])) {
+    $context = "[BAĞLAM BAŞLANGICI]\n";
+    $this->buildUserContext($context, $user, 'Admin');
+    $this->buildSystemStatisticsContext($context);
+    
+    // Branş bilgisi istendiyse ekle
+    if ($this->containsKeywords($userMessageLower, ['branş', 'branşlara göre'])) {
+        $this->buildTeacherBranchDistribution($context);
     }
+    
+    $context .= "[BAĞLAM SONU]\n";
+    
+    $systemPrompt = "Sen İkihece'nin yapay zeka asistanısın. Sistem istatistiklerini net ve öz şekilde sun. Sayıları vurgula.";
+    $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
+    
+    return $this->aiService->getChatResponse($userPrompt, $systemPrompt);
+}
+            
+// 8️⃣ SİSTEM RAPORLARI → REFERANS MENU
+if ($this->containsKeywords($userMessageLower, ['sistem rapor', 'raporları göster', 'raporlar'])) {
+    return $this->createReferenceMenu(
+        "Sistem Raporları",
+        [
+            "Bu ayın genel raporunu ver",
+            "Geçen ayın raporunu göster",
+            "Son 10 sistem işlemini göster"
+        ]
+    );
+}
+
+// 8️⃣-A SİSTEM RAPORLARI - DETAYLI SORGULAR
+if ($this->containsKeywords($userMessageLower, ['ayın rapor', 'aylık rapor', 'rapor'])) {
+    $context = "[BAĞLAM BAŞLANGICI]\n";
+    $this->buildUserContext($context, $user, 'Admin');
+    $this->buildReportContext($context, $userMessageLower);
+    $context .= "[BAĞLAM SONU]\n";
+    
+    $systemPrompt = "Sen İkihece'nin yapay zeka asistanısın. Aylık raporları özetli ve net şekilde sun. Önemli metrikleri vurgula.";
+    $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
+    
+    return $this->aiService->getChatResponse($userPrompt, $systemPrompt);
+}
+
+// 8️⃣-B SİSTEM LOGLARİ
+if ($this->containsKeywords($userMessageLower, ['sistem işlem', 'log', 'son işlem'])) {
+    $context = "[BAĞLAM BAŞLANGICI]\n";
+    $this->buildUserContext($context, $user, 'Admin');
+    $this->buildLogContext($context);
+    $context .= "[BAĞLAM SONU]\n";
+    
+    $systemPrompt = "Sen İkihece'nin yapay zeka asistanısın. Sistem işlemlerini kronolojik sırayla özetle.";
+    $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
+    
+    return $this->aiService->getChatResponse($userPrompt, $systemPrompt);
+}
+            
+// 9️⃣ VERİTABANI SORGULARI → REFERANS MENU
+if ($this->containsKeywords($userMessageLower, ['veritabanı sorgula', 'database sorgu'])) {
+    return $this->createReferenceMenu(
+        "Veritabanı Sorguları",
+        [
+            "Veritabanı tablolarını göster",
+            "Students tablosunda kaç kayıt var?",
+            "Users tablosunda kaç kayıt var?",
+            "Bu ay kaç ders yapıldı?"
+        ]
+    );
+}
+
+// 9️⃣-A VERİTABANI ŞEMASI VE SORGULAR
+if ($this->containsKeywords($userMessageLower, ['veritabanı', 'database', 'tablo', 'sql', 'kaç kayıt', 'tablosunda'])) {
+    // SQL sorgusu varsa çalıştır
+    $sqlQuery = $this->extractSQLFromMessage($userMessage);
+    
+    $context = "[BAĞLAM BAŞLANGICI]\n";
+    $this->buildUserContext($context, $user, 'Admin');
+    $this->buildDatabaseSchemaContext($context);
+    
+    if ($sqlQuery) {
+        $this->executeSQLQuery($sqlQuery, $context);
+    }
+    
+    $context .= "[BAĞLAM SONU]\n";
+    
+    $systemPrompt = "Sen İkihece'nin yapay zeka asistanısın. Veritabanı bilgilerini teknik ama anlaşılır şekilde sun. SADECE SELECT sorguları kullanılabilir.";
+    $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
+    
+    return $this->aiService->getChatResponse($userPrompt, $systemPrompt);
+}
+
+// 🔟 SABİT PROGRAM → REFERANS MENU
+if ($this->containsKeywords($userMessageLower, ['sabit program']) && 
+    !$this->containsKeywords($userMessageLower, ['olmayan', 'düzenli', 'analiz'])) {
+    return $this->createReferenceMenu(
+        "Sabit Program Sorguları",
+        [
+            "Sabit programı olmayan ama düzenli gelen öğrenciler",
+            "Sabit program analizi yap"
+        ]
+    );
+}
+
+// 🔟-A SABİT PROGRAM ANALİZİ - DETAYLI SORGULAR
+if ($this->containsKeywords($userMessageLower, ['sabit program']) && 
+    $this->containsKeywords($userMessageLower, ['olmayan', 'düzenli', 'analiz'])) {
+    
+    $context = "[BAĞLAM BAŞLANGICI]\n";
+    $this->buildUserContext($context, $user, 'Admin');
+    $this->buildFixedProgramAnalysisContext($context, $userMessage);
+    $context .= "[BAĞLAM SONU]\n";
+    
+    $systemPrompt = "Sen İkihece'nin yapay zeka asistanısın. Sabit program analizini net şekilde sun. Önerileri somut olarak ver.";
+    $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
+    
+    return $this->aiService->getChatResponse($userPrompt, $systemPrompt);
+}
+            
+// 1️⃣1️⃣ AKILLI ÖNERİ SİSTEMİ
+if ($this->containsKeywords($userMessageLower, ['gelmesi muhtemel', 'gelecek öğrenci', 'kimler gelecek'])) {
+    
+    // Tarih kontrolü
+    $hasDate = $this->containsKeywords($userMessageLower, ['bugün', 'yarın', 'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma', 'cumartesi', 'pazar']);
+    
+    if (!$hasDate) {
+        // Filtre seçeneklerini göster
+        return "### 🎯 Akıllı Öneri Sistemi\n\n" .
+            "Gelmesi muhtemel öğrencileri öğrenmek için **hangi gün** ve **hangi filtrelerle** sormak istersiniz?\n\n" .
+            "**📅 Tarih Seçenekleri:**\n" .
+            "• Bugün\n• Yarın\n• Pazartesi/Salı/Çarşamba/Perşembe/Cuma\n• Belirli bir tarih (gg.aa.yyyy)\n\n" .
+            "**🎓 Eğitim Programı Filtreleri:**\n" .
+            "• otizm tanılı\n• zihinsel yetersizlik\n• dil ve konuşma bozukluğu\n• öğrenme güçlüğü\n• bedensel yetersizlik\n\n" .
+            "**📍 Mesafe Filtreleri:**\n" .
+            "• civar mesafedeki (0-5 km)\n• yakın mesafedeki (5-15 km)\n• uzak mesafedeki (15+ km)\n\n" .
+            "**⏰ Ders Hakkı Filtreleri:**\n" .
+            "• ders hakkı azalan (10 saatten az)\n• ders hakkı çok az (5 saatten az)\n• ders hakkı kritik (2 saatten az)\n\n" .
+            "**💡 Örnek Kullanımlar:**\n" .
+            "• 'Yarın gelmesi muhtemel öğrenciler'\n" .
+            "• 'Bugün gelmesi muhtemel otizm tanılı öğrenciler'\n" .
+            "• 'Yarın civar mesafedeki ve ders hakkı azalan öğrenciler'\n" .
+            "• 'Pazartesi gelmesi muhtemel zihinsel yetersizlikli ve yakın mesafedeki öğrenciler'";
+    }
+    
+    // Tarih var, analiz yap
+    $context = "[BAĞLAM BAŞLANGICI]\n";
+    $this->buildUserContext($context, $user, 'Admin');
+    $this->buildSmartSuggestions($context, $userMessageLower);
+    $context .= "[BAĞLAM SONU]\n";
+    
+    $systemPrompt = "Sen İkihece'nin yapay zeka asistanısın. 
+
+Gelmesi muhtemel öğrencileri şu formatta sun:
+
+**🎯 [TARİH] İÇİN ÖNERİLEN ÖĞRENCİLER**
+
+Her öğrenci için:
+- **Öğrenci Adı Soyadı**
+  - Geliş İhtimali: % [oran]
+  - Son 90 günde bu günde: [X] kez geldi
+  - Mesafe: [mesafe]
+  - Ders Hakkı: [hak durumu]
+  - Eğitim Programı: [program]
+
+Öğrencileri ihtimal yüzdesine göre sırala (en yüksekten en düşüğe).";
+    
+    $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
+    
+    return $this->aiService->getChatResponse($userPrompt, $systemPrompt);
+}
+            
+            // 12 NORMAL CONTEXT - DİĞER TÜM SORGULAR
+            $context = "[BAĞLAM BAŞLANGICI]\n";
+            $this->buildUserContext($context, $user, 'Admin');
+            $this->buildInstitutionContext($context);
+            
+            // SQL sorgusu varsa çalıştır
+            $sqlQuery = $this->extractSQLFromMessage($userMessage);
+            if ($sqlQuery) {
+                $this->executeSQLQuery($sqlQuery, $context);
+            }
+            
+            // Veritabanı şeması talebi
+            if ($this->containsKeywords($userMessageLower, ['veritabanı', 'database', 'tablo', 'sql', 'şema'])) {
+                $this->buildDatabaseSchemaContext($context);
+            }
+            
+            // Rapor talebi
+            if ($this->containsKeywords($userMessageLower, ['rapor', 'istatistik', 'özet'])) {
+                $this->buildReportContext($context, $userMessageLower);
+            }
+            
+            // Log talebi
+            if ($this->containsKeywords($userMessageLower, ['log', 'kayıt', 'işlem'])) {
+                $this->buildLogContext($context);
+            }
+            
+            $context .= "[BAĞLAM SONU]\n";
+            
+            return $this->getAIResponse($context, $userMessage, 'general');
+        }
     
     /**
      * Öğretmenlerin ders sayıları - MODEL KULLANIMI
@@ -553,7 +685,8 @@ class AdminAIController extends BaseAIController
             
             // Sabit programı olan öğrenci ID'lerini al
             $fixedStudentIds = $fixedLessonModel
-                ->select('DISTINCT student_id')
+                ->distinct()
+                ->select('student_id')
                 ->asArray()
                 ->findColumn('student_id');
             
@@ -863,23 +996,30 @@ class AdminAIController extends BaseAIController
     /**
      * Rapor
      */
-    private function buildReportContext(string &$context, string $msg): void
-    {
-        $targetMonth = $this->extractMonthFromMessage($msg);
-        $reportModel = new ReportModel();
-        $report = $reportModel->where('report_month', $targetMonth)->first();
-
-        $context .= "\n=== AYLIK RAPOR ({$targetMonth}) ===\n";
-
-        if ($report) {
-            $data = is_object($report) ? (array) $report : $report;
-            $context .= "Toplam Ders: " . ($data['total_lessons'] ?? 0) . "\n";
-            $context .= "Bireysel: " . ($data['individual_lessons'] ?? 0) . "\n";
-            $context .= "Grup: " . ($data['group_lessons'] ?? 0) . "\n";
-        } else {
-            $context .= "Bu ay için rapor bulunamadı.\n";
-        }
+private function buildReportContext(string &$context, string $msg): void
+{
+    $reportModel = new ReportModel();
+    
+    // extractMonthFromMessage zaten BaseAIController'da mevcut, "2025-10" formatında döner
+    $targetMonth = $this->extractMonthFromMessage($msg);
+    
+    // Yıl ve ay'ı ayrıştır
+    list($year, $month) = explode('-', $targetMonth);
+    
+    $context .= "\n=== AYLIK RAPOR ({$targetMonth}) ===\n";
+    
+    try {
+        // getMonthlySummary zaten var ve doğru çalışıyor
+        $summary = $reportModel->getMonthlySummary((int)$year, (int)$month);
+        
+        $context .= "Toplam Ders Saati: " . ($summary['total_hours'] ?? 0) . "\n";
+        $context .= "Bireysel Ders: " . ($summary['total_individual'] ?? 0) . "\n";
+        $context .= "Grup Ders: " . ($summary['total_group'] ?? 0) . "\n";
+        $context .= "Ders Alan Toplam Öğrenci: " . ($summary['total_students'] ?? 0) . "\n";
+    } catch (\Exception $e) {
+        $context .= "Bu ay için rapor hesaplanamadı: " . $e->getMessage() . "\n";
     }
+}
     
     /**
      * Log
@@ -1312,17 +1452,47 @@ class AdminAIController extends BaseAIController
             // Bireysel öğrenci RAM analizi
             $parts = explode(' ', $studentName);
             if (count($parts) >= 2) {
-                $student = $db->query("
-                    SELECT 
-                        adi, soyadi, ram, ram_baslagic, ram_bitis, ram_raporu,
-                        hastane_adi, hastane_raporu_baslama_tarihi, hastane_raporu_bitis_tarihi
-                    FROM students 
-                    WHERE adi = ? AND soyadi = ? AND deleted_at IS NULL
-                ", [$parts[0], $parts[1]])->getRowArray();
+            $student = $db->query("
+                SELECT 
+                    id, adi, soyadi, ram, ram_baslagic, ram_bitis, ram_raporu,
+                    hastane_adi, hastane_raporu_baslama_tarihi, hastane_raporu_bitis_tarihi
+                FROM students 
+                WHERE adi = ? AND soyadi = ? AND deleted_at IS NULL
+            ", [$parts[0], $parts[1]])->getRowArray();
                 
                 if ($student) {
                     $context .= "\n=== {$student['adi']} {$student['soyadi']} - RAM RAPORU ANALİZİ ===\n\n";
                     
+                    // YENİ: AI destekli RAM analiz verilerini çek
+                        $analysisModel = new \App\Models\RamReportAnalysisModel();
+                        $ramAnalysis = $analysisModel->where('student_id', $student['id'])->first();
+
+                        if ($ramAnalysis) {
+                            $context .= "🤖 YAPAY ZEKA DESTEKLİ ANALİZ:\n";
+                            $context .= str_repeat("-", 70) . "\n";
+                            
+                            if (!empty($ramAnalysis['total_memory'])) {
+                                $context .= "Toplam Bellek: {$ramAnalysis['total_memory']}\n";
+                            }
+                            if (!empty($ramAnalysis['available_memory'])) {
+                                $context .= "Kullanılabilir Bellek: {$ramAnalysis['available_memory']}\n";
+                            }
+                            if (!empty($ramAnalysis['memory_info'])) {
+                                $memInfo = json_decode($ramAnalysis['memory_info'], true);
+                                if ($memInfo) {
+                                    $context .= "Bellek Detayları:\n";
+                                    foreach ($memInfo as $key => $value) {
+                                        $context .= "  - " . ucfirst($key) . ": {$value}\n";
+                                    }
+                                }
+                            }
+                            if (!empty($ramAnalysis['ram_text_content'])) {
+                                $context .= "\nRAM Rapor İçeriği (İlk 2000 karakter):\n";
+                                $context .= mb_substr($ramAnalysis['ram_text_content'], 0, 2000) . "...\n";
+                            }
+                            $context .= "Analiz Tarihi: " . date('d.m.Y H:i', strtotime($ramAnalysis['analyzed_at'])) . "\n\n";
+                        }
+
                     if (!empty($student['ram'])) {
                         $context .= "RAM Bilgisi: {$student['ram']}\n";
                         
@@ -2070,288 +2240,251 @@ private function buildSmartSuggestions(string &$context, string $msg): void
         
         $context .= "\n";
     }
-
-    /**
-     * Öğrenci Detaylı Analizi - MODEL KULLANIMI
+/**
+     * Öğrenci detaylı analizi - GELİŞTİRİLMİŞ VERSİYON
      */
     private function buildStudentDetailedAnalysis(string &$context, string $msg): void
     {
-    // DEBUG BAŞLANGIÇ
-    $context .= "\n[DEBUG] Aranan mesaj: {$msg}\n";
-    $context .= "[DEBUG] Lowercase: " . $this->turkish_strtolower($msg) . "\n";
-    
-    $studentModel = new \App\Models\StudentModel();
-    
-    // Öğrenci adını bul
-    $studentId = $this->findStudentIdInMessage($msg);
-    
-    $context .= "[DEBUG] Bulunan Student ID: " . ($studentId ?? 'NULL') . "\n\n";
-    // DEBUG BİTİŞ
-    
-    if (!$studentId) {
-        $context .= "\n=== ÖĞRENCİ DETAYLI ANALİZİ ===\n";
-        $context .= "Öğrenci adı tespit edilemedi. Lütfen '[Öğrenci Adı Soyadı]' formatında yazın.\n";
-        
-        // Sistemdeki ilk 5 öğrenciyi göster (yardımcı olsun)
-        $ornekOgrenciler = $studentModel->select('adi, soyadi')->limit(5)->findAll();
-        $context .= "\nÖrnek öğrenciler:\n";
-        foreach ($ornekOgrenciler as $o) {
-            $context .= "- {$o['adi']} {$o['soyadi']}\n";
-        }
-        return;
-    }
+        log_message('debug', 'buildStudentDetailedAnalysis ÇAĞRILDI: ' . $msg);
         
         $studentModel = new \App\Models\StudentModel();
         $lessonModel = new \App\Models\LessonModel();
-        $lessonStudentModel = new \App\Models\LessonStudentModel();
-        $fixedLessonModel = new \App\Models\FixedLessonModel();
-        $evaluationModel = new \App\Models\StudentEvaluationModel();
-        $userProfileModel = new \App\Models\UserProfileModel();
         
-        // Öğrenci adını bul - STUDENTS tablosundan ara
-        $studentId = $this->findStudentIdInMessage($msg);
-        
-        if (!$studentId) {
-            $context .= "\n=== ÖĞRENCİ DETAYLI ANALİZİ ===\n";
-            $context .= "Öğrenci adı tespit edilemedi. Lütfen '[Öğrenci Adı Soyadı]' formatında yazın.\n";
+        // Öğrenci ismini çıkar
+        $studentName = $this->extractStudentName($msg);
+        if (!$studentName) {
+            $context .= "\n❌ Öğrenci ismi bulunamadı.\n";
+            log_message('error', 'Öğrenci ismi çıkarılamadı: ' . $msg);
             return;
         }
         
-        // Öğrenci bilgilerini al
-        $student = $studentModel->find($studentId);
+        log_message('debug', 'Çıkarılan öğrenci ismi: ' . $studentName);
+        
+        // Öğrenciyi veritabanından bul
+        $nameParts = explode(' ', $studentName);
+        $firstName = $nameParts[0];
+        $lastName = $nameParts[1] ?? '';
+        
+        $student = $studentModel
+            ->where('adi', $firstName)
+            ->where('soyadi', $lastName)
+            ->where('deleted_at', null)
+            ->first();
         
         if (!$student) {
-            $context .= "\n=== ÖĞRENCİ DETAYLI ANALİZİ ===\n";
-            $context .= "Öğrenci bulunamadı.\n";
+            $context .= "\n❌ '{$studentName}' isimli öğrenci sistemde bulunamadı.\n";
+            log_message('error', 'Öğrenci bulunamadı: ' . $studentName);
             return;
         }
         
-        $fullName = $student['adi'] . ' ' . $student['soyadi'];
+        log_message('debug', 'Öğrenci bulundu: ID=' . $student['id']);
         
         $context .= "\n" . str_repeat("=", 70) . "\n";
-        $context .= "📊 {$fullName} - DETAYLI EĞİTİM ANALİZİ\n";
+        $context .= "ÖĞRENCİ DETAYLI ANALİZ: {$studentName}\n";
         $context .= str_repeat("=", 70) . "\n\n";
         
-        // KİŞİSEL BİLGİLER
-        $context .= "👤 KİŞİSEL BİLGİLER\n";
-        $context .= str_repeat("-", 70) . "\n";
-        $context .= "Ad Soyad: {$fullName}\n";
-        $context .= "TCKN: {$student['tckn']}\n";
+        // 1️⃣ KİŞİSEL BİLGİLER
+        $context .= "=== KİŞİSEL BİLGİLER ===\n";
+        $context .= "Ad Soyad: {$student['adi']} {$student['soyadi']}\n";
+        $context .= "TC No: " . ($student['tckn'] ?? 'Belirtilmemiş') . "\n";
+        $context .= "Doğum Tarihi: " . ($student['dogum_tarihi'] ? date('d.m.Y', strtotime($student['dogum_tarihi'])) : 'Yok') . "\n";
         
-        if (!empty($student['dogum_tarihi'])) {
+        if ($student['dogum_tarihi']) {
             $birthDate = new \DateTime($student['dogum_tarihi']);
             $today = new \DateTime();
             $age = $today->diff($birthDate)->y;
-            $context .= "Doğum Tarihi: " . $birthDate->format('d.m.Y') . " ({$age} yaş)\n";
+            $context .= "Yaş: {$age}\n";
         }
         
-        $context .= "Eğitim Programı: " . $this->formatProgramNames($student['egitim_programi'] ?? '') . "\n";
+        $context .= "Cinsiyet: " . ($student['cinsiyet'] ?? 'Belirtilmemiş') . "\n";
+        $context .= "Eğitim Programı: " . ($student['egitim_programi'] ?? 'Yok') . "\n\n";
+        
+        // 2️⃣ İLETİŞİM BİLGİLERİ
+        $context .= "=== İLETİŞİM BİLGİLERİ ===\n";
+        $context .= "Anne Tel: " . ($student['veli_anne_telefon'] ?? 'Yok') . "\n";
+        $context .= "Baba Tel: " . ($student['veli_baba_telefon'] ?? 'Yok') . "\n";
         $context .= "Mesafe: " . ($student['mesafe'] ?? 'Belirtilmemiş') . "\n";
         $context .= "Servis: " . ($student['servis'] ?? 'Belirtilmemiş') . "\n\n";
         
-        // VELİ BİLGİLERİ
-        $context .= "👨‍👩‍👧 VELİ BİLGİLERİ\n";
-        $context .= str_repeat("-", 70) . "\n";
-        $context .= "Anne: " . ($student['veli_anne'] ?? '-') . " - " . ($student['veli_anne_telefon'] ?? '-') . "\n";
-        $context .= "Baba: " . ($student['veli_baba'] ?? '-') . " - " . ($student['veli_baba_telefon'] ?? '-') . "\n";
+        // 3️⃣ DERS HAKKI BİLGİLERİ
+        $context .= "=== DERS HAKKI ===\n";
+        $totalHours = ($student['normal_bireysel_hak'] ?? 0) + 
+                      ($student['normal_grup_hak'] ?? 0) + 
+                      ($student['telafi_bireysel_hak'] ?? 0) + 
+                      ($student['telafi_grup_hak'] ?? 0);
         
-        if (!empty($student['adres_detayi'])) {
-            $context .= "Adres: {$student['adres_detayi']}\n";
+        $context .= "Toplam Kalan: {$totalHours} saat\n";
+        $context .= "  • Normal Bireysel: " . ($student['normal_bireysel_hak'] ?? 0) . " saat\n";
+        $context .= "  • Normal Grup: " . ($student['normal_grup_hak'] ?? 0) . " saat\n";
+        $context .= "  • Telafi Bireysel: " . ($student['telafi_bireysel_hak'] ?? 0) . " saat\n";
+        $context .= "  • Telafi Grup: " . ($student['telafi_grup_hak'] ?? 0) . " saat\n";
+        
+        if ($totalHours <= 5) {
+            $context .= "\n⚠️ ACİL: Ders hakkı kritik seviyede!\n";
+        } elseif ($totalHours <= 10) {
+            $context .= "\n⚠️ DİKKAT: Ders hakkı azalıyor!\n";
         }
         $context .= "\n";
         
-        // EĞİTİM DURUMU
-        $context .= "📚 EĞİTİM DURUMU\n";
-        $context .= str_repeat("-", 70) . "\n";
-        $context .= "Örgün Eğitim: " . ($student['orgun_egitim'] ?? 'Belirtilmemiş') . "\n";
-        $context .= "Eğitim Şekli: " . ($student['egitim_sekli'] ?? 'Belirtilmemiş') . "\n";
+        // 4️⃣ DERS İSTATİSTİKLERİ
+        $context .= "=== DERS İSTATİSTİKLERİ ===\n";
         
-        if (!empty($student['ram_raporu'])) {
-            $ramBaslangic = !empty($student['ram_baslagic']) ? date('d.m.Y', strtotime($student['ram_baslagic'])) : '-';
-            $ramBitis = !empty($student['ram_bitis']) ? date('d.m.Y', strtotime($student['ram_bitis'])) : '-';
-            $context .= "RAM Raporu: ✅ Yüklü (Geçerlilik: {$ramBaslangic} - {$ramBitis})\n";
-        } else {
-            $context .= "RAM Raporu: ❌ Yüklenmemiş\n";
-        }
-        $context .= "\n";
-        
-        // DERS HAKKI DURUMU
-        $totalHak = ($student['normal_bireysel_hak'] ?? 0) + 
-                    ($student['normal_grup_hak'] ?? 0) + 
-                    ($student['telafi_bireysel_hak'] ?? 0) + 
-                    ($student['telafi_grup_hak'] ?? 0);
-        
-        $context .= "⏰ DERS HAKKI DURUMU\n";
-        $context .= str_repeat("-", 70) . "\n";
-        $context .= "Normal Bireysel: {$student['normal_bireysel_hak']} saat\n";
-        $context .= "Normal Grup: {$student['normal_grup_hak']} saat\n";
-        $context .= "Telafi Bireysel: {$student['telafi_bireysel_hak']} saat\n";
-        $context .= "Telafi Grup: {$student['telafi_grup_hak']} saat\n";
-        
-        $urgency = '';
-        if ($totalHak <= 5) {
-            $urgency = ' 🔴 ACİL!';
-        } elseif ($totalHak <= 10) {
-            $urgency = ' ⚠️ Dikkat!';
-        }
-        $context .= "TOPLAM KALAN: {$totalHak} saat{$urgency}\n\n";
-        
-        // DERS GEÇMİŞİ
-        // Bu ay
-        $thisMonth = $lessonStudentModel
-            ->join('lessons', 'lessons.id = lesson_students.lesson_id')
-            ->where('lesson_students.student_id', $studentId)
-            ->where('MONTH(lessons.lesson_date)', date('m'))
-            ->where('YEAR(lessons.lesson_date)', date('Y'))
+        // Bu ayki dersler
+        $thisMonth = date('Y-m');
+        $thisMonthLessons = $lessonModel
+            ->join('lesson_students', 'lesson_students.lesson_id = lessons.id')
+            ->where('lesson_students.student_id', $student['id'])
+            ->like('lessons.lesson_date', $thisMonth)
             ->countAllResults();
         
-        // Bu yıl
-        $thisYear = $lessonStudentModel
-            ->join('lessons', 'lessons.id = lesson_students.lesson_id')
-            ->where('lesson_students.student_id', $studentId)
-            ->where('YEAR(lessons.lesson_date)', date('Y'))
+        $context .= "Bu Ay: {$thisMonthLessons} ders\n";
+        
+        // Toplam dersler
+        $totalLessons = $lessonModel
+            ->join('lesson_students', 'lesson_students.lesson_id = lessons.id')
+            ->where('lesson_students.student_id', $student['id'])
             ->countAllResults();
         
-        // Gün deseni (en çok hangi günlerde geliyor)
-        $lessonDates = $lessonModel
+        $context .= "Toplam: {$totalLessons} ders\n";
+        
+        // Son ders tarihi
+        $lastLesson = $lessonModel
             ->select('lessons.lesson_date')
-            ->join('lesson_students ls', 'ls.lesson_id = lessons.id')
-            ->where('ls.student_id', $studentId)
-            ->asArray()
-            ->findAll();
+            ->join('lesson_students', 'lesson_students.lesson_id = lessons.id')
+            ->where('lesson_students.student_id', $student['id'])
+            ->orderBy('lessons.lesson_date', 'DESC')
+            ->first();
         
-        $dayPattern = [];
-        foreach ($lessonDates as $lesson) {
-            $dayName = date('l', strtotime($lesson['lesson_date']));
-            $dayPattern[$dayName] = ($dayPattern[$dayName] ?? 0) + 1;
-        }
-        
-        arsort($dayPattern);
-        
-        $context .= "📅 DERS GEÇMİŞİ\n";
-        $context .= str_repeat("-", 70) . "\n";
-        $context .= "Bu Ay Aldığı Ders: {$thisMonth} ders\n";
-        $context .= "Bu Yıl Toplam: {$thisYear} ders\n";
-        
-        if (!empty($dayPattern)) {
-            $gunIsimleri = [
-                'Sunday' => 'Pazar', 'Monday' => 'Pazartesi', 'Tuesday' => 'Salı',
-                'Wednesday' => 'Çarşamba', 'Thursday' => 'Perşembe', 'Friday' => 'Cuma', 'Saturday' => 'Cumartesi'
-            ];
-            
-            $i = 0;
-            foreach ($dayPattern as $day => $count) {
-                if ($i >= 2) break;
-                $gunAdi = $gunIsimleri[$day] ?? $day;
-                $label = $i == 0 ? 'En Çok Ders Aldığı Gün' : 'İkinci Sırada';
-                $context .= "{$label}: {$gunAdi} ({$count} kez)\n";
-                $i++;
-            }
+        if ($lastLesson) {
+            $lastDate = date('d.m.Y', strtotime($lastLesson['lesson_date']));
+            $context .= "Son Ders: {$lastDate}\n";
         }
         $context .= "\n";
         
-        // ÇALIŞTIĞI ÖĞRETMENLER
-        $teachers = $lessonModel
-            ->select('lessons.teacher_id, COUNT(DISTINCT lessons.id) as ders_sayisi')
-            ->join('lesson_students ls', 'ls.lesson_id = lessons.id')
-            ->where('ls.student_id', $studentId)
-            ->groupBy('lessons.teacher_id')
-            ->orderBy('ders_sayisi', 'DESC')
-            ->limit(3)
-            ->asArray()
-            ->findAll();
+        // 5️⃣ ÇALIŞILAN ÖĞRETMENLER
+        $teachers = $studentModel->getTeachersForStudent($student['id']);
         
         if (!empty($teachers)) {
-            $context .= "👨‍🏫 ÇALIŞTIĞI ÖĞRETMENLER\n";
-            $context .= str_repeat("-", 70) . "\n";
-            
-            foreach ($teachers as $t) {
-                $profile = $userProfileModel->where('user_id', $t['teacher_id'])->first();
-                if ($profile) {
-                    // DÜZELTİLDİ
-                    $teacherName = $profile->first_name . ' ' . $profile->last_name; 
-                    $context .= "{$teacherName}: {$t['ders_sayisi']} ders\n";
-                }
+            $context .= "=== ÇALIŞILAN ÖĞRETMENLER ===\n";
+            foreach ($teachers as $teacher) {
+                $context .= "• {$teacher['first_name']} {$teacher['last_name']}\n";
             }
             $context .= "\n";
         }
         
-        // GELİŞİM GÜNLÜĞÜ
-        $evalCount = $evaluationModel
-            ->where('student_id', $studentId)
-            ->countAllResults();
+        // 6️⃣ RAM RAPORU VE ANALİZ
+        $context .= "=== RAM RAPORU VE ANALİZ ===\n";
         
-        $lastEval = $evaluationModel
-            ->where('student_id', $studentId)
-            ->orderBy('created_at', 'DESC')
-            ->asArray()
+        log_message('debug', 'RAM raporu kontrol ediliyor: ' . ($student['ram_raporu'] ?? 'NULL'));
+        
+        // RAM Dosya Kontrolü
+        if (!empty($student['ram_raporu'])) {
+            $ramPath = FCPATH . 'uploads/ram/' . $student['ram_raporu'];
+            log_message('debug', 'RAM path: ' . $ramPath);
+            log_message('debug', 'Dosya var mı: ' . (file_exists($ramPath) ? 'EVET' : 'HAYIR'));
+            
+            if (file_exists($ramPath)) {
+                $fileSize = filesize($ramPath);
+                $fileSizeKB = round($fileSize / 1024, 2);
+                $context .= "✅ RAM Raporu Dosyası Mevcut\n";
+                $context .= "Dosya Adı: {$student['ram_raporu']}\n";
+                $context .= "Dosya Boyutu: {$fileSizeKB} KB\n\n";
+            } else {
+                $context .= "⚠️ RAM raporu kaydı var ama dosya bulunamadı\n";
+                $context .= "Kayıtlı Dosya Adı: {$student['ram_raporu']}\n\n";
+            }
+        } else {
+            $context .= "❌ RAM raporu yüklenmemiş\n\n";
+        }
+        
+        // RAM Raporu Analiz Verileri
+        $ramAnalysisModel = new \App\Models\RamReportAnalysisModel();
+        $ramAnalysis = $ramAnalysisModel
+            ->where('student_id', $student['id'])
+            ->orderBy('analyzed_at', 'DESC')
             ->first();
         
-        $context .= "📝 GELİŞİM GÜNLÜĞÜ\n";
-        $context .= str_repeat("-", 70) . "\n";
-        $context .= "Toplam Not Sayısı: {$evalCount} not\n";
+        if ($ramAnalysis) {
+            log_message('debug', 'RAM analizi bulundu: ID=' . $ramAnalysis['id']);
+            
+            $context .= "📊 RAM Raporu Analiz Verileri:\n";
+            $context .= "Analiz Tarihi: " . date('d.m.Y H:i', strtotime($ramAnalysis['analyzed_at'])) . "\n\n";
+            
+            // Hafıza Bilgileri (eğer varsa)
+            if (!empty($ramAnalysis['total_memory'])) {
+                $context .= "🧠 Hafıza Bilgileri:\n";
+                $context .= "Toplam Hafıza: {$ramAnalysis['total_memory']}\n";
+                $context .= "Kullanılabilir Hafıza: {$ramAnalysis['available_memory']}\n";
+                
+                if (!empty($ramAnalysis['memory_info'])) {
+                    $context .= "Ek Bilgiler: {$ramAnalysis['memory_info']}\n";
+                }
+                $context .= "\n";
+            }
+            
+            // RAM Metin İçeriği (ilk 1000 karakter)
+            if (!empty($ramAnalysis['ram_text_content'])) {
+                $textLength = strlen($ramAnalysis['ram_text_content']);
+                $displayText = substr($ramAnalysis['ram_text_content'], 0, 1000);
+                
+                $context .= "📄 RAM Raporu İçerik Özeti:\n";
+                $context .= trim($displayText);
+                
+                if ($textLength > 1000) {
+                    $context .= "...\n(Toplam {$textLength} karakter, ilk 1000 karakter gösteriliyor)\n";
+                } else {
+                    $context .= "\n";
+                }
+                $context .= "\n";
+            }
+        } else {
+            log_message('debug', 'RAM analizi bulunamadı');
+            $context .= "ℹ️ RAM raporu analizi henüz yapılmamış\n\n";
+        }
         
-        if ($lastEval) {
-            $context .= "Son Not Tarihi: " . date('d.m.Y H:i', strtotime($lastEval['created_at'])) . "\n";
-            $context .= "Son Notu Yazan: {$lastEval['teacher_snapshot_name']}\n";
-            $evalPreview = mb_substr($lastEval['evaluation'], 0, 100);
-            $context .= "Son Not Özeti: \"{$evalPreview}" . (mb_strlen($lastEval['evaluation']) > 100 ? '...' : '') . "\"\n";
+// 7️⃣ GELİŞİM NOTLARI (EVALUATIONS)
+        $evaluationModel = new \App\Models\StudentEvaluationModel();
+        
+        $context .= "=== GELİŞİM GÜNLÜĞÜ ===\n";
+        
+        // Toplam not sayısı
+        $evalCount = $evaluationModel
+            ->where('student_id', $student['id'])
+            ->countAllResults();
+        
+        $context .= "Toplam Not Sayısı: {$evalCount} gelişim notu\n";
+        
+        // Son 3 notu göster
+        if ($evalCount > 0) {
+            $recentEvals = $evaluationModel
+                ->where('student_id', $student['id'])
+                ->orderBy('created_at', 'DESC')
+                ->limit(3)
+                ->findAll();
+            
+            $context .= "\nSon Gelişim Notları:\n";
+            foreach ($recentEvals as $i => $eval) {
+                $date = date('d.m.Y H:i', strtotime($eval['created_at']));
+                $teacher = $eval['teacher_snapshot_name'] ?? 'Bilinmiyor';
+                $notePreview = mb_substr($eval['evaluation'], 0, 150);
+                
+                $context .= "\n" . ($i + 1) . ". Not - {$date} ({$teacher}):\n";
+                $context .= "\"{$notePreview}";
+                if (mb_strlen($eval['evaluation']) > 150) {
+                    $context .= "...\"";
+                } else {
+                    $context .= "\"";
+                }
+                $context .= "\n";
+            }
         } else {
             $context .= "Henüz gelişim notu yazılmamış.\n";
         }
         $context .= "\n";
         
-        // SABİT PROGRAM
-        $fixedCount = $fixedLessonModel
-            ->where('student_id', $studentId)
-            ->countAllResults();
+        log_message('debug', 'Gelişim notları eklendi: ' . $evalCount . ' not bulundu');
         
-        if ($fixedCount > 0) {
-            $fixedSchedule = $fixedLessonModel
-                ->select('fixed_lessons.day_of_week, fixed_lessons.start_time, fixed_lessons.teacher_id')
-                ->where('fixed_lessons.student_id', $studentId)
-                ->orderBy('fixed_lessons.day_of_week', 'ASC')
-                ->orderBy('fixed_lessons.start_time', 'ASC')
-                ->asArray()
-                ->findAll();
-            
-            $gunIsimleri = ['', 'Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
-            
-            $context .= "📊 SABİT PROGRAM\n";
-            $context .= str_repeat("-", 70) . "\n";
-            
-            foreach ($fixedSchedule as $fs) {
-                $gun = $gunIsimleri[$fs['day_of_week']] ?? $fs['day_of_week'];
-                $profile = $userProfileModel->where('user_id', $fs['teacher_id'])->first();
-                $teacherName = $profile ? $profile->first_name . ' ' . $profile->last_name : 'Bilinmiyor';
-                $context .= "Her {$gun} {$fs['start_time']} - {$teacherName}\n";
-            }
-            $context .= "\n";
-        }
-        
-        // ÖNERİLER
-        $context .= "💡 ÖNERİLER\n";
-        $context .= str_repeat("-", 70) . "\n";
-        
-        if ($totalHak <= 10) {
-            $context .= "• Ders hakkı yenilemesi yaklaşıyor ({$totalHak} saat kaldı)\n";
-        }
-        
-        if ($fixedCount > 0) {
-            $context .= "• Sabit program mevcut, düzenli devam sağlanıyor\n";
-        } else {
-            $context .= "• Sabit program tanımlanabilir (düzenli devam için önerilir)\n";
-        }
-        
-        if (empty($student['ram_raporu'])) {
-            $context .= "• RAM raporu yüklenmesi gerekiyor (eğitim planlaması için kritik)\n";
-        }
-        
-        if ($evalCount < 5 && $thisYear > 10) {
-            $context .= "• Gelişim notları daha sık yazılabilir\n";
-        }
-        
-        $context .= "\n";
+        log_message('debug', 'buildStudentDetailedAnalysis TAMAMLANDI');
     }
 
     /**
@@ -2455,5 +2588,105 @@ private function buildSmartSuggestions(string &$context, string $msg): void
         if ($noBranchCount > 0) {
             $context .= "Branşı Belirtilmemiş: {$noBranchCount} öğretmen\n";
         }
+    }
+
+        /**
+         * Öğrenci ismini mesajdan çıkarır
+         */
+        private function extractStudentName(string $message): ?string
+        {
+            $studentModel = new \App\Models\StudentModel();
+            $students = $studentModel->select('adi, soyadi')->findAll();
+            
+            foreach ($students as $student) {
+                $fullName = $student['adi'] . ' ' . $student['soyadi'];
+                if (stripos($message, $fullName) !== false) {
+                    return $fullName;
+                }
+            }
+            
+            return null;
+        }
+        
+        /**
+         * AI yanıtını tipine göre formatlar
+         */
+        private function getAIResponse(string $context, string $userMessage, string $type): string
+        {
+            $systemPrompts = [
+                'student_analysis' => "Sen İkihece'nin yapay zeka asistanısın.
+
+    Öğrenci detaylı analiz verilerini NET ve PROFESYONEL şekilde sun:
+
+    **SUNUM STİLİ:**
+    - Kategorilere göre başlıklar kullan
+    - Önemli sayıları **kalın** yaz
+    - Pozitif gelişmeleri vurgula
+    - İyileştirme alanlarını yapıcı belirt
+    - Öneriler bölümünü mutlaka ekle
+
+    Profesyonel, net ve veri odaklı ol.",
+                
+                'teacher_analysis' => "Sen İkihece'nin yapay zeka asistanısın.
+
+    Öğretmen detaylı analiz verilerini NET ve PROFESYONEL şekilde sun:
+
+    **SUNUM STİLİ:**
+    - Kategorilere göre başlıklar kullan (KİŞİSEL BİLGİLER, DERS İSTATİSTİKLERİ)
+    - Önemli sayıları **kalın** yaz
+    - Pozitif performansı vurgula
+    - Geliştirme önerileri sun
+
+    Profesyonel ve saygılı ol.",
+                
+                'general' => "Sen İkihece Özel Eğitim Kurumu'nun AI asistanısın.
+
+    Admin ile konuşuyorsun. Yetkilerin:
+    - Tam veritabanı erişimi
+    - SQL sorguları (SADECE SELECT)
+    - Detaylı analizler
+    - Sistem logları
+
+    Profesyonel, net ve aksiyona dönük cevaplar ver."
+            ];
+            
+            $systemPrompt = $systemPrompts[$type] ?? $systemPrompts['general'];
+            $userPrompt = $context . "\n\nKullanıcının Sorusu: '{$userMessage}'";
+            
+            return $this->aiService->getChatResponse($userPrompt, $systemPrompt);
+        }
+
+    /**
+    * Öğretmen ismini mesajdan çıkarır
+    */
+        private function extractTeacherName(string $message): ?string
+    {
+        $db = \Config\Database::connect();
+        
+        // Öğretmen grubundaki kullanıcıları çek
+        $teachers = $db->query("
+            SELECT u.id, up.first_name, up.last_name
+            FROM users u
+            INNER JOIN user_profiles up ON u.id = up.user_id
+            INNER JOIN auth_groups_users agu ON u.id = agu.user_id
+            WHERE agu.group = 'ogretmen'
+            AND u.deleted_at IS NULL
+            ORDER BY up.first_name, up.last_name
+        ")->getResultArray();
+        
+        log_message('debug', 'Öğretmen sayısı: ' . count($teachers));
+        
+        foreach ($teachers as $teacher) {
+            $fullName = $teacher['first_name'] . ' ' . $teacher['last_name'];
+            
+            // Mesajda tam isim geçiyor mu kontrol et
+            if (stripos($message, $fullName) !== false) {
+                log_message('debug', 'Öğretmen bulundu: ' . $fullName);
+                return $fullName;
+            }
+        }
+        
+        log_message('debug', 'Mesajda öğretmen ismi bulunamadı: ' . $message);
+        return null;
     }
 }
