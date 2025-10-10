@@ -283,52 +283,62 @@ public function index()
         return view('dashboard/teacher', $this->data);
     }
 
-    public function servis()
-    {
-        $lessonModel = new \App\Models\LessonModel();
-        $studentModel = new StudentModel();
-        
-        $today = date('Y-m-d');
-        
-        // Bugün ders alan öğrencileri çek (benzersiz)
-$todayStudents = $studentModel
-    ->select('students.id, students.adi, students.soyadi, students.profile_image, students.servis, students.mesafe, students.adres_detayi as adres, students.veli_anne_telefon, students.veli_baba_telefon, students.google_konum, cities.name as city_name, districts.name as district_name, lessons.start_time, lessons.end_time')
-    ->distinct()
-    ->join('lesson_students', 'lesson_students.student_id = students.id')
-    ->join('lessons', 'lessons.id = lesson_students.lesson_id')
-    ->join('cities', 'cities.id = students.city_id', 'left')
-    ->join('districts', 'districts.id = students.district_id', 'left')
-    ->where('lessons.lesson_date', $today)
-    ->where('students.deleted_at', null)
-    ->orderBy('students.adi', 'ASC')
-    ->findAll();
-        
-        // İstatistikler
-        $stats = [
-            'total_students' => count($todayStudents),
-            'with_service' => 0,
-            'civar' => 0,
-            'yakin' => 0,
-            'uzak' => 0,
-        ];
-        
-        foreach ($todayStudents as $student) {
-            if ($student['servis'] === 'var') {
-                $stats['with_service']++;
-            }
-            
-            if ($student['mesafe'] === 'civar') $stats['civar']++;
-            elseif ($student['mesafe'] === 'yakın') $stats['yakin']++;
-            elseif ($student['mesafe'] === 'uzak') $stats['uzak']++;
+public function servis()
+{
+    $lessonModel = new \App\Models\LessonModel();
+    $studentModel = new StudentModel();
+    
+    $today = date('Y-m-d');
+    
+    // SADECE SERVİS KULLANAN öğrencileri çek ve SAATE GÖRE SIRALA
+    $todayStudents = $studentModel
+        ->select('students.id, students.adi, students.soyadi, students.profile_image, students.servis, students.mesafe, students.adres_detayi as adres, students.veli_anne_telefon, students.veli_baba_telefon, students.google_konum, students.iletisim, cities.name as city_name, districts.name as district_name, lessons.start_time, lessons.end_time')
+        ->distinct()
+        ->join('lesson_students', 'lesson_students.student_id = students.id')
+        ->join('lessons', 'lessons.id = lesson_students.lesson_id')
+        ->join('cities', 'cities.id = students.city_id', 'left')
+        ->join('districts', 'districts.id = students.district_id', 'left')
+        ->where('lessons.lesson_date', $today)
+        ->whereIn('students.servis', ['var', 'arasira'])
+        ->where('students.deleted_at', null)
+        ->orderBy('lessons.start_time', 'ASC')
+        ->orderBy('students.adi', 'ASC')
+        ->findAll();
+    
+    // SAATE GÖRE GRUPLA
+    $groupedByTime = [];
+    foreach ($todayStudents as $student) {
+        $time = $student['start_time'];
+        if (!isset($groupedByTime[$time])) {
+            $groupedByTime[$time] = [];
         }
-        
-        $this->data['stats'] = $stats;
-        $this->data['todayStudents'] = $todayStudents;
-        $this->data['title'] = 'Servis Paneli';
-        
-        return view('dashboard/servis', $this->data);
+        $groupedByTime[$time][] = $student;
     }
     
+    // İstatistikler
+    $stats = [
+        'total_students' => count($todayStudents),
+        'total_groups' => count($groupedByTime),
+        'with_service' => 0,
+        'civar' => 0,
+        'yakin' => 0,
+        'uzak' => 0,
+    ];
+    
+    foreach ($todayStudents as $student) {
+        if ($student['servis'] === 'var') $stats['with_service']++;
+        if ($student['mesafe'] === 'civar') $stats['civar']++;
+        elseif ($student['mesafe'] === 'yakın') $stats['yakin']++;
+        elseif ($student['mesafe'] === 'uzak') $stats['uzak']++;
+    }
+    
+    $this->data['stats'] = $stats;
+    $this->data['groupedByTime'] = $groupedByTime;
+    $this->data['title'] = 'Servis Paneli';
+    
+    return view('dashboard/servis', $this->data);
+}
+
     /**
      * Veli Dashboard'ını gösterir.
      */

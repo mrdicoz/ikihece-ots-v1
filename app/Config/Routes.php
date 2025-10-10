@@ -21,9 +21,14 @@ $routes->post('notifications/unsubscribe', 'NotificationController::unsubscribe'
 // ====================================================================
 $routes->group('', ['filter' => 'session'], static function ($routes) {
 
+
     // --- ANA GİRİŞ KAPISI ---
     $routes->get('/', 'DashboardController::index', ['as' => 'home']);
 
+    // Servis takip rotaları
+    $routes->post('api/location/save', 'Api\LocationController::saveLocation', ['filter' => 'group:servis']);
+    $routes->get('api/location/drivers', 'Api\LocationController::getActiveDrivers', ['filter' => 'group:admin,servis,mudur']);
+    $routes->get('tracking/map', 'TrackingController::map', ['as' => 'tracking.map', 'filter' => 'group:admin,mudur']);
     
     // --- YÖNLENDİRME HEDEFLERİ ---
     $routes->group('dashboard', static function ($routes) {
