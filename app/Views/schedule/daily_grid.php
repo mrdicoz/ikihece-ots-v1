@@ -30,6 +30,7 @@
             <span class="badge text-bg-success mx-1">Yeşil</span>: Öğrencinin bu saatte sabit dersi var.
             <span class="badge text-bg-warning mx-1">Sarı</span>: Öğrencinin sabit dersi var, ancak farklı bir gün/saatte.
             <span class="badge text-bg-secondary mx-1">Gri</span>: Öğrencinin tanımlı bir sabit dersi yok.
+            <span class="badge text-bg-danger mx-1">Kırmızı</span>: Öğrenci aynı anda başka bir öğretmende de ders alıyor (ÇAKIŞMA).
         </div>
 
         <div id="schedule-content-wrapper">
@@ -82,16 +83,22 @@
                                                             if ($info) {
                                                                 $popoverContent = htmlspecialchars('<div><img src="' . base_url($info['photo']) . '" class="rounded-circle me-2" width="40" height="40" style="object-fit:cover"><strong>' . esc($name) . '</strong></div><div class="text-muted small mt-1"><i class="bi bi-geo-alt-fill"></i> ' . esc(($info['city'] ?? '') . ' / ' . ($info['district'] ?? '')) . '</div><hr class="my-2"><small>' . ($info['message'] ?? '') . '</small>');
                                                             }
-                                                            $badgeClass = 'text-bg-secondary';
-                                                            if ($info && !empty($info['fixed_lessons'])) {
-                                                                $isMatch = false;
-                                                                foreach ($info['fixed_lessons'] as $fixed) {
-                                                                    if ($fixed['day_of_week'] == $dayOfWeekForGrid && $fixed['start_time'] == $lesson['start_time']) {
-                                                                        $isMatch = true; break;
+                                                                // ÖNCE ÇAKIŞMA KONTROLÜ (ÖNCELİK 1)
+                                                                if (!empty($conflictMap[$studentId][$lesson['start_time']])) {
+                                                                    $badgeClass = 'text-bg-danger';
+                                                                } else {
+                                                                    // ÇAKIŞMA YOKSA DİĞER KURALLARA BAK
+                                                                    $badgeClass = 'text-bg-secondary';
+                                                                    if ($info && !empty($info['fixed_lessons'])) {
+                                                                        $isMatch = false;
+                                                                        foreach ($info['fixed_lessons'] as $fixed) {
+                                                                            if ($fixed['day_of_week'] == $dayOfWeekForGrid && $fixed['start_time'] == $lesson['start_time']) {
+                                                                                $isMatch = true; break;
+                                                                            }
+                                                                        }
+                                                                        $badgeClass = $isMatch ? 'text-bg-success' : 'text-bg-warning';
                                                                     }
                                                                 }
-                                                                $badgeClass = $isMatch ? 'text-bg-success' : 'text-bg-warning';
-                                                            }
                                                         ?>
                                                             <span class="badge <?= $badgeClass ?> student-badge" data-bs-toggle="popover" data-bs-html="true" data-bs-trigger="hover" title="Öğrenci Bilgisi" data-bs-content="<?= $popoverContent ?>"><?= esc(trim($name)) ?></span>
                                                         <?php endforeach; ?>

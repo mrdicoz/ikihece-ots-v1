@@ -30,15 +30,25 @@
                     <h4 class="card-title"><?= esc($student['adi'] . ' ' . $student['soyadi']) ?></h4>
                     <p class="text-muted">TCKN: <?= esc($student['tckn']) ?></p>
                     <hr>
-                    <?php if (!empty($student['ram_raporu'])): ?>
-                        <button type="button" class="btn btn-success w-100 mt-2" data-bs-toggle="modal" data-bs-target="#reportModal" data-src="<?= site_url('students/view-ram-report/' . $student['id']) ?>">
-                            <i class="bi bi-eye-fill"></i> Raporu Görüntüle
-                        </button>
-                    <?php else: ?>
-                        <button type="button" class="btn btn-secondary w-100 mt-2" disabled>
-                            <i class="bi bi-eye-slash-fill"></i> Rapor Yok
-                        </button>
-                    <?php endif; ?>
+                        <?php if (!empty($student['ram_raporu'])): ?>
+                            <button type="button" class="btn btn-success w-100 mt-2" data-bs-toggle="modal" data-bs-target="#reportModal" data-src="<?= site_url('students/view-ram-report/' . $student['id']) ?>">
+                                <i class="bi bi-eye-fill"></i> Raporu Görüntüle
+                            </button>
+                            
+                            <?php if (!$isAnalyzed): ?>
+                                <button type="button" 
+                                        class="btn btn-warning w-100 mt-2" 
+                                        id="analyzeRamBtn" 
+                                        data-student-id="<?= $student['id'] ?>">
+                                    <i class="bi bi-cpu-fill"></i> RAM Raporunu Analiz Et
+                                </button>
+                            <?php endif; ?>
+                            
+                        <?php else: ?>
+                            <button type="button" class="btn btn-secondary w-100 mt-2" disabled>
+                                <i class="bi bi-eye-slash-fill"></i> Rapor Yok
+                            </button>
+                        <?php endif; ?>
                     
                     <?php if (auth()->user()->can('ogrenciler.duzenle')): ?>
                     <a href="<?= site_url('students/' . $student['id'] . '/edit') ?>" class="btn btn-success w-100 mt-2">
@@ -462,5 +472,47 @@
             }
         });
     });
+
+    // RAM Raporu Tekli Analiz
+$('#analyzeRamBtn').on('click', function() {
+    const btn = $(this);
+    const studentId = btn.data('student-id');
+    
+    if(!confirm('Bu öğrencinin RAM raporu analiz edilecek. Onaylıyor musunuz?')) {
+        return;
+    }
+    
+    btn.prop('disabled', true)
+       .html('<span class="spinner-border spinner-border-sm me-2"></span>Analiz ediliyor...');
+    
+    $.ajax({
+        url: '<?= site_url('students/analyze-single-ram/') ?>' + studentId,
+        type: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+        },
+        dataType: 'json',
+        success: function(response) {
+            if(response.success) {
+                alert(response.message);
+                location.reload(); // Sayfayı yenile
+            } else {
+                alert('Hata: ' + (response.message || 'Bilinmeyen bir hata oluştu'));
+                btn.prop('disabled', false)
+                   .html('<i class="bi bi-cpu-fill"></i> RAM Raporunu Analiz Et');
+            }
+        },
+        error: function(xhr) {
+            let errorMsg = 'İstek sırasında bir hata oluştu!';
+            if(xhr.responseJSON && xhr.responseJSON.message) {
+                errorMsg = xhr.responseJSON.message;
+            }
+            alert(errorMsg);
+            btn.prop('disabled', false)
+               .html('<i class="bi bi-cpu-fill"></i> RAM Raporunu Analiz Et');
+        }
+    });
+});
 </script>
 <?= $this->endSection() ?>

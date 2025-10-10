@@ -42,6 +42,7 @@ protected $validationRules      = [
     'iletisim'   => 'required',
     'city_id'    => 'required|integer|greater_than[0]',
     'district_id'=> 'required|integer|greater_than[0]',
+    'egitim_programi' => 'required|array|min_length[1]',
 ];
 
 protected $validationMessages   = [
@@ -66,6 +67,10 @@ protected $validationMessages   = [
     'district_id' => [
         'required'      => 'İlçe seçimi zorunludur.',
         'greater_than'  => 'Lütfen geçerli bir ilçe seçiniz.',
+    ],
+    'egitim_programi' => [
+        'required'   => 'En az bir eğitim programı seçilmelidir.',
+        'min_length' => 'En az bir eğitim programı seçilmelidir.',
     ],
 ];
     protected $skipValidation       = false;

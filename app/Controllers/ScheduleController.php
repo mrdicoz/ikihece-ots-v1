@@ -102,6 +102,23 @@ public function dailyGrid($date = null)
         }
         $allStudentIdsOnPage = array_unique(array_filter($allStudentIdsOnPage));
 
+        // Çakışma kontrolü: Aynı öğrenci aynı saatte birden fazla öğretmende mi?
+        $conflictMap = [];
+        if (!empty($allStudentIdsOnPage)) {
+            $lessonStudentModel = new LessonStudentModel();
+            $conflictData = $lessonStudentModel
+                ->select('lesson_students.student_id, lessons.start_time, COUNT(DISTINCT lessons.teacher_id) as teacher_count')
+                ->join('lessons', 'lessons.id = lesson_students.lesson_id')
+                ->where('lessons.lesson_date', $date)
+                ->whereIn('lesson_students.student_id', $allStudentIdsOnPage)
+                ->groupBy('lesson_students.student_id, lessons.start_time')
+                ->findAll();
+            
+            foreach ($conflictData as $conflict) {
+                $conflictMap[$conflict['student_id']][$conflict['start_time']] = ($conflict['teacher_count'] > 1);
+            }
+        }
+
         $studentInfoMap = [];
         if (!empty($allStudentIdsOnPage)) {
             $fixedLessonModel = new FixedLessonModel();
@@ -165,6 +182,7 @@ public function dailyGrid($date = null)
             'teachers'        => $teachers,
             'lessonMap'       => $lessonMap,
             'studentInfoMap'  => $studentInfoMap,
+            'conflictMap'     => $conflictMap,
         ];
         return view('schedule/daily_grid', array_merge($this->data, $data));
     }

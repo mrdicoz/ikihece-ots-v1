@@ -171,6 +171,8 @@ public function create()
     }
     // --- GÜVENLİK KONTROLÜ SONU ---
 
+    
+
     $student = $model
         ->select('students.*, cities.name as city_name, districts.name as district_name')
         ->join('cities', 'cities.id = students.city_id', 'left')
@@ -202,13 +204,19 @@ public function create()
         }
     }
 
-    // --- DEĞİŞEN KISIM SONU ---
-$data = [
+    // ✅ RAM ANALİZ DURUMU KONTROLÜ
+    $db = \Config\Database::connect();
+    $isAnalyzed = $db->table('ram_report_analysis')
+                     ->where('student_id', $id)
+                     ->countAllResults() > 0;
+
+    $data = [
         'title'            => 'Öğrenci Profili',
         'student'          => $student,
         'evaluations'      => $evaluationModel->getEvaluationsForStudent((int)$id),
         'canAddEvaluation' => $user->inGroup('admin', 'yonetici', 'mudur', 'sekreter', 'ogretmen'),
-        'evaluators'       => $evaluationModel->getUniqueEvaluators((int)$id), // Yeni ve temiz yöntem
+        'evaluators'       => $evaluationModel->getUniqueEvaluators((int)$id),
+        'isAnalyzed'       => $isAnalyzed, // ✅ YENİ
     ];
     
     return view('students/show', array_merge($this->data, $data));
@@ -502,35 +510,49 @@ public function update($id = null)
         return !empty($info) ? json_encode($info, JSON_UNESCAPED_UNICODE) : null;
     }
 
-    public function bulkAnalyzeRamReports()
+    public function analyzeSingleRam($id = null)
     {
-        $studentModel = new StudentModel();
-        $students = $studentModel->select('id, ram_raporu')
-                                ->where('ram_raporu IS NOT NULL')
-                                ->where('ram_raporu !=', '')
-                                ->findAll();
-        
-        $processed = 0;
-        $failed = 0;
-        
-        foreach ($students as $student) {
-            $filePath = WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu'];
-            if (file_exists($filePath)) {
-                if ($this->analyzeAndSaveRamReport($student['id'], $filePath)) {
-                    $processed++;
-                } else {
-                    $failed++;
-                }
-            } else {
-                $failed++;
-            }
+        if (!$this->request->isAJAX()) {
+            return redirect()->back();
         }
+
+        $studentModel = new StudentModel();
+        $student = $studentModel->select('id, ram_raporu')->find($id);
         
-        return $this->response->setJSON([
-            'success' => true, 
-            'message' => "{$processed} rapor başarıyla analiz edildi" . ($failed > 0 ? ", {$failed} rapor başarısız" : ""),
-            'processed' => $processed,
-            'failed' => $failed
-        ]);
+        if (!$student) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Öğrenci bulunamadı!'
+            ]);
+        }
+
+        if (empty($student['ram_raporu'])) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Bu öğrencinin RAM raporu yok!'
+            ]);
+        }
+
+        $filePath = WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu'];
+        
+        if (!file_exists($filePath)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'RAM rapor dosyası bulunamadı!'
+            ]);
+        }
+
+        // Mevcut analiz metodunu kullan
+        if ($this->analyzeAndSaveRamReport($student['id'], $filePath)) {
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => 'RAM raporu başarıyla analiz edildi!'
+            ]);
+        } else {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Rapor analiz edilirken bir hata oluştu!'
+            ]);
+        }
     }
 }

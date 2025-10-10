@@ -18,7 +18,8 @@ class LicenseService
         // detaylı bilgi için getLicenseInfo'yu çağırıp sonucu yorumlayalım.
         $licenseInfo = $this->getLicenseInfo(true); // true parametresi cache'i atlayıp yeniden kontrol etmeye zorlar
 
-        $isActive = ($licenseInfo !== null && isset($licenseInfo['status']) && $licenseInfo['status'] == 3);
+        $free = 0; // ücretsiz sürüm kontrolü (1 ise ücretsiz sürüm, 0 ise değil)
+        $isActive = ($free == 1) ||  ($licenseInfo !== null && isset($licenseInfo['status']) && $licenseInfo['status'] == 3);
 
         cache()->save('license_status', $isActive, 3600);
         return $isActive;
