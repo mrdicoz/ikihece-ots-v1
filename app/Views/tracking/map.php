@@ -68,7 +68,7 @@ $(document).ready(function() {
         // Söför seçildiğinde otomatik güncellemeyi başlat
         if ($(this).val() && $(this).val().length > 0) {
             if (!updateInterval) {
-                updateInterval = setInterval(updateMap, 10000); // 10 saniye
+                updateInterval = setInterval(updateMap, 15000); // 15 saniye
             }
         } else {
             // Söför seçimi kaldırılırsa güncellemeyi durdur

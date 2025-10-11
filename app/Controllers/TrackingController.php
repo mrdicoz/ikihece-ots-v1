@@ -18,7 +18,7 @@ class TrackingController extends BaseController
             ->getResultArray();
         
         $this->data['drivers'] = $drivers;
-        $this->data['title'] = 'Söför Takip Haritası';
+        $this->data['title'] = 'Servis Takip Haritası';
         
         return view('tracking/map', $this->data);
     }

@@ -16,6 +16,8 @@ $routes->get('maintenance', 'Home::maintenance', ['as' => 'maintenance']);
 $routes->post('notifications/unsubscribe', 'NotificationController::unsubscribe');
 
 
+
+
 // ====================================================================
 // GİRİŞ GEREKTİREN ALAN (Güvenlik Duvarımız)
 // ====================================================================
@@ -24,12 +26,14 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
 
     // --- ANA GİRİŞ KAPISI ---
     $routes->get('/', 'DashboardController::index', ['as' => 'home']);
+    
 
     // Servis takip rotaları
     $routes->post('api/location/save', 'Api\LocationController::saveLocation', ['filter' => 'group:servis']);
     $routes->get('api/location/drivers', 'Api\LocationController::getActiveDrivers', ['filter' => 'group:admin,servis,mudur']);
-    $routes->get('tracking/map', 'TrackingController::map', ['as' => 'tracking.map', 'filter' => 'group:admin,mudur']);
+    $routes->get('tracking/map', 'TrackingController::map', ['as' => 'tracking.map', 'filter' => 'group:admin,mudur,sekreter,ogretmen,servis,veli']);
     
+
     // --- YÖNLENDİRME HEDEFLERİ ---
     $routes->group('dashboard', static function ($routes) {
         $routes->get('admin', 'DashboardController::admin', ['as' => 'dashboard.admin', 'filter' => 'group:admin']);
@@ -38,7 +42,9 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->get('sekreter', 'DashboardController::sekreter', ['as' => 'dashboard.sekreter', 'filter' => 'group:admin,sekreter']);
         $routes->get('teacher', 'DashboardController::teacher', ['as' => 'dashboard.teacher', 'filter' => 'group:admin,ogretmen']);
         $routes->get('parent', 'DashboardController::parent', ['as' => 'dashboard.parent', 'filter' => 'group:admin,veli']);
-        $routes->get('servis', 'DashboardController::servis', ['as' => 'dashboard.servis', 'filter' => 'group:admin,servis']);
+        $routes->get('servis', 'DashboardController::servis', ['as' => 'dashboard.servis', 'filter' => 'group:admin,servis,mudur,sekreter']);
+        
+        
         
         // Veli için özel rotalar
         $routes->post('set-active-child', 'DashboardController::setActiveChild', ['filter' => 'group:veli']);

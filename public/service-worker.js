@@ -1,7 +1,7 @@
 // public/service-worker.js
 
 // Önbellek adını versiyonla belirtmek, güncellemelerde eski önbelleği temizlemeyi sağlar.
-const CACHE_NAME = 'ikihece-ots-cache-v3'; // <-- VERSİYONU ARTIRDIK
+const CACHE_NAME = 'ikihece-ots-cache-v4'; // <-- VERSİYONU ARTIRDIK
 
 // "App Shell" - yani uygulamanın iskeletini oluşturan, her zaman gerekli olan dosyalar.
 const urlsToCache = [
@@ -116,3 +116,93 @@ self.addEventListener('notificationclick', function(event) {
         clients.openWindow(event.notification.data.url)
     );
 });
+
+// ============================================
+// 6. BACKGROUND SYNC - Konum Takibi
+// ============================================
+
+// Background Sync Event - Sayfa kapalıyken bile çalışır
+self.addEventListener('sync', function(event) {
+    console.log('Service Worker: Background Sync tetiklendi ->', event.tag);
+    
+    if (event.tag === 'sync-location') {
+        event.waitUntil(sendLocationInBackground());
+    }
+});
+
+// Periodic Background Sync - Düzenli aralıklarla çalışır
+self.addEventListener('periodicsync', function(event) {
+    console.log('Service Worker: Periodic Sync tetiklendi ->', event.tag);
+    
+    if (event.tag === 'periodic-location-sync') {
+        event.waitUntil(sendLocationInBackground());
+    }
+});
+
+// Arka planda konum gönder
+async function sendLocationInBackground() {
+    try {
+        console.log('Service Worker: Arka planda konum gönderiliyor...');
+        
+        // IndexedDB'den kayıtlı konum bilgisini al
+        const locationData = await getStoredLocation();
+        
+        if (!locationData) {
+            console.log('Service Worker: Kayıtlı konum bulunamadı');
+            return;
+        }
+        
+        // API'ye gönder
+        const response = await fetch('/api/location/save', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `latitude=${locationData.latitude}&longitude=${locationData.longitude}`
+        });
+        
+        if (response.ok) {
+            console.log('Service Worker: Konum başarıyla gönderildi (arka plan)');
+            
+            // Kullanıcıya bildirim gönder (opsiyonel)
+            self.registration.showNotification('Konum Güncellendi', {
+                body: 'Konumunuz başarıyla güncellendi',
+                icon: '/assets/images/favicon-192x192.png',
+                badge: '/assets/images/favicon-192x192.png',
+                tag: 'location-update',
+                silent: true // Sessiz bildirim
+            });
+        } else {
+            console.error('Service Worker: Konum gönderilemedi');
+        }
+        
+    } catch (error) {
+        console.error('Service Worker: Arka plan konum gönderimi hatası:', error);
+    }
+}
+
+// IndexedDB'den konum al
+function getStoredLocation() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('LocationDB', 1);
+        
+        request.onerror = () => reject(request.error);
+        
+        request.onsuccess = () => {
+            const db = request.result;
+            const transaction = db.transaction(['locations'], 'readonly');
+            const store = transaction.objectStore('locations');
+            const getRequest = store.get('lastLocation');
+            
+            getRequest.onsuccess = () => resolve(getRequest.result);
+            getRequest.onerror = () => reject(getRequest.error);
+        };
+        
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains('locations')) {
+                db.createObjectStore('locations');
+            }
+        };
+    });
+}

@@ -42,7 +42,7 @@ protected $validationRules      = [
     'iletisim'   => 'required',
     'city_id'    => 'required|integer|greater_than[0]',
     'district_id'=> 'required|integer|greater_than[0]',
-    'egitim_programi' => 'required|array|min_length[1]',
+    'egitim_programi' => 'required|min_length[1]',
 ];
 
 protected $validationMessages   = [
