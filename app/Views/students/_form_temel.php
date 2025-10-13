@@ -10,7 +10,15 @@
                 <option value="erkek" <?= (old('cinsiyet', $student['cinsiyet'] ?? '') === 'erkek') ? 'selected' : '' ?>>Erkek</option>
                 <option value="kadin" <?= (old('cinsiyet', $student['cinsiyet'] ?? '') === 'kadin') ? 'selected' : '' ?>>Kadın</option>
             </select></div>
-            <div class="col-md-6"><label class="form-label">İletişim Telefonu</label><input type="tel" name="iletisim" class="form-control" value="<?= old('iletisim', $student['iletisim'] ?? '') ?>"></div>
+            <div class="col-md-6">
+                <label class="form-label">İletişim Telefonu</label>
+                <input type="tel" 
+                    name="iletisim" 
+                    id="iletisim_telefon"
+                    class="form-control" 
+                    value="<?= old('iletisim', $student['iletisim'] ?? '') ?>" 
+                    placeholder="(0___) ___ __ __">
+            </div>
         </div>
     </div>
     <div class="col-md-4 text-center">

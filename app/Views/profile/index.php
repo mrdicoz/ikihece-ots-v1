@@ -60,9 +60,15 @@
                                     <label for="tc_kimlik_no" class="form-label">T.C. Kimlik Numarası</label>
                                     <input type="text" class="form-control" id="tc_kimlik_no" name="tc_kimlik_no" value="<?= esc(old('tc_kimlik_no', $profile->tc_kimlik_no)) ?>" maxlength="11" required>
                                 </div>
-                                <div class="mb-3">
+                               <div class="mb-3">
                                     <label for="phone_number" class="form-label">Telefon Numarası</label>
-                                    <input type="text" class="form-control" id="phone_number" name="phone_number" value="<?= esc(old('phone_number', $profile->phone_number)) ?>">
+                                    <input type="tel" 
+                                        class="form-control phone-mask" 
+                                        id="phone_number" 
+                                        name="phone_number" 
+                                        value="<?= esc(old('phone_number', $profile->phone_number ?? '')) ?>"
+                                        placeholder="(0___) ___ __ __"
+                                        maxlength="16">
                                 </div>
 
                                 <?php if (auth()->user()->inGroup('ogretmen')): ?>
@@ -240,5 +246,17 @@ document.addEventListener('DOMContentLoaded', function () {
         fetchDistricts(initialCityId, initialDistrictId);
     }
 });
+// Telefon mask'lerini uygula
+const telefonMaskOptions = {
+    mask: '(0000) 000 00 00',
+    lazy: false,
+    placeholderChar: '_'
+};
+
+// İletişim telefonu
+const phonenumber = document.getElementById('phone_number');
+if (phonenumber) {
+    IMask(phonenumber, telefonMaskOptions);
+}
 </script>
 <?= $this->endSection() ?>

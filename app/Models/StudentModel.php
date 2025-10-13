@@ -39,10 +39,10 @@ protected $validationRules      = [
     'adi'        => 'required|string|max_length[100]',
     'soyadi'     => 'required|string|max_length[100]',
     'tckn'       => 'required|exact_length[11]|is_unique[students.tckn,id,{id}]', // ESKİ HALİNE GETİRİN    
-    'iletisim'   => 'required',
+    'iletisim'   => 'required|min_length[16]', // ✅ (0543) 506 93 50 = 16 karakter
     'city_id'    => 'required|integer|greater_than[0]',
     'district_id'=> 'required|integer|greater_than[0]',
-    'egitim_programi' => 'required|min_length[1]',
+    'egitim_programi' => 'required',
 ];
 
 protected $validationMessages   = [
@@ -58,7 +58,8 @@ protected $validationMessages   = [
         'is_unique'    => 'Bu T.C. Kimlik Numarası zaten başka bir öğrenciye kayıtlı.', // ESKİ HALİ
     ],
     'iletisim' => [
-        'required' => 'İletişim (Telefon) alanı zorunludur.'
+        'required' => 'İletişim (Telefon) alanı zorunludur.',
+        'min_length' => 'Telefon numarasını gözden geçirin.',
     ],
     'city_id' => [
         'required'      => 'İl seçimi zorunludur.',
@@ -70,7 +71,6 @@ protected $validationMessages   = [
     ],
     'egitim_programi' => [
         'required'   => 'En az bir eğitim programı seçilmelidir.',
-        'min_length' => 'En az bir eğitim programı seçilmelidir.',
     ],
 ];
     protected $skipValidation       = false;

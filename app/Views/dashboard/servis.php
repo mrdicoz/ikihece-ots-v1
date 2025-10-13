@@ -3,7 +3,20 @@
 
 <?= $this->section('main') ?>
 <div class="container-fluid mt-4 d-print-none" id="screen-view">
-
+<?php if (auth()->loggedIn() && auth()->user()->inGroup('servis')): ?>
+<div class="col-12 mb-3">
+    <div class="alert alert-warning d-flex align-items-start">
+        <i class="bi bi-exclamation-triangle-fill me-2 fs-4"></i>
+        <div>
+            <strong>ÖNEMLİ TALİMAT:</strong><br>
+            • Konum takibi sırasında <strong>Chrome/tarayıcıyı KAPATMAYIN</strong><br>
+            • Telefon ekranı kilitli olabilir (sorun yok)<br>
+            • Başka uygulamalar açabilirsiniz (sorun yok)<br>
+            • Sadece tarayıcı arka planda açık kalsın
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 <div class="row align-items-center mb-4 g-3">
 
     
@@ -146,7 +159,8 @@
 // Değişkenleri en üstte tanımlayalım
 let gprsInterval = null; 
 let isTracking = false; 
-let periodicSyncRegistered = false;
+let wakeLock = null;
+
 
 // Sayfa yüklendiğinde çalışacak ana fonksiyon
 document.addEventListener('DOMContentLoaded', function() {
@@ -206,90 +220,81 @@ function updateRowStyles() {
     });
 }
 
-// --- GPRS ve Konum Fonksiyonları ---
-
-async function startTracking(){ 
-    if(!navigator.geolocation || !('serviceWorker' in navigator)){
-        showGprsStatus('Tarayıcınız konum veya PWA özelliklerini desteklemiyor!', 'danger');
+// KONUM BAŞLAT
+async function startTracking() {
+    if (!navigator.geolocation) {
+        showGprsStatus('❌ Tarayıcı konum desteklemiyor!', 'danger');
         return;
-    } 
-    isTracking=true; 
-    $('#gprsButton').removeClass('btn-success').addClass('btn-danger').html('<i class="bi bi-stop-circle"></i> Konum Kapat'); 
-    
-    sendLocation(); 
-    
-    try { 
-        const registration = await navigator.serviceWorker.ready; 
-        if('periodicSync' in registration){ 
-            const status = await navigator.permissions.query({name:'periodic-background-sync'}); 
-            if(status.state==='granted'){
-                await registration.periodicSync.register('periodic-location-sync',{minInterval:30*1000}); 
-                periodicSyncRegistered=true; 
-                showGprsStatus('✓ Arka plan takibi aktif (PWA)', 'success');
-            } else {
-                startNormalInterval();
-            }
-        } else {
-            startNormalInterval();
-        }
-    } catch(error) {
-        startNormalInterval();
     }
-}
 
-function startNormalInterval(){ 
-    gprsInterval = setInterval(sendLocation, 30000); // 30 saniye
-}
+    isTracking = true;
+    $('#gprsButton').removeClass('btn-success').addClass('btn-danger')
+        .html('<i class="bi bi-stop-circle"></i> Konum Kapat');
 
-async function stopTracking(){ 
-    clearInterval(gprsInterval); 
-    isTracking=false; 
-    $('#gprsButton').removeClass('btn-danger').addClass('btn-success').html('<i class="bi bi-broadcast"></i> Konum Aç'); 
-    if(periodicSyncRegistered){ 
-        try { 
-            const registration = await navigator.serviceWorker.ready; 
-            if('periodicSync' in registration){ 
-                await registration.periodicSync.unregister('periodic-location-sync'); 
-                periodicSyncRegistered=false; 
-            }
-        } catch(error) {
-            console.error('Periodic sync iptal hatası:', error);
+    // Wake Lock - Ekranın uyumasını engelle
+    if ('wakeLock' in navigator) {
+        try {
+            wakeLock = await navigator.wakeLock.request('screen');
+            console.log('✅ Wake Lock aktif - Ekran kilitli çalışır');
+        } catch (e) {
+            console.warn('⚠️ Wake Lock başarısız:', e);
         }
-    } 
-    showGprsStatus('Konum gönderimi durduruldu','secondary');
+    }
+
+    // İlk konum
+    sendLocation();
+    
+    // 30 saniyede bir
+    gprsInterval = setInterval(sendLocation, 30000);
+    
+    showGprsStatus('✅ Konum takibi aktif! Tarayıcıyı KAPATMAYIN', 'success');
 }
 
-function sendLocation(){ 
-    navigator.geolocation.getCurrentPosition( 
-        (position) => { 
-            const lat = position.coords.latitude; 
-            const lng = position.coords.longitude; 
-            $.post('<?= base_url('api/location/save') ?>',{latitude:lat,longitude:lng})
-            .done(() => { 
-                const time = new Date().toLocaleTimeString(); 
-                showGprsStatus(`<i class="bi bi-check-circle-fill"></i> Konum gönderildi - ${time}`,'success');
+// KONUM DURDUR
+async function stopTracking() {
+    clearInterval(gprsInterval);
+    isTracking = false;
+    
+    if (wakeLock) {
+        await wakeLock.release();
+        wakeLock = null;
+    }
+    
+    $('#gprsButton').removeClass('btn-danger').addClass('btn-success')
+        .html('<i class="bi bi-broadcast"></i> Konum Aç');
+    showGprsStatus('⏸️ Durduruldu', 'secondary');
+}
+
+// KONUM GÖNDER
+function sendLocation() {
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            $.post('<?= base_url('api/location/save') ?>', {
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+                timestamp: new Date().toISOString()
             })
-            .fail(() => { 
-                showGprsStatus('<i class="bi bi-exclamation-triangle-fill"></i> Konum gönderilemedi! (Çevrimdışı)', 'danger'); 
-                if('serviceWorker' in navigator && 'SyncManager' in window){
-                    navigator.serviceWorker.ready.then(reg => reg.sync.register('sync-location'));
-                }
+            .done(() => {
+                showGprsStatus(`✅ Konum OK - ${new Date().toLocaleTimeString()}`, 'success');
+            })
+            .fail(() => {
+                showGprsStatus('❌ Gönderilemedi!', 'danger');
             });
-        }, 
-        (error) => { 
-            showGprsStatus(`<i class="bi bi-x-circle-fill"></i> Konum alınamadı: ${error.message}`,'warning');
-        }
+        },
+        (err) => showGprsStatus('❌ GPS hatası: ' + err.message, 'danger'),
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 5000 }
     );
 }
 
-function showGprsStatus(message, type){
-    $('#gprsStatus').removeClass().addClass(`alert alert-${type} text-center`).html(message).slideDown();
+function showGprsStatus(msg, type) {
+    $('#gprsStatus').removeClass().addClass(`alert alert-${type} text-center`).html(msg).slideDown();
 }
 
-window.addEventListener('beforeunload', function(e){
-    if(isTracking && !periodicSyncRegistered){
-        e.preventDefault(); 
-        e.returnValue = '⚠️ Konum takibi aktif! Sayfa kapatılırsa takip duracak.';
+// Tarayıcı kapatma uyarısı
+window.addEventListener('beforeunload', (e) => {
+    if (isTracking) {
+        e.preventDefault();
+        e.returnValue = '⚠️ Konum takibi aktif!';
     }
 });
 </script>

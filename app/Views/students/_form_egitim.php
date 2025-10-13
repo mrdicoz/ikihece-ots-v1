@@ -9,14 +9,41 @@
         <option value="öğlenci" <?= (old('egitim_sekli', $student['egitim_sekli'] ?? '') === 'öğlenci') ? 'selected' : '' ?>>Öğlenci</option>
         <option value="sabahcı" <?= (old('egitim_sekli', $student['egitim_sekli'] ?? '') === 'sabahcı') ? 'selected' : '' ?>>Sabahçı</option>
     </select></div>
-    <div class="col-12">
-        <label for="egitim_programi" class="form-label">Eğitim Program(lar)ı</label>
-        <select id="egitim_programi" name="egitim_programi[]" multiple>
-            <option value="Bedensel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı">Bedensel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı</option>
-            <option value="Dil ve Konuşma Bozukluğu Olan Bireyler İçin Destek Eğitim Programı">Dil ve Konuşma Bozukluğu Olan Bireyler İçin Destek Eğitim Programı</option>
-            <option value="Zihinsel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı">Zihinsel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı</option>
-            <option value="Öğrenme Güçlüğü Olan Bireyler İçin Destek Eğitim Programı">Öğrenme Güçlüğü Olan Bireyler İçin Destek Eğitim Programı</option>
-            <option value="Otizm Spektrum Bozukluğu Olan Bireyler İçin Destek Eğitim Programı">Otizm Spektrum Bozukluğu Olan Bireyler İçin Destek Eğitim Programı</option>
-        </select>
-    </div>
+<div class="col-12">
+    <label for="egitim_programi" class="form-label">Eğitim Program(lar)ı</label>
+    
+    <?php
+        // Form gönderiminden sonra bir hata olursa, daha önce seçilmiş olan
+        // eğitim programlarını bir dizi olarak alıyoruz. Eğer daha önce
+        // bir seçim yapılmadıysa, boş bir dizi oluşturuyoruz.
+        $selectedPrograms = old('egitim_programi', []);
+    ?>
+
+    <select id="egitim_programi" name="egitim_programi[]" multiple>
+        <option value="Bedensel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı" 
+            <?= in_array('Bedensel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı', $selectedPrograms) ? 'selected' : '' ?>>
+            Bedensel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı
+        </option>
+
+        <option value="Dil ve Konuşma Bozukluğu Olan Bireyler İçin Destek Eğitim Programı" 
+            <?= in_array('Dil ve Konuşma Bozukluğu Olan Bireyler İçin Destek Eğitim Programı', $selectedPrograms) ? 'selected' : '' ?>>
+            Dil ve Konuşma Bozukluğu Olan Bireyler İçin Destek Eğitim Programı
+        </option>
+
+        <option value="Zihinsel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı" 
+            <?= in_array('Zihinsel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı', $selectedPrograms) ? 'selected' : '' ?>>
+            Zihinsel Yetersizliği Olan Bireyler İçin Destek Eğitim Programı
+        </option>
+
+        <option value="Öğrenme Güçlüğü Olan Bireyler İçin Destek Eğitim Programı" 
+            <?= in_array('Öğrenme Güçlüğü Olan Bireyler İçin Destek Eğitim Programı', $selectedPrograms) ? 'selected' : '' ?>>
+            Öğrenme Güçlüğü Olan Bireyler İçin Destek Eğitim Programı
+        </option>
+
+        <option value="Otizm Spektrum Bozukluğu Olan Bireyler İçin Destek Eğitim Programı" 
+            <?= in_array('Otizm Spektrum Bozukluğu Olan Bireyler İçin Destek Eğitim Programı', $selectedPrograms) ? 'selected' : '' ?>>
+            Otizm Spektrum Bozukluğu Olan Bireyler İçin Destek Eğitim Programı
+        </option>
+    </select>
+</div>
 </div>

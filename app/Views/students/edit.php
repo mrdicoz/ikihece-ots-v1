@@ -60,6 +60,23 @@
 
 <?= $this->section('pageScripts') ?>
 <script>
+    // Modal backdrop temizleme fonksiyonu
+function cleanupModalBackdrop() {
+    // Tüm backdrop'ları kaldır
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+    
+    // Body'den modal-open class'ını kaldır
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+}
+
+// Sayfa yüklendiğinde temizle
+document.addEventListener('DOMContentLoaded', function() {
+    cleanupModalBackdrop();
+});
+
+
 document.addEventListener('DOMContentLoaded', function () {
     // Cropper
     initCropper('profile_photo_input', 'cropperModal', 'cropper-image', 'crop-button', 'cropped_image_data');
@@ -113,5 +130,30 @@ document.addEventListener('DOMContentLoaded', function () {
         fetchDistricts(initialCityId, initialDistrictId);
     }
 });
+
+// Telefon mask'lerini uygula
+const telefonMaskOptions = {
+    mask: '(0000) 000 00 00',
+    lazy: false,
+    placeholderChar: '_'
+};
+
+// İletişim telefonu
+const iletisimTel = document.getElementById('iletisim_telefon');
+if (iletisimTel) {
+    IMask(iletisimTel, telefonMaskOptions);
+}
+
+// Anne telefon
+const anneTel = document.getElementById('veli_anne_telefon');
+if (anneTel) {
+    IMask(anneTel, telefonMaskOptions);
+}
+
+// Baba telefon
+const babaTel = document.getElementById('veli_baba_telefon');
+if (babaTel) {
+    IMask(babaTel, telefonMaskOptions);
+}
 </script>
 <?= $this->endSection() ?>
