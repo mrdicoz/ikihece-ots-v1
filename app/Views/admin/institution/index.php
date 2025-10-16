@@ -53,6 +53,14 @@
                         <label for="adresi" class="form-label">Adresi</label>
                         <textarea class="form-control" id="adresi" name="adresi" rows="2"><?= esc($institution->adresi ?? '') ?></textarea>
                     </div>
+
+                    <div class="col-12">
+                        <label for="google_konum" class="form-label">Google Konum Linki</label>
+                        <input type="text" class="form-control" id="google_konum" name="google_konum" value="<?= esc($institution->google_konum ?? '') ?>" placeholder="Google Haritalar veya WhatsApp konum linkini buraya yapıştırın...">
+                        <div class="form-text">
+                            Kopyaladığınız linkin içinde "@" ile başlayan koordinat bilgisi olmalıdır.
+                        </div>
+                    </div>
                     <div class="col-md-3">
                         <label for="acilis_tarihi" class="form-label">Açılış Tarihi</label>
                         <input type="date" class="form-control" id="acilis_tarihi" name="acilis_tarihi" value="<?= esc($institution->acilis_tarihi ?? '') ?>">

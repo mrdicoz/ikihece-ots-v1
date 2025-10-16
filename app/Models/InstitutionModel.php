@@ -16,7 +16,7 @@ class InstitutionModel extends Model
         'kurum_kodu', 'kurum_adi', 'kurum_kisa_adi', 'adresi', 'city_id', 'district_id', // DEĞİŞTİ
         'acilis_tarihi', 'web_sayfasi', 'epostasi', 'sabit_telefon', 'telefon',
         'kurucu_tipi', 'sirket_adi', 'kurucu_temsilci_tckn', 'kurum_vergi_dairesi',
-        'kurum_vergi_no'
+        'kurum_vergi_no', 'google_konum', 'latitude', 'longitude'
     ];
 
     // Dates
