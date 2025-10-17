@@ -3,16 +3,13 @@
 <?= $this->section('title') ?><?= esc($title) ?><?= $this->endSection() ?>
 
 <?= $this->section('main') ?>
-<!-- Harita Container -->
 <div id="map"></div>
 
-<!-- Mobil Panel Tetikleyici -->
 <button class="mobile-menu-trigger d-lg-none" id="mobile-panel-trigger" type="button" 
         data-bs-toggle="offcanvas" data-bs-target="#controlPanel">
     <i class="bi bi-list"></i>
 </button>
 
-<!-- Sol Kontrol Paneli -->
 <div class="offcanvas-start control-panel" tabindex="-1" id="controlPanel">
     <div class="offcanvas-header d-lg-none">
         <h5 class="offcanvas-title text-success">
@@ -23,7 +20,6 @@
     
     <div class="offcanvas-body">
         <div class="panel-wrapper">
-            <!-- Desktop Header -->
             <div class="panel-header d-none d-lg-flex">
                 <h5 class="mb-0 text-success">
                     <i class="bi bi-geo-alt-fill"></i> Servis Takip
@@ -31,10 +27,8 @@
                 <span class="badge bg-success"><?= $driverCount ?> Servis</span>
             </div>
             
-            <!-- Panel İçeriği -->
             <div class="panel-body">
                 <?php if ($driverCount > 1): ?>
-                    <!-- Çoklu Servis Seçimi -->
                     <div class="mb-3">
                         <label class="form-label small text-muted">İzlenecek Servisleri Seçin</label>
                         <select id="driverSelect" multiple>
@@ -46,7 +40,6 @@
                         </select>
                     </div>
                 <?php elseif ($driverCount === 1 && !empty($drivers)): ?>
-                    <!-- Tek Servis -->
                     <div class="alert alert-success p-2 mb-3">
                         <i class="bi bi-person-check-fill"></i>
                         <strong><?= esc($drivers[0]['first_name'] . ' ' . $drivers[0]['last_name']) ?></strong>
@@ -54,20 +47,13 @@
                     </div>
                     <input type="hidden" id="singleDriverId" value="<?= $drivers[0]['id'] ?>">
                 <?php else: ?>
-                    <!-- Servis Yok -->
                     <div class="alert alert-warning p-2 mb-3">
                         <i class="bi bi-exclamation-triangle-fill"></i>
                         <strong>Aktif servis bulunamadı.</strong>
                     </div>
                 <?php endif; ?>
                 
-                <!-- Kontrol Butonları -->
                 <div class="control-buttons">
-                    <button class="btn btn-outline-primary btn-sm w-100" id="autoZoomBtn">
-                        <i class="bi bi-aspect-ratio"></i> 
-                        <span id="autoZoomText">Otomatik Yakınlaştırma: Açık</span>
-                    </button>
-                    
                     <?php if ($driverCount > 0): ?>
                     <button class="btn btn-outline-info btn-sm w-100" id="showAllBtn">
                         <i class="bi bi-pin-map"></i> Tümünü Göster
@@ -80,28 +66,15 @@
                     </button>
                     <?php endif; ?>
                 </div>
-                
-                <!-- Güncelleme Aralığı -->
-                <div class="update-interval">
-                    <label class="form-label small text-muted">Güncelleme Aralığı</label>
-                    <select class="form-select form-select-sm" id="updateIntervalSelect">
-                        <option value="5000">5 saniye</option>
-                        <option value="10000">10 saniye</option>
-                        <option value="15000" selected>15 saniye</option>
-                        <option value="30000">30 saniye</option>
-                    </select>
-                </div>
             </div>
         </div>
     </div>
     
-    <!-- Desktop Panel Toggle Butonu -->
     <button class="panel-toggle d-none d-lg-block" id="panelToggleBtn">
         <i class="bi bi-chevron-left"></i>
     </button>
 </div>
 
-<!-- Sağ Durum Kartları -->
 <div class="status-cards">
     <div class="status-card">
         <div class="pulse-indicator live"></div>
@@ -111,55 +84,17 @@
         </div>
     </div>
     
-    <?php if ($driverCount > 0): ?>
-    <div class="status-card">
-        <i class="bi bi-bus-front-fill text-success fs-5"></i>
-        <div>
-            <div class="fw-bold" id="activeCount">0</div>
-            <div class="small text-muted">Aktif Servis</div>
-        </div>
-    </div>
-    <?php endif; ?>
-    
-<?php if (!empty($companyLocation)): ?>
-<div class="status-card" id="etaCard" style="display: none;">
-    <i class="bi bi-clock-history text-primary fs-5"></i>
-    <div>
-        <div class="fw-bold" id="etaTime">-- dk</div>
-        <div class="small text-muted">Kuruma <span id="etaInfo">En Yakın</span></div>
-    </div>
-</div>
-<?php endif; ?>
+    <!-- Servis kartları buraya dinamik eklenecek -->
+    <div id="driverCards"></div>
+</div>; ?>
 </div>
 
-<!-- Tam Ekran Butonu -->
-<button class="fullscreen-btn" id="fullscreenBtn">
-    <i class="bi bi-arrows-fullscreen"></i>
-</button>
 <?= $this->endSection() ?>
 
 <?= $this->section('pageStyles') ?>
 <style>
     /* ============ PANEL STİLLERİ ============ */
     
-    /* Mobil Tetikleyici */
-    .mobile-menu-trigger {
-        position: absolute;
-        top: 15px;
-        left: 15px;
-        z-index: 1000;
-        background: white;
-        border: none;
-        border-radius: 8px;
-        padding: 10px 14px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        transition: all 0.3s ease;
-    }
-    
-    .mobile-menu-trigger:hover {
-        transform: scale(1.05);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-    }
     
     /* Desktop Panel (LG+) */
     @media (min-width: 992px) {
@@ -177,11 +112,6 @@
             z-index: 1000;
         }
         
-        /* Tam ekran modunda panel pozisyonu */
-        .fullscreen-mode .control-panel {
-            top: 15px;
-            max-height: calc(100vh - 30px);
-        }
         
         /* Panel gizlendiğinde */
         .control-panel.collapsed {
@@ -333,40 +263,7 @@
         }
     }
     
-    /* ============ TAM EKRAN BUTONU ============ */
-    .fullscreen-btn {
-        position: absolute;
-        bottom: 30px;
-        right: 20px;
-        z-index: 1000;
-        width: 46px;
-        height: 46px;
-        background: white;
-        border: 2px solid #dee2e6;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    
-    .fullscreen-btn:hover {
-        transform: scale(1.1);
-        border-color: #198754;
-        box-shadow: 0 4px 15px rgba(25,135,84,0.2);
-    }
-    
-    .fullscreen-btn i {
-        font-size: 20px;
-        color: #495057;
-        transition: color 0.3s ease;
-    }
-    
-    .fullscreen-btn:hover i {
-        color: #198754;
-    }
+    /* ============ TAM EKRAN BUTONU STİLLERİ KALDIRILMIŞTIR ============ */
     
     /* ============ KONTROL BUTONLARI ============ */
     .control-buttons {
@@ -376,6 +273,7 @@
         margin-bottom: 20px;
     }
     
+    /* Güncelleme aralığı kaldırıldığı için bu stil boş kalabilir */
     .update-interval {
         padding-top: 15px;
         border-top: 1px solid rgba(0,0,0,0.1);
@@ -545,6 +443,7 @@
             min-width: auto;
         }
         
+        /* Tam ekran butonu kaldırılmıştır */
         .fullscreen-btn {
             bottom: 80px;
         }
@@ -555,11 +454,49 @@
             display: none;
         }
         
+        /* Tam ekran butonu kaldırılmıştır */
         .fullscreen-btn {
             bottom: 20px;
             right: 15px;
         }
     }
+
+    /* Sürücü Kartları */
+.driver-card {
+    transition: all 0.2s ease;
+}
+
+.driver-card:hover {
+    transform: translateX(-5px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.driver-card-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.driver-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Marker Sadeleştirme */
+.bus-icon-main {
+    width: 48px;
+    height: 48px;
+}
+
+.driver-label,
+.eta-badge,
+.update-time-badge {
+    display: none !important;
+}
 </style>
 <?= $this->endSection() ?>
 
@@ -571,9 +508,9 @@ class TrackingSystem {
         this.map = null;
         this.markers = {};
         this.companyMarker = null;
-        this.autoZoom = true;
         this.updateTimer = null;
-        this.isFullscreen = false;
+        // this.autoZoom = true; // SİLİNMİŞTİR
+        // this.isFullscreen = false; // SİLİNMİŞTİR
         this.driverCount = <?= $driverCount ?? 0 ?>;
         this.companyLocation = <?= json_encode($companyLocation ?? null) ?>;
         this.drivers = <?= json_encode($drivers ?? []) ?>;
@@ -597,8 +534,7 @@ class TrackingSystem {
         this.initControls();
         this.bindEvents();
         this.startTracking();
-        this.startLiveTimeUpdater(); // YENİ SATIR
-
+        this.startLiveTimeUpdater();
     }
     
     initMap() {
@@ -679,16 +615,10 @@ class TrackingSystem {
             document.getElementById('controlPanel').classList.toggle('collapsed');
         });
         
-        // Auto zoom
-        document.getElementById('autoZoomBtn')?.addEventListener('click', () => {
-            this.autoZoom = !this.autoZoom;
-            document.getElementById('autoZoomText').textContent = 
-                `Otomatik Yakınlaştırma: ${this.autoZoom ? 'Açık' : 'Kapalı'}`;
-            if (this.autoZoom) this.fitBounds();
-        });
+        // Auto zoom, Güncelleme aralığı ve Tam ekran butonları SİLİNMİŞTİR
         
         // Tümünü göster
-        document.getElementById('showAllBtn')?.addEventListener('click', () => {
+        document.getElementById('showAllBtn')?.addEventListener('click', () => { 
             if (this.driverCount > 1 && this.tomSelect) {
                 const allValues = this.drivers.map(d => d.id.toString());
                 this.tomSelect.setValue(allValues);
@@ -697,93 +627,55 @@ class TrackingSystem {
         });
         
         // Kuruma odaklan
-        document.getElementById('focusCompanyBtn')?.addEventListener('click', () => {
+        document.getElementById('focusCompanyBtn')?.addEventListener('click', () => { 
             if (this.companyMarker) {
                 this.map.setView(this.companyMarker.getLatLng(), 16);
                 this.companyMarker.openPopup();
             }
         });
-        
-        // Güncelleme aralığı
-        document.getElementById('updateIntervalSelect')?.addEventListener('change', (e) => {
-            this.stopTimer();
-            this.startTimer();
-        });
-        
-        // Tam ekran
-        document.getElementById('fullscreenBtn')?.addEventListener('click', () => {
-            this.toggleFullscreen();
-        });
-        
-        // Fullscreen API events
-        document.addEventListener('fullscreenchange', () => {
-            this.handleFullscreenChange();
-        });
     }
     
-    toggleFullscreen() {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().then(() => {
-                document.body.classList.add('fullscreen-mode');
-                document.getElementById('fullscreenIcon').className = 'bi bi-arrows-angle-contract';
-            });
-        } else {
-            document.exitFullscreen().then(() => {
-                document.body.classList.remove('fullscreen-mode');
-                document.getElementById('fullscreenIcon').className = 'bi bi-arrows-fullscreen';
-            });
+    // toggleFullscreen() ve handleFullscreenChange() metotları SİLİNMİŞTİR
+
+    
+    async updateDriverLocations() {
+        let driverIds = [];
+        
+        // Sürücü ID'lerini belirle
+        if (this.driverCount === 1) {
+            const singleId = document.getElementById('singleDriverId')?.value;
+            if (singleId) driverIds.push(singleId);
+        } else if (this.driverCount > 1 && this.tomSelect) {
+            driverIds = this.tomSelect.getValue();
         }
         
-        // Harita boyutunu güncelle
-        setTimeout(() => this.map.invalidateSize(), 300);
-    }
-    
-    handleFullscreenChange() {
-        this.isFullscreen = !!document.fullscreenElement;
+        if (driverIds.length === 0) {
+            this.clearMarkers();
+            this.updateStatusCards(0, null);
+            return;
+        }
         
-        // Harita boyutunu güncelle
-        setTimeout(() => {
-            this.map.invalidateSize();
-            if (this.autoZoom) this.fitBounds();
-        }, 300);
+        try {
+            // BURADA DEĞİŞTİR ↓
+            const response = await fetch(`<?= site_url('api/mobile/location/drivers') ?>?drivers=${driverIds.join(',')}`);
+            const drivers = await response.json();
+            
+            console.log('API Response:', drivers); // Debug için
+            
+            this.updateMarkers(drivers);
+
+            // Sürücü kartlarını güncelle
+            this.updateDriverCards(drivers);
+            
+            // Durum güncellemeleri
+            document.querySelector('.pulse-indicator')?.classList.add('live');
+            document.getElementById('liveTime').textContent = new Date().toLocaleTimeString('tr-TR');
+            
+        } catch (error) {
+            console.error('Konum güncellemesi başarısız:', error);
+            document.querySelector('.pulse-indicator')?.classList.remove('live');
+        }
     }
-    
-async updateDriverLocations() {
-    let driverIds = [];
-    
-    // Sürücü ID'lerini belirle
-    if (this.driverCount === 1) {
-        const singleId = document.getElementById('singleDriverId')?.value;
-        if (singleId) driverIds.push(singleId);
-    } else if (this.driverCount > 1 && this.tomSelect) {
-        driverIds = this.tomSelect.getValue();
-    }
-    
-    if (driverIds.length === 0) {
-        this.clearMarkers();
-        this.updateStatusCards(0, null);
-        return;
-    }
-    
-    try {
-        const response = await fetch(`<?= site_url('api/location/drivers') ?>?drivers=${driverIds.join(',')}`);
-        const drivers = await response.json();
-        
-        this.updateMarkers(drivers);
-        
-        // En yakın sürücüyü bul
-        const closestDriver = this.findClosestDriver(drivers);
-        this.updateStatusCards(drivers.length, closestDriver);
-        
-        // Durum güncellemeleri
-        document.querySelector('.pulse-indicator')?.classList.add('live');
-        document.getElementById('liveTime').textContent = new Date().toLocaleTimeString('tr-TR');
-        
-    } catch (error) {
-        console.error('Konum güncellemesi başarısız:', error);
-        document.querySelector('.pulse-indicator')?.classList.remove('live');
-    }
-}
     
     updateMarkers(drivers) {
     const receivedIds = drivers.map(d => d.user_id.toString());
@@ -799,8 +691,8 @@ async updateDriverLocations() {
     });
     
     // Marker'ları güncelle veya oluştur
-    drivers.forEach(driver => {
-        const status = this.getDriverStatus(driver.updated_at);
+   drivers.forEach(driver => {
+    const status = this.getDriverStatus(driver.created_at);
         
         // Her seferinde yeni ikon oluştur (güncelleme zamanını göstermek için)
         const icon = this.createDriverIcon(driver, status);
@@ -820,31 +712,26 @@ async updateDriverLocations() {
         this.markers[driver.user_id].bindPopup(this.createPopupContent(driver));
     });
     
-    // Otomatik yakınlaştırma
-    if (this.autoZoom && Object.keys(this.markers).length > 0) {
+    // Otomatik yakınlaştırma (artık this.autoZoom kontrolü olmadan çağrılıyor)
+    if (Object.keys(this.markers).length > 0) {
         this.fitBounds();
     }
 }
     
 createDriverIcon(driver, status) {
-    // Son güncelleme metnini hazırla
-    const updateText = driver.last_update_text || 'Bilinmiyor';
-    
     const html = `
         <div class="bus-icon-wrapper ${status}">
             <div class="bus-icon-main">
                 <i class="bi bi-bus-front-fill"></i>
             </div>
-            <div class="driver-label">${driver.first_name}</div>
-            ${driver.eta ? `<div class="eta-badge">${driver.eta.text}</div>` : ''}
         </div>
     `;
     
     return L.divIcon({
         className: 'bus-marker',
         html: html,
-        iconSize: [60, 100],
-        iconAnchor: [30, 70]
+        iconSize: [48, 48],
+        iconAnchor: [24, 24]
     });
 }
     
@@ -857,31 +744,31 @@ createPopupContent(driver) {
             </h6>
             ${driver.eta ? `
                 <div class="d-flex justify-content-between small mb-1">
-                    <span>Mesafe:</span>
+                    <span><i class="bi bi-geo-alt"></i> Mesafe:</span>
                     <strong>${driver.eta.distance} km</strong>
                 </div>
                 <div class="d-flex justify-content-between small mb-2">
-                    <span>Tahmini:</span>
-                    <strong class="text-primary">${driver.eta.text}</strong>
+                    <span><i class="bi bi-clock-history"></i> Süre:</span>
+                    <strong class="text-success">${driver.eta.text}</strong>
                 </div>
-            ` : ''}
+            ` : '<div class="text-muted small">Konum bilgisi bulunamadı</div>'}
+            <hr class="my-2">
             <div class="text-muted small">
-                <i class="bi bi-speedometer2"></i> ${driver.speed || 0} km/s<br>
-                <i class="bi bi-clock"></i> ${driver.last_update_text || 'Bilinmiyor'}
+                <i class="bi bi-clock"></i> ${driver.last_update_text || 'Güncelleme zamanı bilinmiyor'}
             </div>
         </div>
     `;
 }
     
-    getDriverStatus(updatedAt) {
-        const now = new Date();
-        const updated = new Date(updatedAt);
-        const diffMinutes = (now - updated) / 60000;
-        
-        if (diffMinutes < 2) return 'active';
-        if (diffMinutes < 5) return 'idle';
-        return 'offline';
-    }
+   getDriverStatus(createdAt) {
+    const now = new Date();
+    const updated = new Date(createdAt);
+    const diffMinutes = (now - updated) / 60000;
+    
+    if (diffMinutes < 2) return 'active';
+    if (diffMinutes < 5) return 'idle';
+    return 'offline';
+}
     
   findClosestDriver(drivers) {
     if (!this.companyLocation || drivers.length === 0) return null;
@@ -895,27 +782,61 @@ createPopupContent(driver) {
     }, null);
 }
     
-    updateStatusCards(count, closestDriver) {
-        // Aktif servis sayısı
-        const activeCountEl = document.getElementById('activeCount');
-        if (activeCountEl) activeCountEl.textContent = count;
+updateStatusCards(count, closestDriver) {
+    // ETA kartını kaldırdık, artık kullanılmayacak
+}
 
-        // ETA kartı
-        const etaCard = document.getElementById('etaCard');
-        if (etaCard && this.companyLocation) {
-            if (closestDriver && closestDriver.eta) {
-                etaCard.style.display = 'flex';
-                document.getElementById('etaTime').textContent = closestDriver.eta.text;
-                // Sürücü adını da gösterebiliriz
-                const etaInfo = document.getElementById('etaInfo');
-                if (etaInfo) {
-                    etaInfo.textContent = closestDriver.first_name;
-                }
-            } else {
-                etaCard.style.display = 'none';
+updateDriverCards(drivers) {
+    const container = document.getElementById('driverCards');
+    if (!container) return;
+    
+    // Kartları temizle
+    container.innerHTML = '';
+    
+    // Her sürücü için kart oluştur
+    drivers.forEach(driver => {
+        if (!driver.eta) return; // ETA yoksa gösterme
+        
+        const status = this.getDriverStatus(driver.created_at);
+        const statusColors = {
+            'active': 'success',
+            'idle': 'warning',
+            'offline': 'secondary'
+        };
+        
+        const card = document.createElement('div');
+        card.className = 'status-card driver-card';
+        card.innerHTML = `
+            <div class="driver-card-icon bg-${statusColors[status]}">
+                <i class="bi bi-bus-front-fill text-white"></i>
+            </div>
+            <div class="driver-card-info">
+                <div class="fw-bold">${driver.first_name} ${driver.last_name}</div>
+                <div class="small text-muted d-flex justify-content-between">
+                    <span><i class="bi bi-geo-alt"></i> ${driver.eta.distance} km</span>
+                    <span><i class="bi bi-clock"></i> ${driver.eta.text}</span>
+                </div>
+                <div class="small text-muted">
+                    <i class="bi bi-arrow-clockwise"></i> ${driver.last_update_text}
+                </div>
+            </div>
+        `;
+        
+        // Karta tıklandığında marker'a odaklan
+        card.style.cursor = 'pointer';
+        card.addEventListener('click', () => {
+            if (this.markers[driver.user_id]) {
+                this.map.setView(
+                    [driver.latitude, driver.longitude], 
+                    16
+                );
+                this.markers[driver.user_id].openPopup();
             }
-        }
-    }
+        });
+        
+        container.appendChild(card);
+    });
+}
     
     clearMarkers() {
         Object.values(this.markers).forEach(marker => {
@@ -935,9 +856,8 @@ createPopupContent(driver) {
     }
     
     startTimer() {
-        const interval = parseInt(
-            document.getElementById('updateIntervalSelect')?.value || 15000
-        );
+        // Sabit 15 saniye aralık kullan (Güncelleme aralığı seçimi kaldırılmıştır)
+        const interval = 15000;
         
         if (!this.updateTimer) {
             this.updateTimer = setInterval(() => {

@@ -17,7 +17,6 @@ $routes->POST('notifications/unsubscribe', 'NotificationController::unsubscribe'
 
 
 
-
 // ====================================================================
 // GİRİŞ GEREKTİREN ALAN (Güvenlik Duvarımız)
 // ====================================================================
@@ -277,28 +276,20 @@ $routes->group('api/mobile', static function ($routes) {
     $routes->GET('location/user/(:num)', 'Api\Location::getByUserId/$1');
     $routes->GET('location/email/(:segment)', 'Api\Location::getByEmail/$1');
     $routes->GET('students/daily', 'Api\StudentController::dailyList');
+    $routes->GET('location/drivers', 'TrackingController::getDriverLocations');
 
 });
 
     // Servis takip rotaları
-    $routes->POST('api/location/save', 'Api\LocationController::saveLocation', ['filter' => 'group:servis']);
-    $routes->GET('api/location/drivers', 'Api\LocationController::getActiveDrivers', ['filter' => 'group:admin,servis,mudur']);
-    $routes->GET('tracking/map', 'TrackingController::map', ['as' => 'tracking.map', 'filter' => 'group:admin,mudur,sekreter,ogretmen,servis,veli']);
+   // $routes->POST('api/location/save', 'Api\LocationController::saveLocation', ['filter' => 'group:servis']);
+   // $routes->GET('api/location/drivers', 'Api\LocationController::getActiveDrivers', ['filter' => 'group:admin,servis,mudur']);
+   $routes->GET('tracking/map', 'TrackingController::map', ['as' => 'tracking.map', 'filter' => 'group:admin,mudur,sekreter,ogretmen,servis,veli']);
 
-    /*
-    * --------------------------------------------------------------------
-    * Servis Takip Rotaları
-    * --------------------------------------------------------------------
-    */
+
+    // ============================================
+    // SERVİS TAKİP ROTALARI
+    // ============================================
     $routes->group('', ['filter' => 'session'], static function ($routes) {
-        // Harita ana sayfasını gösterecek rota
-        $routes->get('tracking/map', 'TrackingController::map', ['as' => 'tracking.map']);
-
-        // API Rotaları
-        $routes->group('api', static function ($routes) {
-            // Canlı sürücü konumlarını getiren API ucu
-            $routes->get('location/drivers', 'TrackingController::getDriverLocations');
-            // TODO: Sürücü uygulamasından konum güncellemesi alacak API ucu (ileride yapılacak)
-            // $routes->post('location/update', 'TrackingController::updateDriverLocation');
-        });
+        // Harita sayfası (session gerektirir)
+        //$routes->get('tracking/map', 'TrackingController::map', ['as' => 'tracking.map']);
     });
