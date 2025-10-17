@@ -106,8 +106,8 @@ class TrackingController extends BaseController
             }
             
             // Son güncelleme zamanını insan okunabilir yap
-            if (!empty($driver['updated_at'])) {
-                $updatedTime = Time::parse($driver['updated_at']);
+            if (!empty($driver['created_at'])) {
+                $updatedTime = Time::parse($driver['created_at']);
                 $driver['last_update_text'] = $updatedTime->humanize();
             } else {
                 $driver['last_update_text'] = 'Bilinmiyor';

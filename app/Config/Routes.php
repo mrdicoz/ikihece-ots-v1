@@ -260,36 +260,39 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
 });
 
 // ============================================
-// MOBİL UYGULAMA API'LERİ (Public - Session Gerektirmez)
+// MOBİL UYGULAMA API'LERİ (DOKUNULMAYACAK)
 // ============================================
 $routes->group('api/mobile', static function ($routes) {
-    // Test bağlantısı
-    $routes->GET('test-connection', 'Api\TestConnection::index');
-    
-    // Login
-    $routes->POST('login', 'Api\Auth::login');
-    
-    // Konum kaydetme (mobil uygulama için)
-    $routes->POST('location/save', 'Api\Location::save');
-    
-    // Konum sorgulama
-    $routes->GET('location/user/(:num)', 'Api\Location::getByUserId/$1');
-    $routes->GET('location/email/(:segment)', 'Api\Location::getByEmail/$1');
-    $routes->GET('students/daily', 'Api\StudentController::dailyList');
-    $routes->GET('location/drivers', 'TrackingController::getDriverLocations');
-
+    // Not: Bu grup içindeki rotalarınız olduğu gibi kalacak.
+    // Harita için gerekli olan rota artık bu grupta değil.
+    $routes->get('test-connection', 'Api\TestConnection::index');
+    $routes->post('login', 'Api\Auth::login');
+    $routes->post('location/save', 'Api\Location::save');
+    $routes->get('location/user/(:num)', 'Api\Location::getByUserId/$1');
+    $routes->get('location/email/(:segment)', 'Api\Location::getByEmail/$1');
+    $routes->get('students/daily', 'Api\StudentController::dailyList');
+    // Diğer mobil API rotalarınız...
 });
 
-    // Servis takip rotaları
-   // $routes->POST('api/location/save', 'Api\LocationController::saveLocation', ['filter' => 'group:servis']);
-   // $routes->GET('api/location/drivers', 'Api\LocationController::getActiveDrivers', ['filter' => 'group:admin,servis,mudur']);
-   $routes->GET('tracking/map', 'TrackingController::map', ['as' => 'tracking.map', 'filter' => 'group:admin,mudur,sekreter,ogretmen,servis,veli']);
 
+// ============================================
+// WEB UYGULAMASI - SERVİS TAKİP (YENİ DÜZENLEME)
+// ============================================
+// Bu grup, hem harita sayfasını hem de veri çekeceği API'yi içerir.
+// 'session' filtresi ile sadece giriş yapmış kullanıcıların erişimi sağlanır.
+$routes->group('tracking', ['filter' => 'session'], static function ($routes) {
+    
+    // Harita sayfasını görüntüleyen rota
+    // URL: http://localhost/tracking/map
+    $routes->get('map', 'TrackingController::map', [
+        'as' => 'tracking.map', // Rota ismi
+        'filter' => 'group:admin,mudur,sekreter,ogretmen,servis,veli'
+    ]);
 
-    // ============================================
-    // SERVİS TAKİP ROTALARI
-    // ============================================
-    $routes->group('', ['filter' => 'session'], static function ($routes) {
-        // Harita sayfası (session gerektirir)
-        //$routes->get('tracking/map', 'TrackingController::map', ['as' => 'tracking.map']);
-    });
+    // Haritanın veri çekeceği API rotası (SADECE WEB İÇİN)
+    // URL: http://localhost/tracking/locations
+    $routes->get('locations', 'TrackingController::getDriverLocations', [
+        'as' => 'tracking.locations', // Rota ismi
+        'filter' => 'group:admin,mudur,sekreter,ogretmen,servis,veli'
+    ]);
+});
