@@ -148,7 +148,7 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
 
 
     // --- YAPAY ZEKA ASİSTANI ---
-    $routes->group('ai', ['filter' => 'group:admin,yonetici,mudur,sekreter,ogretmen'], static function ($routes) {
+    $routes->group('ai', ['filter' => 'group:admin,yonetici,mudur,sekreter,ogretmen,veli'], static function ($routes) {
         $routes->GET('assistant', 'AIController::assistantView', ['as' => 'ai.assistant']);
         $routes->POST('assistant', 'AIController::processMessage', ['as' => 'ai.processMessage']);
         $routes->POST('process', 'AIController::processAjax', ['as' => 'ai.process']);

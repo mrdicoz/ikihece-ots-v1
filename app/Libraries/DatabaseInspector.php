@@ -156,30 +156,30 @@ class DatabaseInspector
     public function getDatabaseRelationships(): string
     {
         $relations = "=== VERİTABANI İLİŞKİLERİ ===\n\n";
-        
+
         $relations .= "📌 users (Kullanıcılar)\n";
         $relations .= "  └─> user_profiles (1:1) - Profil bilgileri\n";
         $relations .= "  └─> auth_groups_users (1:N) - Rol atamaları\n";
         $relations .= "  └─> lessons (1:N, teacher_id) - Verdiği dersler\n";
-        $relations .= "  └─> fixed_lessons (1:N, teacher_id) - Sabit ders programı\n";
+        $relations .= "  └─> fixed_schedules (1:N, ogretmen_id) - Sabit ders programı\n";
         $relations .= "  └─> logs (1:N) - Yaptığı işlemler\n\n";
-        
+
         $relations .= "📌 students (Öğrenciler)\n";
         $relations .= "  └─> lessons (1:N) - Aldığı dersler\n";
-        $relations .= "  └─> fixed_lessons (1:N) - Sabit ders programı\n";
-        $relations .= "  └─> user_profiles (1:1, student_id) - Bağlı veli hesabı\n\n";
-        
+        $relations .= "  └─> fixed_schedules (1:N, ogrenci_id) - Sabit ders programı\n";
+        $relations .= "  └─> entitlements (1:N) - Ders hakları\n";
+        $relations .= "  └─> users (N:1, parent_id) - Bağlı veli hesabı\n\n";
+
         $relations .= "📌 lessons (Dersler)\n";
         $relations .= "  └─> users (N:1, teacher_id) - Dersi veren öğretmen\n";
         $relations .= "  └─> students (N:1, student_id) - Dersi alan öğrenci\n\n";
-        
-        $relations .= "📌 fixed_lessons (Sabit Program)\n";
-        $relations .= "  └─> users (N:1, teacher_id) - Öğretmen\n";
-        $relations .= "  └─> students (N:1, student_id) - Öğrenci\n\n";
-        
+
+        $relations .= "📌 fixed_schedules (Sabit Program)\n";
+        $relations .= "  └─> users (N:1, ogretmen_id) - Öğretmen\n";
+        $relations .= "  └─> students (N:1, ogrenci_id) - Öğrenci\n\n";
+
         $relations .= "📌 announcements (Duyurular)\n";
         $relations .= "  └─> users (N:1, created_by) - Oluşturan kullanıcı\n\n";
-        
         return $relations;
     }
 

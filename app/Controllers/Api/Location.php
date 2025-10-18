@@ -62,6 +62,21 @@ class Location extends ResourceController
 
             if ($inserted) {
                 log_message('info', "✅ BAŞARILI! Konum kaydedildi. ID: {$inserted}");
+
+                // **** YENİ EKLENEN KISIM ****
+                // Kullanıcının toplam konum sayısını al
+                $totalLocations = $locationModel->where('user_id', $userId)->countAllResults();
+                log_message('info', "Kullanıcının toplam konum sayısı: {$totalLocations}");
+
+                // Eğer konum sayısı 5'ten fazlaysa, en eskisini sil
+                if ($totalLocations > 5) {
+                    $oldestLocation = $locationModel->where('user_id', $userId)->orderBy('created_at', 'ASC')->first();
+                    if ($oldestLocation) {
+                        $locationModel->delete($oldestLocation['id']);
+                        log_message('info', "Limit aşıldı. En eski konum (ID: {$oldestLocation['id']}) silindi.");
+                    }
+                }
+                // **** YENİ KISIM SONU ****
                 
                 return $this->respond([
                     'status'  => 'success',
