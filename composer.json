@@ -15,6 +15,7 @@
         "codeigniter4/shield": "^1.1",
         "guzzlehttp/guzzle": "^7.9",
         "minishlink/web-push": "^9.0",
+        "mpdf/mpdf": "^8.2",
         "phpoffice/phpspreadsheet": "^4.4",
         "smalot/pdfparser": "^2.12",
         "thiagoalessio/tesseract_ocr": "^2.13"

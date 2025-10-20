@@ -103,7 +103,78 @@
                         <input type="text" class="form-control" id="kurum_vergi_no" name="kurum_vergi_no" value="<?= esc($institution->kurum_vergi_no ?? '') ?>">
                     </div>
                 </div>
+                <h5 class="mt-4 text-success">EVRAK AYARLARI</h5>
+                <hr>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="evrak_prefix" class="form-label">Evrak Numarası Öneki</label>
+                            <input type="text" class="form-control" id="evrak_prefix" name="evrak_prefix" value="<?= esc($institution->evrak_prefix ?? 'SRGM-2025-') ?>" placeholder="Örn: SRGM-2025-">
+                            <div class="form-text">
+                                Evrak numaralarının başına gelecek sabit metin. Örnek: <code>SRGM-2025-</code>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="evrak_baslangic_no" class="form-label">Başlangıç Numarası</label>
+                            <input type="number" class="form-control" id="evrak_baslangic_no" name="evrak_baslangic_no" value="<?= esc($institution->evrak_baslangic_no ?? 1000) ?>" placeholder="1000">
+                            <div class="form-text">
+                                Evrak numaralandırması bu sayıdan başlayacak.
+                            </div>
+                        </div>
+                    </div>
 
+                    <h5 class="mt-4 text-success">YETKİLİ BİLGİLERİ</h5>
+                <hr>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="kurum_muduru_user_id" class="form-label">Kurum Müdürü (Sistem Kullanıcısı)</label>
+                        <select class="form-select" id="kurum_muduru_user_id" name="kurum_muduru_user_id">
+                            <option value="">Sistemden bir kullanıcı seçin...</option>
+                            <?php foreach($users as $user): ?>
+                                <option value="<?= $user->id ?>" <?= (($institution->kurum_muduru_user_id ?? '') == $user->id) ? 'selected' : '' ?>><?= esc($user->username) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text">Eğer müdür bir sistem kullanıcısı ise buradan seçin.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="kurum_muduru_adi" class="form-label">Kurum Müdürü Adı (Manuel)</label>
+                        <input type="text" class="form-control" id="kurum_muduru_adi" name="kurum_muduru_adi" value="<?= esc($institution->kurum_muduru_adi ?? '') ?>">
+                        <div class="form-text">Kullanıcı olarak seçilmediyse veya farklı bir isim gösterilecekse buraya yazın.</div>
+                    </div>
+                     <div class="col-md-6">
+                        <label for="kurucu_mudur_adi" class="form-label">Kurucu Müdür Adı</label>
+                        <input type="text" class="form-control" id="kurucu_mudur_adi" name="kurucu_mudur_adi" value="<?= esc($institution->kurucu_mudur_adi ?? '') ?>">
+                    </div>
+                </div>
+                
+                    <h5 class="mt-4 text-success">GÖRSEL AYARLAR</h5>
+                <hr>
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-6">
+                        <label for="kurum_logo" class="form-label">Kurum Logosu</label>
+                        <input type="file" class="form-control" id="kurum_logo" name="kurum_logo">
+                        <div class="form-text">En iyi görünüm için PNG formatında ve şeffaf arka planlı bir logo yükleyin.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <?php if (!empty($institution->kurum_logo_path)): ?>
+                            <img src="<?= base_url($institution->kurum_logo_path) ?>" alt="Mevcut Logo" style="max-height: 80px; background: #f8f9fa;" class="img-thumbnail">
+                        <?php else: ?>
+                            <p class="text-muted">Henüz logo yüklenmemiş.</p>
+                        <?php endif; ?>
+                    </div>
+
+                    <div class="col-md-6 mt-3">
+                        <label for="kurum_qr" class="form-label">Kurum QR Kodu</label>
+                        <input type="file" class="form-control" id="kurum_qr" name="kurum_qr">
+                        <div class="form-text">MEB tarafından sağlanan QR kodunu yükleyebilirsiniz.</div>
+                    </div>
+                    <div class="col-md-6 mt-3">
+                        <?php if (!empty($institution->kurum_qr_kod_path)): ?>
+                            <img src="<?= base_url($institution->kurum_qr_kod_path) ?>" alt="Mevcut QR Kod" style="max-height: 80px;" class="img-thumbnail">
+                        <?php else: ?>
+                            <p class="text-muted">Henüz QR kod yüklenmemiş.</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
                 <div class="text-end mt-4">
                     <button type="submit" class="btn btn-success">
                         <i class="bi bi-check-circle"></i> Bilgileri Kaydet

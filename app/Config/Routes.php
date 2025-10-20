@@ -296,3 +296,33 @@ $routes->group('tracking', ['filter' => 'session'], static function ($routes) {
         'filter' => 'group:admin,mudur,sekreter,ogretmen,servis,veli'
     ]);
 });
+
+$routes->group('documents', ['namespace' => 'App\Controllers\Documents', 'filter' => 'session'], function ($routes) {
+    // Kategori Yönetimi Rotaları (Pusulaya göre admin ve yönetici erişebilir)
+    $routes->get('categories', 'CategoryController::index', ['as' => 'documents.categories', 'filter' => 'group:admin,yonetici']);
+    $routes->match(['GET', 'POST'], 'categories/create', 'CategoryController::create');
+    $routes->match(['GET', 'POST'], 'categories/edit/(:num)', 'CategoryController::edit/$1');
+    $routes->get('categories/delete/(:num)', 'CategoryController::delete/$1');
+
+    // Şablonlar (Admin/Yönetici)
+    $routes->get('templates', 'TemplateController::index', ['as' => 'documents.templates', 'filter' => 'group:admin,yonetici']);
+    $routes->match(['GET', 'POST'], 'templates/create', 'TemplateController::create');
+    $routes->match(['GET', 'POST'], 'templates/edit/(:num)', 'TemplateController::edit/$1');
+    $routes->get('templates/delete/(:num)', 'TemplateController::delete/$1');
+
+
+    // Belge Oluşturma
+    $routes->get('create', 'DocumentController::index', ['as' => 'documents.create']); // Yeni seçim sayfası
+    $routes->get('create/form/(:num)', 'DocumentController::form/$1', ['as' => 'documents.create.form']); // Asıl form sayfası
+    $routes->post('store', 'DocumentController::store');
+    $routes->get('get-templates', 'DocumentController::getTemplates'); // Bu AJAX rotası aynı kalıyor
+
+    // PDF İşlemleri
+    $routes->get('view-pdf/(:num)', 'DocumentController::viewPDF/$1');
+    $routes->get('download-pdf/(:num)', 'DocumentController::downloadPDF/$1');
+
+    // Arşiv
+    $routes->get('archive', 'ArchiveController::index', ['as' => 'documents.archive']);
+    $routes->match(['GET', 'POST'], 'archive/search', 'ArchiveController::search'); // <-- Bu satırı ekleyin
+    $routes->get('archive/delete/(:num)', 'ArchiveController::delete/$1');
+});
