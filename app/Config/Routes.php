@@ -178,6 +178,7 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
 
         // RAPORLAR
         $routes->match(['GET', 'POST'], 'reports/monthly', 'Admin\ReportController::monthly', ['as' => 'admin.reports.monthly']);
+        $routes->match(['GET', 'POST'], 'service-reports', 'Admin\ServiceReportController::index', ['as' => 'admin.service.reports']);
     });
 
 

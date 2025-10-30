@@ -4,6 +4,8 @@ namespace App\Controllers\Api;
 
 use CodeIgniter\RESTful\ResourceController;
 use App\Models\DriverLocationModel;
+use App\Models\ReportSettingsModel;
+use App\Models\ServiceReportModel;
 
 class Location extends ResourceController
 {
@@ -32,7 +34,6 @@ class Location extends ResourceController
         try {
             $db = \Config\Database::connect();
             
-            // Email'den user_id bul (auth_identities tablosundan)
             $identity = $db->table('auth_identities')
                 ->where('secret', $email)
                 ->where('type', 'email_password')
@@ -47,7 +48,6 @@ class Location extends ResourceController
             $userId = $identity['user_id'];
             log_message('info', "User bulundu: ID={$userId}");
 
-            // Konum kaydet
             $locationModel = new DriverLocationModel();
             
             $data = [
@@ -58,17 +58,20 @@ class Location extends ResourceController
 
             log_message('info', 'DB\'ye kayıt atılıyor: ' . json_encode($data));
 
-            $inserted = $locationModel->insert($data);
+            $insertedId = $locationModel->insert($data);
 
-            if ($inserted) {
-                log_message('info', "✅ BAŞARILI! Konum kaydedildi. ID: {$inserted}");
+            if ($insertedId) {
+                log_message('info', "✅ BAŞARILI! Konum kaydedildi. ID: {$insertedId}");
 
-                // **** YENİ EKLENEN KISIM ****
-                // Kullanıcının toplam konum sayısını al
+                // Process service report calculation
+                try {
+                    $this->updateServiceReport($userId);
+                } catch (\Exception $e) {
+                    log_message('error', '[ServiceReport] Rapor hesaplama hatası: ' . $e->getMessage());
+                }
+
+                // Keep only the last 5 locations
                 $totalLocations = $locationModel->where('user_id', $userId)->countAllResults();
-                log_message('info', "Kullanıcının toplam konum sayısı: {$totalLocations}");
-
-                // Eğer konum sayısı 5'ten fazlaysa, en eskisini sil
                 if ($totalLocations > 5) {
                     $oldestLocation = $locationModel->where('user_id', $userId)->orderBy('created_at', 'ASC')->first();
                     if ($oldestLocation) {
@@ -76,12 +79,11 @@ class Location extends ResourceController
                         log_message('info', "Limit aşıldı. En eski konum (ID: {$oldestLocation['id']}) silindi.");
                     }
                 }
-                // **** YENİ KISIM SONU ****
                 
                 return $this->respond([
                     'status'  => 'success',
                     'message' => 'Konum kaydedildi',
-                    'id'      => $inserted,
+                    'id'      => $insertedId,
                     'user_id' => $userId,
                 ], 200);
             }
@@ -93,5 +95,81 @@ class Location extends ResourceController
             log_message('error', '❌ EXCEPTION: ' . $e->getMessage());
             return $this->fail('Sunucu hatası: ' . $e->getMessage(), 500);
         }
+    }
+
+    /**
+     * Update the service report with the latest location data.
+     *
+     * @param int $userId
+     */
+    private function updateServiceReport(int $userId)
+    {
+        helper('geo');
+        $settingsModel = new ReportSettingsModel();
+        $serviceReportModel = new ServiceReportModel();
+        $locationModel = new DriverLocationModel();
+
+        $settings = array_merge([
+            'tracking_start_time' => '08:00',
+            'tracking_end_time'   => '19:00',
+        ], $settingsModel->getSettings());
+
+        $currentTime = new \DateTime('now', new \DateTimeZone('Europe/Istanbul'));
+        $startTime = new \DateTime($settings['tracking_start_time'], new \DateTimeZone('Europe/Istanbul'));
+        $endTime = new \DateTime($settings['tracking_end_time'], new \DateTimeZone('Europe/Istanbul'));
+
+        if ($currentTime < $startTime || $currentTime > $endTime) {
+            log_message('info', '[ServiceReport] Takip saatleri dışında, hesaplama yapılmadı.');
+            return;
+        }
+
+        $locations = $locationModel->where('user_id', $userId)->orderBy('created_at', 'DESC')->limit(2)->find();
+
+        if (count($locations) < 2) {
+            log_message('info', '[ServiceReport] Mesafe hesaplamak için yeterli konum verisi yok (en az 2 gerekli).');
+            return;
+        }
+
+        $currentLocation = $locations[0];
+        $previousLocation = $locations[1];
+
+        $distance = haversineDistance(
+            (float)$previousLocation['latitude'],
+            (float)$previousLocation['longitude'],
+            (float)$currentLocation['latitude'],
+            (float)$currentLocation['longitude']
+        );
+
+        $timeDiffSeconds = strtotime($currentLocation['created_at']) - strtotime($previousLocation['created_at']);
+
+        $idleThresholdKm = 0.01; // 10 meters
+        $kmToAdd = 0;
+        $idleSecondsToAdd = 0;
+
+        if ($distance < $idleThresholdKm) {
+            $idleSecondsToAdd = $timeDiffSeconds;
+            log_message('info', "[ServiceReport] Araç duruyor. {$idleSecondsToAdd} saniye eklendi.");
+        } else {
+            $kmToAdd = $distance;
+            log_message('info', "[ServiceReport] Mesafe hesaplandı: {$kmToAdd} km.");
+        }
+
+        $today = date('Y-m-d');
+        $report = $serviceReportModel->where('user_id', $userId)->where('date', $today)->first();
+
+        if (!$report) {
+            $report = [
+                'user_id' => $userId,
+                'date'    => $today,
+                'total_km' => 0,
+                'total_idle_time_seconds' => 0,
+            ];
+        }
+
+        $report['total_km'] += $kmToAdd;
+        $report['total_idle_time_seconds'] += $idleSecondsToAdd;
+
+        $serviceReportModel->save($report);
+        log_message('info', "[ServiceReport] Rapor güncellendi: UserID: {$userId}, Tarih: {$today}");
     }
 }
