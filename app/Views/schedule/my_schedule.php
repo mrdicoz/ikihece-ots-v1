@@ -37,24 +37,34 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <?php for ($hour = 8; $hour <= 18; $hour++): 
+                        <?php for ($hour = config('Ots')->scheduleStartHour; $hour < config('Ots')->scheduleEndHour; $hour++): 
                             $time = str_pad($hour, 2, '0', STR_PAD_LEFT) . ':00';
                         ?>
                         <tr>
                             <td class="fw-bold text-center align-middle bg-light"><?= $time ?></td>
                             <?php foreach ($weekDates as $day): 
-                                $lessonsInSlot = $scheduleData[$day->format('Y-m-d')][$time] ?? [];
+                                $dateKey = $day->format('Y-m-d');
+                                $itemsInSlot = $scheduleData[$dateKey][$time] ?? [];
                             ?>
                             <td class="p-1 align-top" style="min-width: 150px;">
-                                <?php if (!empty($lessonsInSlot)): ?>
+                                <?php if (!empty($itemsInSlot)): ?>
                                     <div class="list-group list-group-flush">
-                                        <?php foreach ($lessonsInSlot as $lesson): ?>
-                                            <a href="<?= site_url('students/' . $lesson['student_id']) ?>" class="list-group-item list-group-item-action p-2" data-bs-toggle="tooltip" title="<?= esc(date('H:i', strtotime($lesson['start_time']))) ?> - <?= esc(date('H:i', strtotime($lesson['end_time']))) ?>">
-                                                <div class="d-flex align-items-center">
-                                                    <img src="<?= base_url($lesson['profile_image'] ?? 'assets/images/user.jpg') ?>" class="rounded-circle me-2" alt="<?= esc($lesson['adi']) ?>" style="width:28px; height:28px; object-fit:cover;">
-                                                    <small class="text-truncate"><?= esc($lesson['adi'] . ' ' . $lesson['soyadi']) ?></small>
-                                                </div>
-                                            </a>
+                                        <?php foreach ($itemsInSlot as $item): ?>
+                                            <?php if ($item['type'] === 'lesson'): ?>
+                                                <a href="<?= site_url('students/' . $item['student_id']) ?>" class="list-group-item list-group-item-action p-2" data-bs-toggle="tooltip" title="<?= esc(date('H:i', strtotime($item['start_time']))) ?> - <?= esc(date('H:i', strtotime($item['end_time']))) ?>">
+                                                    <div class="d-flex align-items-center">
+                                                        <img src="<?= base_url($item['profile_image'] ?? 'assets/images/user.jpg') ?>" class="rounded-circle me-2" alt="<?= esc($item['adi']) ?>" style="width:28px; height:28px; object-fit:cover;">
+                                                        <small class="text-truncate"><?= esc($item['adi'] . ' ' . $item['soyadi']) ?></small>
+                                                    </div>
+                                                </a>
+                                            <?php elseif ($item['type'] === 'evaluation'): ?>
+                                                <a href="#" class="list-group-item list-group-item-action p-2 bg-info-subtle has-evaluation" data-evaluation-id="<?= $item['id'] ?>" data-bs-toggle="tooltip" title="<?= esc(date('H:i', strtotime($item['start_time']))) ?> - <?= esc(date('H:i', strtotime($item['end_time']))) ?>">
+                                                    <div class="d-flex align-items-center">
+                                                        <i class="bi bi-card-checklist me-2"></i>
+                                                        <small class="text-truncate">DEĞERLENDİRME</small>
+                                                    </div>
+                                                </a>
+                                            <?php endif; ?>
                                         <?php endforeach; ?>
                                     </div>
                                 <?php endif; ?>
@@ -74,6 +84,31 @@
                 </div>
             <ul id="mobileLessonList" class="list-group list-group-flush">
                 </ul>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="evaluationDetailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="evaluationDetailModalLabel">Değerlendirme Detayları</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="evaluation-form">
+                    <input type="hidden" name="evaluation_id" id="evaluationId">
+                    <div class="mb-3">
+                        <label for="evaluationNotes" class="form-label">Notlar</label>
+                        <textarea class="form-control" id="evaluationNotes" name="notes" rows="5"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                <button type="button" class="btn btn-danger" id="deleteEvaluationBtn">Değerlendirmeyi Sil</button>
+                <button type="button" class="btn btn-primary" id="updateEvaluationNotesBtn">Notları Kaydet</button>
+            </div>
         </div>
     </div>
 </div>
@@ -132,22 +167,36 @@ document.addEventListener('DOMContentLoaded', function () {
             let hourHtml = '';
             if (lessonsInHour.length > 0) {
                 hasLessons = true;
-                lessonsInHour.forEach(lesson => {
-                    const startTime = lesson.start_time.substring(0, 5);
-                    const endTime = lesson.end_time.substring(0, 5);
-                    const studentUrl = `<?= site_url('students') ?>/${lesson.student_id}`;
-                    const profileImage = `<?= base_url() ?>${lesson.profile_image || 'assets/images/user.jpg'}`;
+                lessonsInHour.forEach(item => { // 'lesson' yerine 'item' adını kullandım, daha genel olması için
+                    const startTime = item.start_time.substring(0, 5);
+                    const endTime = item.end_time.substring(0, 5);
+                    if (item.type === 'lesson') {
+                        // Ders Kartı
+                        const studentUrl = `<?= site_url('students') ?>/${item.student_id}`;
+                        const profileImage = `<?= base_url() ?>${item.profile_image || 'assets/images/user.jpg'}`;
 
-                    hourHtml += `
-                        <a href="${studentUrl}" class="text-decoration-none text-body">
-                            <div class="d-flex align-items-center p-2 rounded mb-1 bg-light">
-                                <img src="${profileImage}" class="rounded-circle me-3" alt="${lesson.adi}" style="width:36px; height:36px; object-fit:cover;">
-                                <div class="text-truncate">
-                                    <span class="fw-bold">${lesson.adi} ${lesson.soyadi}</span>
-                                    <small class="d-block text-muted">${startTime} - ${endTime}</small>
+                        hourHtml += `
+                            <a href="${studentUrl}" class="text-decoration-none text-body">
+                                <div class="d-flex align-items-center p-2 rounded mb-1 bg-light">
+                                    <img src="${profileImage}" class="rounded-circle me-3" alt="${item.adi}" style="width:36px; height:36px; object-fit:cover;">
+                                    <div class="text-truncate">
+                                        <span class="fw-bold">${item.adi} ${item.soyadi}</span>
+                                        <small class="d-block text-muted">${startTime} - ${endTime}</small>
+                                    </div>
                                 </div>
-                            </div>
-                        </a>`;
+                            </a>`;
+                    } else if (item.type === 'evaluation') {
+                        hourHtml += `
+                            <a href="#" class="text-decoration-none text-body has-evaluation" data-evaluation-id="${item.id}" data-bs-toggle="tooltip" title="${startTime} - ${endTime}">
+                                <div class="d-flex align-items-center p-2 rounded mb-1 bg-info-subtle">
+                                    <i class="bi bi-card-checklist me-3 fs-5"></i>
+                                    <div class="text-truncate">
+                                        <span class="fw-bold">DEĞERLENDİRME</span>
+                                        <small class="d-block text-muted">${startTime} - ${endTime}</small>
+                                    </div>
+                                </div>
+                            </a>`;
+                    }
                 });
             }
 
@@ -200,6 +249,91 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Sayfa ilk yüklendiğinde mevcut günü çiz
     renderDay(currentDayIndex);
+
+    // Yeni Değerlendirme Detay Modalını başlat
+    const evaluationDetailModal = new bootstrap.Modal(document.getElementById('evaluationDetailModal'));
+
+    // Değerlendirme bloğuna tıklama olayı
+    $(document).on('click', '.has-evaluation', function() {
+        const evaluationId = $(this).data('evaluation-id');
+        $('#evaluationId').val(evaluationId);
+        $('#evaluationNotes').val('Yükleniyor...').prop('disabled', true);
+        evaluationDetailModal.show();
+
+        $.get(`<?= site_url("degerlendirme/get/") ?>${evaluationId}`)
+            .done(function(response) {
+                if (response.success && response.data) {
+                    $('#evaluationNotes').val(response.data.notes || '').prop('disabled', false);
+                } else {
+                    $('#evaluationNotes').val('Notlar yüklenemedi.').prop('disabled', true);
+                    alert(response.message || 'Değerlendirme detayları alınamadı.');
+                }
+            })
+            .fail(function() {
+                $('#evaluationNotes').val('Sunucu hatası.').prop('disabled', true);
+                alert('Değerlendirme detayları alınırken sunucu hatası oluştu.');
+            });
+    });
+
+    // Değerlendirme Notlarını Kaydet butonu
+    $('#updateEvaluationNotesBtn').on('click', function() {
+        const evaluationId = $('#evaluationId').val();
+        const notes = $('#evaluationNotes').val();
+        const button = $(this);
+        button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Kaydediliyor...');
+
+        $.post(`<?= site_url("degerlendirme/update/") ?>${evaluationId}`, {
+            '<?= csrf_token() ?>': '<?= csrf_hash() ?>',
+            notes: notes
+        })
+        .done(function(response) {
+            if (response.success) {
+                alert(response.message);
+                evaluationDetailModal.hide();
+                // Sayfayı yenilemek yerine sadece ilgili günün verisini yenilemek daha iyi olabilir.
+                // Şimdilik tam sayfa yenileme yapıyoruz.
+                location.reload(); 
+            } else {
+                alert(response.message || 'Notlar güncellenirken bir hata oluştu.');
+            }
+        })
+        .fail(function() {
+            alert('Sunucu hatası: Notlar güncellenemedi.');
+        })
+        .always(function() {
+            button.prop('disabled', false).html('Notları Kaydet');
+        });
+    });
+
+    // Değerlendirmeyi Sil butonu
+    $('#deleteEvaluationBtn').on('click', function() {
+        if (!confirm('Bu değerlendirmeyi kalıcı olarak silmek istediğinizden emin misiniz?')) return;
+
+        const evaluationId = $('#evaluationId').val();
+        const button = $(this);
+        button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Siliniyor...');
+
+        $.post(`<?= site_url("degerlendirme/delete/") ?>${evaluationId}`, {
+            '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
+        })
+        .done(function(response) {
+            if (response.success) {
+                alert(response.message);
+                evaluationDetailModal.hide();
+                // Sayfayı yenilemek yerine sadece ilgili günün verisini yenilemek daha iyi olabilir.
+                // Şimdilik tam sayfa yenileme yapıyoruz.
+                location.reload(); 
+            } else {
+                alert(response.message || 'Değerlendirme silinirken bir hata oluştu.');
+            }
+        })
+        .fail(function() {
+            alert('Sunucu hatası: Değerlendirme silinemedi.');
+        })
+        .always(function() {
+            button.prop('disabled', false).html('Değerlendirmeyi Sil');
+        });
+    });
 });
 </script>
 <?= $this->endSection() ?>

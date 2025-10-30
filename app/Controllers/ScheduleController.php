@@ -10,6 +10,7 @@ use App\Models\LessonModel;
 use App\Models\LessonStudentModel;
 use App\Models\StudentModel;
 use App\Models\UserProfileModel;
+use App\Models\DegerlendirmeModel;
 use CodeIgniter\I18n\Time;
 use CodeIgniter\Shield\Models\UserModel;
 
@@ -171,8 +172,21 @@ public function dailyGrid($date = null)
 
         $lessonMap = [];
         foreach ($lessons as $lesson) {
+            $lesson['type'] = 'lesson'; // Türü belirt
             $hourKey = date('H', strtotime($lesson['start_time']));
             $lessonMap[$lesson['teacher_id']][$hourKey] = $lesson;
+        }
+
+        // Değerlendirmeleri çek ve lessonMap'e ekle
+        $degerlendirmeModel = new DegerlendirmeModel();
+        $evaluations = $degerlendirmeModel->where('evaluation_date', $date)->findAll();
+
+        foreach ($evaluations as $evaluation) {
+            $evaluation['type'] = 'evaluation'; // Türü belirt
+            $hourKey = date('H', strtotime($evaluation['start_time']));
+            // Eğer o saatte zaten bir ders varsa, çakışma olabilir. Şimdilik üzerine yazıyoruz.
+            // İdeal senaryoda çakışma kontrolü yapılmalı.
+            $lessonMap[$evaluation['teacher_id']][$hourKey] = $evaluation;
         }
 
         $data = [
@@ -416,7 +430,22 @@ public function dailyGrid($date = null)
         foreach ($lessonsRaw as $lesson) {
             $dateKey = date('Y-m-d', strtotime($lesson['lesson_date']));
             $hourKey = date('H:i', strtotime($lesson['start_time']));
-            $scheduleData[$dateKey][$hourKey][] = $lesson;
+            $scheduleData[$dateKey][$hourKey][] = array_merge($lesson, ['type' => 'lesson']);
+        }
+
+        // Öğretmenin değerlendirmelerini çek ve scheduleData'ya ekle
+        $degerlendirmeModel = new DegerlendirmeModel();
+        $evaluationsRaw = $degerlendirmeModel
+            ->where('teacher_id', $teacherId)
+            ->where('evaluation_date >=', $startDate->format('Y-m-d'))
+            ->where('evaluation_date <=', $endDate->format('Y-m-d'))
+            ->findAll();
+
+        foreach ($evaluationsRaw as $evaluation) {
+            $dateKey = date('Y-m-d', strtotime($evaluation['evaluation_date']));
+            $hourKey = date('H:i', strtotime($evaluation['start_time']));
+            // Eğer o saatte zaten bir ders varsa, değerlendirme üzerine yazılır. Çakışma kontrolü frontend'de yapılmalı.
+            $scheduleData[$dateKey][$hourKey][] = array_merge($evaluation, ['type' => 'evaluation']);
         }
 
         // 4. Veriyi View'e gönder
@@ -610,80 +639,82 @@ public function addFixedLessonsForDay()
             return $this->response->setJSON(['success' => false, 'message' => 'Eksik parametre.']);
         }
 
-        // 1. Gerekli Modelleri Yükle
         $fixedLessonModel = new FixedLessonModel();
         $lessonModel = new LessonModel();
         $lessonStudentModel = new LessonStudentModel();
         $db = \Config\Database::connect();
 
-        // 2. Haftanın gününü hesapla (1=Pzt, 2=Salı, ..., 7=Pazar)
         $dayOfWeek = date('N', strtotime($date));
+        $time = Time::parse($date);
+        $weekOfMonth = (int)ceil($time->getDay() / 7);
+        $weekMap = [1 => 'A', 2 => 'B', 3 => 'C', 4 => 'D', 5 => 'A'];
+        $targetWeekType = $weekMap[$weekOfMonth];
 
-        // 3. Öğretmenin o güne ait tüm sabit derslerini bul
         $fixedLessons = $fixedLessonModel
             ->where('teacher_id', $teacherId)
             ->where('day_of_week', $dayOfWeek)
+            ->groupStart()
+                ->where('week_type', $targetWeekType)
+                ->orWhere('week_type', 'A')
+            ->groupEnd()
             ->findAll();
 
         if (empty($fixedLessons)) {
             return $this->response->setJSON(['success' => true, 'message' => 'Bu öğretmen için bugüne ait tanımlanmış sabit ders bulunmamaktadır.']);
         }
 
-        // 4. O gün için öğretmenin mevcut ders saatlerini al
+        $groupedFixedLessons = [];
+        foreach ($fixedLessons as $fixed) {
+            $groupedFixedLessons[$fixed['start_time']][] = $fixed;
+        }
+
         $existingLessons = $lessonModel
             ->where('teacher_id', $teacherId)
             ->where('lesson_date', $date)
             ->findColumn('start_time') ?? [];
 
-        // 5. Eklenecek dersleri hazırla ve çakışmaları kontrol et
         $lessonsToAdd = [];
         $lessonStudentsToAdd = [];
-        $addedCount = 0;
-
-        foreach ($fixedLessons as $fixed) {
-            // Eğer bu saatte zaten bir ders varsa, bu sabit dersi atla
-            if (in_array($fixed['start_time'], $existingLessons)) {
+        
+        foreach ($groupedFixedLessons as $startTime => $lessonsInSlot) {
+            if (in_array($startTime, $existingLessons)) {
                 continue;
             }
 
+            $firstLessonInSlot = $lessonsInSlot[0];
             $lessonsToAdd[] = [
-                'teacher_id'  => $fixed['teacher_id'],
+                'teacher_id'  => $firstLessonInSlot['teacher_id'],
                 'lesson_date' => $date,
-                'start_time'  => $fixed['start_time'],
-                'end_time'    => $fixed['end_time'],
+                'start_time'  => $firstLessonInSlot['start_time'],
+                'end_time'    => $firstLessonInSlot['end_time'],
             ];
-            // Eklenecek öğrenciyi de geçici bir dizide tut
-            $lessonStudentsToAdd[$fixed['start_time']] = $fixed['student_id'];
-            $addedCount++;
+            $lessonStudentsToAdd[$startTime] = array_column($lessonsInSlot, 'student_id');
         }
 
-        // 6. Eklenecek yeni ders yoksa işlemi bitir
         if (empty($lessonsToAdd)) {
             return $this->response->setJSON(['success' => true, 'message' => 'Tüm sabit dersler zaten programda mevcut. Yeni ders eklenmedi.']);
         }
 
-        // 7. Veritabanı işlemini başlat (transaction)
         $db->transStart();
 
-        // Dersleri toplu olarak ekle
         $lessonModel->insertBatch($lessonsToAdd);
 
-        // Eklenen derslerin ID'lerini ve başlangıç saatlerini al
         $insertedLessons = $lessonModel
             ->where('teacher_id', $teacherId)
             ->where('lesson_date', $date)
             ->whereIn('start_time', array_keys($lessonStudentsToAdd))
             ->findAll();
 
-        // Her derse ait öğrenciyi ekle
         $finalStudentData = [];
         foreach ($insertedLessons as $lesson) {
-            $studentId = $lessonStudentsToAdd[$lesson['start_time']] ?? null;
-            if ($studentId) {
-                $finalStudentData[] = [
-                    'lesson_id' => $lesson['id'],
-                    'student_id' => $studentId,
-                ];
+            $studentIds = $lessonStudentsToAdd[$lesson['start_time']] ?? [];
+            if (!empty($studentIds)) {
+                foreach($studentIds as $studentId) {
+                    $finalStudentData[] = [
+                        'lesson_id'  => $lesson['id'],
+                        'student_id' => $studentId,
+                    ];
+                }
             }
         }
         
@@ -698,20 +729,15 @@ public function addFixedLessonsForDay()
 
         $db->transCommit();
         
-        // Bildirim göndermek için olay tetikle
         \CodeIgniter\Events\Events::trigger('schedule.changed', ['date' => $date], $teacherId);
 
-        return $this->response->setJSON(['success' => true, 'message' => $addedCount . ' adet yeni sabit ders programa başarıyla eklendi.']);
+        return $this->response->setJSON(['success' => true, 'message' => count($lessonsToAdd) . ' adet yeni sabit ders programa başarıyla eklendi.']);
     }
-    
 
-    /**
-     * YENİ FONKSİYON: Belirli bir öğretmen ve tarihteki tüm dersleri siler.
-     */
     public function deleteLessonsForDay()
     {
         if (!$this->request->isAJAX()) {
-            return $this->response->setStatusCode(403, 'Forbidden');
+            return $this->response->setStatusCode(403);
         }
 
         $teacherId = $this->request->getPost('teacher_id');
@@ -721,12 +747,10 @@ public function addFixedLessonsForDay()
             return $this->response->setJSON(['success' => false, 'message' => 'Eksik parametre.']);
         }
 
-        // 1. Gerekli Modelleri Yükle
         $lessonModel = new LessonModel();
         $lessonStudentModel = new LessonStudentModel();
         $db = \Config\Database::connect();
 
-        // 2. Silinecek derslerin ID'lerini bul
         $lessonIdsToDelete = $lessonModel
             ->where('teacher_id', $teacherId)
             ->where('lesson_date', $date)
@@ -738,13 +762,10 @@ public function addFixedLessonsForDay()
         
         $deletedCount = count($lessonIdsToDelete);
 
-        // 3. Veritabanı işlemini başlat (transaction)
         $db->transStart();
 
-        // Önce derslere bağlı öğrenci kayıtlarını sil
         $lessonStudentModel->whereIn('lesson_id', $lessonIdsToDelete)->delete();
         
-        // Sonra derslerin kendisini sil
         $lessonModel->whereIn('id', $lessonIdsToDelete)->delete();
 
         if ($db->transStatus() === false) {
@@ -754,16 +775,11 @@ public function addFixedLessonsForDay()
 
         $db->transCommit();
 
-        // Bildirim göndermek için olay tetikle
         \CodeIgniter\Events\Events::trigger('schedule.changed', ['date' => $date], $teacherId);
 
         return $this->response->setJSON(['success' => true, 'message' => $deletedCount . ' adet ders ve bağlı öğrenci kayıtları programdan başarıyla silindi.']);
     }
 
-     /**
-     * YENİ FONKSİYON: Listelenen tüm öğretmenler için o güne ait sabit dersleri
-     * programa ekler, çakışanları atlar.
-     */
     public function addAllFixedLessonsForDay()
     {
         if (!$this->request->isAJAX()) {
@@ -781,8 +797,14 @@ public function addFixedLessonsForDay()
         $lessonModel = new LessonModel();
         $lessonStudentModel = new LessonStudentModel();
         $db = \Config\Database::connect();
+        
         $dayOfWeek = date('N', strtotime($date));
-        $totalAdded = 0;
+        $time = Time::parse($date);
+        $weekOfMonth = (int)ceil($time->getDay() / 7);
+        $weekMap = [1 => 'A', 2 => 'B', 3 => 'C', 4 => 'D', 5 => 'A'];
+        $targetWeekType = $weekMap[$weekOfMonth];
+        
+        $totalAddedCount = 0;
 
         $db->transStart();
 
@@ -790,29 +812,49 @@ public function addFixedLessonsForDay()
             $fixedLessons = $fixedLessonModel
                 ->where('teacher_id', $teacherId)
                 ->where('day_of_week', $dayOfWeek)
+                ->groupStart()
+                    ->where('week_type', $targetWeekType)
+                    ->orWhere('week_type', 'A')
+                ->groupEnd()
                 ->findAll();
 
             if (empty($fixedLessons)) continue;
+
+            $groupedFixedLessons = [];
+            foreach ($fixedLessons as $fixed) {
+                $groupedFixedLessons[$fixed['start_time']][] = $fixed;
+            }
 
             $existingLessons = $lessonModel
                 ->where('teacher_id', $teacherId)
                 ->where('lesson_date', $date)
                 ->findColumn('start_time') ?? [];
 
-            foreach ($fixedLessons as $fixed) {
-                if (in_array($fixed['start_time'], $existingLessons)) continue;
-                
+            foreach ($groupedFixedLessons as $startTime => $lessonsInSlot) {
+                if (in_array($startTime, $existingLessons)) continue;
+
+                $firstLesson = $lessonsInSlot[0];
                 $lessonData = [
-                    'teacher_id'  => $fixed['teacher_id'],
+                    'teacher_id'  => $firstLesson['teacher_id'],
                     'lesson_date' => $date,
-                    'start_time'  => $fixed['start_time'],
-                    'end_time'    => $fixed['end_time'],
+                    'start_time'  => $firstLesson['start_time'],
+                    'end_time'    => $firstLesson['end_time'],
                 ];
+                
                 $lessonModel->insert($lessonData);
                 $lessonId = $lessonModel->getInsertID();
-                $lessonStudentModel->insert(['lesson_id' => $lessonId, 'student_id' => $fixed['student_id']]);
-                
-                $totalAdded++;
+                $totalAddedCount++;
+
+                $studentData = [];
+                foreach ($lessonsInSlot as $lesson) {
+                    $studentData[] = [
+                        'lesson_id' => $lessonId,
+                        'student_id' => $lesson['student_id']
+                    ];
+                }
+                if (!empty($studentData)) {
+                    $lessonStudentModel->insertBatch($studentData);
+                }
             }
         }
         
@@ -823,14 +865,13 @@ public function addFixedLessonsForDay()
 
         $db->transCommit();
         
-        if ($totalAdded === 0) {
+        if ($totalAddedCount === 0) {
             return $this->response->setJSON(['success' => true, 'message' => 'Tüm sabit dersler zaten programda mevcut. Yeni ders eklenmedi.']);
         }
 
-        // Bildirim göndermek için olay tetikle (tüm öğretmenler için)
         \CodeIgniter\Events\Events::trigger('schedule.changed', ['date' => $date], $teacherIds);
 
-        return $this->response->setJSON(['success' => true, 'message' => $totalAdded . ' adet yeni sabit ders programa başarıyla eklendi.']);
+        return $this->response->setJSON(['success' => true, 'message' => $totalAddedCount . ' adet yeni sabit ders programa başarıyla eklendi.']);
     }
 
     /**
@@ -880,4 +921,80 @@ public function addFixedLessonsForDay()
         return $this->response->setJSON(['success' => true, 'message' => $deletedCount . ' adet ders programdan başarıyla silindi.']);
     }
 
+    // --- DEĞERLENDİRME FONKSİYONLARI ---
+
+    public function createEvaluation()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(403);
+        }
+
+        $data = $this->request->getPost([
+            'teacher_id',
+            'evaluation_date',
+            'start_time',
+            'end_time'
+        ]);
+
+        // Basit bir doğrulama
+        if (empty($data['teacher_id']) || empty($data['evaluation_date']) || empty($data['start_time'])) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Eksik parametreler.']);
+        }
+
+        $degerlendirmeModel = new DegerlendirmeModel();
+
+        if ($degerlendirmeModel->insert($data)) {
+            return $this->response->setJSON(['success' => true, 'message' => 'Değerlendirme başarıyla eklendi.']);
+        } else {
+            return $this->response->setJSON(['success' => false, 'message' => 'Değerlendirme eklenirken bir hata oluştu.']);
+        }
+    }
+
+    public function getEvaluationDetails($id)
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(403);
+        }
+
+        $degerlendirmeModel = new DegerlendirmeModel();
+        $evaluation = $degerlendirmeModel->find($id);
+
+        if ($evaluation) {
+            return $this->response->setJSON(['success' => true, 'data' => $evaluation]);
+        } else {
+            return $this->response->setJSON(['success' => false, 'message' => 'Değerlendirme bulunamadı.']);
+        }
+    }
+
+    public function updateEvaluation($id)
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(403);
+        }
+
+        $notes = $this->request->getPost('notes');
+
+        $degerlendirmeModel = new DegerlendirmeModel();
+
+        if ($degerlendirmeModel->update($id, ['notes' => $notes])) {
+            return $this->response->setJSON(['success' => true, 'message' => 'Değerlendirme notu başarıyla güncellendi.']);
+        } else {
+            return $this->response->setJSON(['success' => false, 'message' => 'Güncelleme sırasında bir hata oluştu.']);
+        }
+    }
+
+    public function deleteEvaluation($id)
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(403);
+        }
+
+        $degerlendirmeModel = new DegerlendirmeModel();
+
+        if ($degerlendirmeModel->delete($id)) {
+            return $this->response->setJSON(['success' => true, 'message' => 'Değerlendirme başarıyla silindi.']);
+        } else {
+            return $this->response->setJSON(['success' => false, 'message' => 'Değerlendirme silinirken bir hata oluştu.']);
+        }
+    }
 }

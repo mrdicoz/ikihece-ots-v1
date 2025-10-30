@@ -116,6 +116,14 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->POST('update/(:num)', 'EvaluationController::update/$1', ['as' => 'evaluations.update']);
     });
 
+    // --- DEĞERLENDİRME MODÜLÜ (Yeni) ---
+    $routes->group('degerlendirme', ['filter' => 'group:admin,yonetici,mudur,sekreter,ogretmen'], static function ($routes) {
+        $routes->POST('create', 'ScheduleController::createEvaluation', ['as' => 'degerlendirme.create']);
+        $routes->GET('get/(:num)', 'ScheduleController::getEvaluationDetails/$1', ['as' => 'degerlendirme.get']);
+        $routes->POST('update/(:num)', 'ScheduleController::updateEvaluation/$1', ['as' => 'degerlendirme.update']);
+        $routes->POST('delete/(:num)', 'ScheduleController::deleteEvaluation/$1', ['as' => 'degerlendirme.delete']);
+    });
+
 
     // --- DERS PROGRAMI ---
     // Bu grup, ders programı ile ilgili tüm rotaları içerir ve yetki kontrolü yapar.
