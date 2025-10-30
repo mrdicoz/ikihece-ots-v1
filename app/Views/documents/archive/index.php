@@ -69,7 +69,7 @@
 </div>
 <?= $this->endSection() ?>
 
-<?= $this->section('scripts') ?>
+<?= $this->section('pageScripts') ?>
 <script>
     $(document).ready(function() {
         $('#archiveTable').DataTable({

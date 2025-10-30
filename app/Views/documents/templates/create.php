@@ -71,15 +71,14 @@
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[LOGO]">[LOGO]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[QR_KOD]">[QR_KOD]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[KURUM_ADI]">[KURUM_ADI]</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[KURUM_KISA_ADI]">[KURUM_KISA_ADI]</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[ALICI]">[ALICI]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[MUDUR]">[MUDUR]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[KURUCU_MUDUR]">[KURUCU_MUDUR]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[ADRES]">[ADRES]</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[TELEFON]">[TELEFON]</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[KONU]">[KONU]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[SABIT_TELEFON]">[SABIT_TELEFON]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[EPOSTA]">[EPOSTA]</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[EVRAK_PREFIX]">[EVRAK_PREFIX]</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[EVRAK_BASLANGIC_NO]">[EVRAK_BASLANGIC_NO]</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[EVRAK_NO]">[EVRAK_NO]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[TARIH]">[TARIH]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="{EKLER}">{EKLER}</button>
                         </div>
@@ -179,18 +178,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- TINYMCE EDİTÖRÜ ---
     tinymce.init({
         selector: '#tinymceEditor',
-        
-        // 1. Lisans Sorununu Çözen Satır
         license_key: 'gpl',
 
-        // 2. İstediğin Yeni Özellikler İçin Eklentiler
-        plugins: 'lists link table code fullscreen',
+        // 1. Önce plugins kısmına 'advlist' ekleyin
+        plugins: 'lists link table code fullscreen advlist',
         
-        // 3. Gelişmiş Toolbar (Yeni Butonlarla Birlikte)
-        toolbar: 'undo redo | blocks | bold italic | fontsizeselect | alignleft aligncenter alignright | bullist numlist outdent indent | hr | link table | code | fullscreen',
+        // 2. Toolbar'da fontsizeselect kullanın
+        toolbar: 'undo redo | alignjustify alignleft aligncenter alignright | fontsize lineheight | bold italic | table | hr | fullscreen | code ',
         
-        // Diğer ayarlarımız aynı kalıyor
-        font_size_formats: '6px 8px 10px 12px 14px 16px 18px 20px 24px 28px 32px 36px',
+        // 3. Font boyutu seçenekleri
+        font_size_formats: '8px 10px 12px 14px 16px 18px 20px 24px 28px 32px 36px',
+        
         height: 500,
         menubar: false,
         content_style: 'body { font-family: Arial, sans-serif; font-size: 12pt; }',
@@ -338,10 +336,10 @@ function renderFieldsTable() {
         content = content.replace(/\[KURUM_ADI\]/g, `<b>${institution.name}</b>`);
         content = content.replace(/\[KURUM_KISA_ADI\]/g, `<b>${institution.short_name || 'Kısa Ad'}</b>`);
         content = content.replace(/\[LOGO\]/g, institution.logo 
-            ? `<img src="<?= base_url('uploads/logos/') ?>${institution.logo}" style="max-width:150px;">` 
+            ? `<img src="<?= base_url() ?>${institution.logo}" style="max-width:150px;">` 
             : '<span class="text-muted">[Logo]</span>');
         content = content.replace(/\[QR_KOD\]/g, institution.qr_code 
-            ? `<img src="<?= base_url('uploads/qr_codes/') ?>${institution.qr_code}" style="max-width:100px;">` 
+            ? `<img src="<?= base_url() ?>${institution.qr_code}" style="max-width:80px;">` 
             : '<span class="text-muted">[QR Kod]</span>');
         content = content.replace(/\[MUDUR\]/g, `<b>${institution.director || 'Müdür'}</b>`);
         content = content.replace(/\[KURUCU_MUDUR\]/g, `<b>${institution.founder_director || 'Kurucu Müdür'}</b>`);

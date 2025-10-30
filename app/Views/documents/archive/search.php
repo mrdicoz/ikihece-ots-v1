@@ -105,8 +105,8 @@
 </div>
 <?= $this->endSection() ?>
 
-<?= $this->section('scripts') ?>
-<?php if (isset($searched) && !empty($results)): ?>
+<?= $this->section('pageScripts') ?>
+<?php if ($searched === true): ?>
 <script>
     $(document).ready(function() {
         $('#searchResultsTable').DataTable({

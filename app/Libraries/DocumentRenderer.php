@@ -11,19 +11,18 @@ class DocumentRenderer
         $mpdf = new Mpdf([
             'mode' => 'utf-8',
             'format' => 'A4',
-            'margin_left' => 25,
-            'margin_right' => 25,
-            'margin_top' => 30,
-            'margin_bottom' => 25,
-            'default_font' => 'dejavusans',
-            'dpi' => 125,
-            'img_dpi' => 125
+            'margin_left' => 15,    // 10mm
+            'margin_right' => 15,   // 15mm
+            'margin_top' => 25,     // 25mm
+            'margin_bottom' => 15,  // 15mm
+            'default_font' => '',   // Boş - varsayılan font
+            'dpi' => 96,            // 96 DPI
+            'img_dpi' => 96         // 96 DPI
         ]);
-
         $style = '
         <style>
             @page {
-                margin: 30mm 25mm 25mm 25mm;
+                margin: 25mm 15mm 15mm 15mm;
             }
             body {
                 font-family: "dejavusans", sans-serif;
@@ -38,7 +37,7 @@ class DocumentRenderer
             }
             td, th {
                 padding: 8px;
-                border: 1px solid #000000;
+                border: 0px solid #000000;
                 text-align: left;
             }
             th {

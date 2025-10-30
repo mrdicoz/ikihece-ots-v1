@@ -92,9 +92,6 @@ class DocumentController extends BaseController
     /**
      * Belgeyi kaydeder.
      */
-/**
-     * Belgeyi kaydeder.
-     */
     public function store()
     {
         $templateId = $this->request->getPost('template_id');
@@ -107,23 +104,37 @@ class DocumentController extends BaseController
         // Form verilerini al
         $formData = $this->request->getPost('fields');
         $documentNumber  = $this->request->getPost('document_number');
+        $documentDate   = $this->request->getPost('document_date'); 
         $subject  = $this->request->getPost('subject');
+        $recipient = $this->request->getPost('recipient');
+        $attachments = $this->request->getPost('attachments');
+
+        // Tarih girilmemişse, bugünün tarihini kullan
+        $documentDate = !empty($documentDate) ? $documentDate : date('Y-m-d'); // <-- 2. YENİ: Boş tarih kontrolü.
 
         // Evrak numarası kontrolü
         if ($template->has_number) {
-            if ($this->numberingModel->isNumberUsed($documentNumber)) {
+            // Eğer kullanıcı numara girmemişse, önerilen numarayı biz atayalım.
+            if (empty($documentNumber)) {
+                $documentNumber = $this->numberingModel->suggestNextNumber($templateId, (bool)$template->fill_gaps);
+            } 
+            // Kullanıcı bir numara girdiyse, kullanılıp kullanılmadığını kontrol edelim.
+            elseif ($this->numberingModel->isNumberUsed($documentNumber, $templateId)) { // templateId ile kontrolü netleştirelim.
                 return redirect()->back()->withInput()->with('error', 'Bu evrak numarası zaten kullanılmış!');
             }
         }
 
         // HTML'i render et (YENİ: Konu ve Evrak Numarası da gönderiliyor)
-        $renderedHtml = $this->renderDocument($template, $formData, $subject, $documentNumber);
+            $renderedHtml = $this->renderDocument($template, $formData, $subject, $recipient, $documentNumber, $attachments, $documentDate);
 
         // Veritabanına kaydet
         $this->documentModel->insert([
             'template_id' => $templateId,
             'document_number' => $template->has_number ? $documentNumber : null,
+            'document_date'   => $documentDate, // <-- 4. YENİ: Tarihi veritabanına ekliyoruz.
             'subject' => $subject,
+            'recipient' => $recipient,
+            'attachments' => json_encode($attachments),
             'form_data' => json_encode($formData),
             'rendered_html' => $renderedHtml,
             'created_by' => auth()->id()
@@ -132,50 +143,86 @@ class DocumentController extends BaseController
         return redirect()->to('/documents/archive')->with('success', 'Belge başarıyla oluşturuldu.');
     }
 
-    /**
-     * Nihai HTML'i oluşturur.
+        /**
+         * Nihai HTML'i oluşturur.
+         */
+        /**
+     * Belge içeriğini render eder.
      */
-   /**
-     * Şablonu render eder.
-     */
-    private function renderDocument($template, $formData, $subject, $documentNumber)
+    private function renderDocument($template, $formData, $subject, $recipient, $documentNumber, $attachments, $documentDate)
     {
-        $html  = $template->content;
-        $settings = $this->institutionModel->first(); // FAZ 4 raporuna göre bu model kullanılıyor
+        $content = $template->content;
+        $settings = $this->institutionModel->first();
 
-        // YENİ: Konu ve Sayı alanlarını değiştir
-        $html = str_replace('{KONU}', esc($subject), $html);
-        // Not: Şablondaki [EVRAK_PREFIX][EVRAK_BASLANGIC_NO] yerine tam numarayı basıyoruz
-        $html = str_replace('[EVRAK_PREFIX][EVRAK_BASLANGIC_NO]', esc($documentNumber), $html);
-
-        // Sabit alanları değiştir
-        $staticFields = json_decode($template->static_fields, true) ?? [];
-        foreach ($staticFields as $field) {
-            switch ($field) {
-                case 'KURUM_ADI':
-                    $html = str_replace('[KURUM_ADI]', $settings->name ?? '', $html);
-                    break;
-                case 'LOGO':
-                    $logoPath  = base_url($settings->logo_path ?? '');
-                    $html  = str_replace('[LOGO]', "<img src='{$logoPath}' style='max-width: 150px;'>", $html);
-                    break;
-                case 'MUDUR':
-                    $html = str_replace('[MUDUR]', $settings->kurum_muduru_adi ?? 'Müdür Adı', $html);
-                    break;
-                case 'ADRES':
-                    $html = str_replace('[ADRES]', $settings->address ?? '', $html);
-                    break;
+        // Tarihi formatla ve [TARIH] etiketiyle değiştir
+        $formattedDate = date('d.m.Y', strtotime($documentDate));
+        
+        // --- BURADAKİ TÜM replaceAll'LARI str_replace YAPACAĞIZ ---
+        $content = str_replace('[TARIH]', $formattedDate, $content);
+        $content = str_replace('[KONU]', $subject, $content);
+        $content = str_replace('[ALICI]', $recipient, $content);
+        $content = str_replace('[EVRAK_NO]', $documentNumber, $content);
+        
+        // Kurum bilgileri
+        $content = str_replace('[KURUM_ADI]', $settings->kurum_adi, $content);
+        $content = str_replace('[KURUM_KISA_ADI]', $settings->kurum_kisa_adi, $content);
+        $content = str_replace('[MUDUR]', $settings->kurum_muduru_adi, $content);
+        $content = str_replace('[KURUCU_MUDUR]', $settings->kurucu_mudur_adi, $content);
+        $content = str_replace('[ADRES]', $settings->adresi, $content);
+        $content = str_replace('[TELEFON]', $settings->telefon, $content);
+        $content = str_replace('[SABIT_TELEFON]', $settings->sabit_telefon, $content);
+        $content = str_replace('[EPOSTA]', $settings->epostasi, $content);
+        $content = str_replace('[WEB_SAYFA]', $settings->web_sayfasi, $content);
+        
+// LOGO İŞLEMLERİ
+        $logoHtml = ''; // Başlangıçta boş
+        $logoDbPath = $settings->kurum_logo_path; // Veritabanından gelen yolu al (örn: uploads/institution/logo.png)
+        if (!empty($logoDbPath)) {
+            // Fiziksel yolu oluştur (örn: C:/.../public/uploads/institution/logo.png)
+            $logoPhysicalPath = FCPATH . $logoDbPath; 
+            // Dosyanın varlığını kontrol et
+            if (is_file($logoPhysicalPath)) {
+                $logoHtml = '<img src="' . $logoPhysicalPath . '" style="max-width:150px">';
             }
         }
+        $content = str_replace('[LOGO]', $logoHtml, $content);
 
-        // Dinamik alanları değiştir
+        // QR KOD İŞLEMLERİ (Logodan tamamen ayrı)
+        $qrHtml = ''; // Başlangıçta boş
+        $qrDbPath = $settings->kurum_qr_kod_path; // Veritabanından gelen yolu al (örn: uploads/qr_codes/qr.png)
+        if (!empty($qrDbPath)) {
+            // Fiziksel yolu oluştur (örn: C:/.../public/uploads/qr_codes/qr.png)
+            $qrPhysicalPath = FCPATH . $qrDbPath;
+             // Dosyanın varlığını kontrol et
+            if (is_file($qrPhysicalPath)) {
+                $qrHtml = '<img src="' . $qrPhysicalPath . '" style="max-width:80px">';
+            }
+        }
+        $content = str_replace('[QR_KOD]', $qrHtml, $content);
+
+        // Dinamik alanlar
         if (!empty($formData)) {
             foreach ($formData as $key => $value) {
-                $html  = str_replace('{' . $key . '}', esc($value), $html);
+                // Hem [KEY] hem de {KEY} formatını destekleyelim
+                $content = str_replace('{' . strtoupper($key) . '}', nl2br($value), $content);
+                $content = str_replace('[' . strtoupper($key) . ']', nl2br($value), $content);
             }
         }
-        
-        return $html;
+
+        // Ekler
+        $attachmentHtml = '';
+        if (!empty($attachments) && !empty(array_filter($attachments))) {
+            $attachmentHtml = '<ol>';
+            foreach (array_filter($attachments) as $attachment) {
+                $attachmentHtml .= '<li>' . esc(strtoupper($attachment)) . '</li>';
+            }
+            $attachmentHtml .= '</ol>';
+        } else {
+            $attachmentHtml = '<li>-</li>';
+        }
+        $content = str_replace('{EKLER}', $attachmentHtml, $content);
+
+        return $content;
     }
     /**
      * Belgeyi PDF olarak tarayıcıda görüntüler.

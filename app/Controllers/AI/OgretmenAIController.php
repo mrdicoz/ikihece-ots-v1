@@ -2,353 +2,275 @@
 
 namespace App\Controllers\AI;
 
-use App\Models\StudentModel;
-use App\Models\LessonModel;
+use App\Libraries\AIService;
 use App\Models\FixedLessonModel;
-use App\Models\UserProfileModel;
-use Smalot\PdfParser\Parser;
+use App\Models\LessonModel;
+use App\Models\RamReportAnalysisModel;
+use App\Models\StudentEvaluationModel;
+use App\Models\StudentModel;
 
 class OgretmenAIController extends BaseAIController
 {
     public function process(string $userMessage, object $user): string
     {
         $userMessageLower = $this->turkish_strtolower($userMessage);
-        
-        $context = "[BAĞLAM BAŞLANGICI]\n";
-        $this->buildUserContext($context, $user, 'Öğretmen');
-        $this->buildInstitutionContext($context);
-        
-        // Öğrenci adı geçiyorsa yetki kontrolü ve detay bilgi ekle
-        $studentId = $this->findStudentIdInMessage($userMessageLower);
-        if ($studentId) {
-            // Yetki kontrolü - sadece kendi öğrencileri
-            if (!(new StudentModel())->isStudentOfTeacher($studentId, $user->id)) {
-                return "Sadece kendi ders programınızda kayıtlı öğrenciler hakkında bilgi alabilirsiniz.";
-            }
-            
-            $this->buildTeacherStudentDetailContext($context, $studentId, $user->id);
+
+        if ($this->isGreeting($userMessageLower)) {
+            return $this->handleGreetingAndPresentMenu();
         }
-        
-        // Ders programı sorguları
-        if ($this->containsKeywords($userMessageLower, ['ders programım', 'derslerim', 'programım', 'takvimim'])) {
-            $this->buildLessonScheduleContext($context, $userMessageLower, $user->id);
+
+        // Intent 1: RAM Raporu Analizi
+        if (preg_match("/(.+?) adlı öğrencinin ram raporu analizi nedir/i", $userMessage, $matches)) {
+            $studentName = trim($matches[1]);
+            $studentId = $this->findStudentIdInMessage($studentName);
+            return $this->handleRamReportQuery($user, $studentId);
         }
-        
-        // Sabit program sorguları
-        if ($this->containsKeywords($userMessageLower, ['sabit program', 'haftalık program', 'sabit dersler'])) {
-            $this->buildFixedScheduleContext($context, $user->id);
+
+        // Intent 2: Muhtemel Ders Programı
+        if (preg_match("/(.+?)(?:'de| de) muhtemel ders programın nedir/i", $userMessage, $matches)) {
+            $dateStr = trim($matches[1]);
+            return $this->handleProbableScheduleQuery($user, $dateStr);
         }
-        
-        $context .= "[BAĞLAM SONU]\n";
-        
-        $systemPrompt = "Sen İkihece Özel Eğitim Kurumu'nun AI asistanısın.
 
-**Şu an bir ÖĞRETMEN ile konuşuyorsun.**
+        // Intent 3: Diğer Öğretmenlerin Yorumları
+        if (preg_match("/diğer öğretmenlerin (.+?) hakkında yorumları nedir/i", $userMessage, $matches)) {
+            $studentName = trim($matches[1]);
+            $studentId = $this->findStudentIdInMessage($studentName);
+            return $this->handleOtherTeacherCommentsQuery($user, $studentId);
+        }
 
-Görevin öğretmene eğitim sürecinde maksimum destek olmak:
+        // Intent 4: Öğretmen Raporu
+        if ($this->containsKeywords($userMessageLower, ['hakkımda rapor oluştur'])) {
+            return $this->handleTeacherReportQuery($user);
+        }
 
-**RAM Raporu Analizi:**
-- RAM raporlarını detaylı analiz et
-- Öğrencinin güçlü ve zayıf yönlerini belirle
-- Öğrenme stiline uygun stratejiler öner
-- Dikkat edilmesi gereken özel durumları vurgula
-
-**Eğitim Stratejileri:**
-- Öğrencinin seviyesine uygun aktiviteler öner
-- Yapılması ve yapılmaması gerekenleri açıkça belirt
-- Diğer öğretmenlerin deneyimlerini dikkate al
-- Pratik, uygulanabilir çözümler sun
-
-**İletişim Rehberliği:**
-- Veli ile iletişim için öneriler sun
-- Öğrenci ile etkili iletişim yolları öner
-- Motivasyon teknikleri paylaş
-
-**Dikkat Edilmesi Gerekenler:**
-- Her öğrenci benzersizdir, genelleme yapma
-- Olumlu yaklaşımı ön planda tut
-- Öğretmenin gözlemlerine değer ver
-- Pratik ve uygulanabilir öneriler sun
-
-Samimi, destekleyici ve profesyonel bir dil kullan. Öğretmeni isimlendirirken 'hocam' veya adını kullan.";
-        
-        $userPrompt = $context . "\n\nÖğretmenin Sorusu: '{$userMessage}'";
-        return $this->aiService->getChatResponse($userPrompt, $systemPrompt);
+        return $this->generateRedirection();
     }
-    
-    /**
-     * Öğretmen için öğrenci detay bilgileri - RAM, dersler, değerlendirmeler
-     */
-    private function buildTeacherStudentDetailContext(string &$context, int $studentId, int $teacherId): void
+
+    private function handleGreetingAndPresentMenu(): string
     {
-        $studentModel = new StudentModel();
-        $student = $studentModel->find($studentId);
-        
-        if (!$student) {
-            $context .= "\n=== ÖĞRENCİ DETAY ===\nÖğrenci bulunamadı.\n";
-            return;
+        $response = "Merhaba hocam, ben yapay zeka asistanınız Pusula. Size nasıl daha verimli yardımcı olabilirim? 🤓\n\n";
+        $response .= "Aşağıdaki gibi sorular sorabilirsiniz:\n\n";
+        $response .= "1. **`{Öğrenci Adı}` adlı öğrencinin ram raporu analizi nedir?**\n";
+        $response .= "2. **`{Tarih}`'de muhtemel ders programın nedir?** (Örn: 'yarın', '25.10.2025')\n";
+        $response .= "3. **Diğer öğretmenlerin `{Öğrenci Adı}` hakkında yorumları nedir?**\n";
+        $response .= "4. **Hakkımda rapor oluştur.**\n";
+        return $response;
+    }
+
+    private function handleRamReportQuery(object $user, ?int $studentId): string
+    {
+        if (!$studentId) {
+            return "Analiz için lütfen geçerli bir öğrenci adı belirtin.";
+        }
+        if (!(new StudentModel())->isStudentOfTeacher($studentId, $user->id)) {
+            return "Hocam, sadece kendi ders verdiğiniz öğrencilerin RAM raporu analizlerine erişebilirsiniz.";
         }
 
-        $context .= "\n" . str_repeat("=", 70) . "\n";
-        $context .= "ÖĞRENCİ DETAYLI DOSYA\n";
-        $context .= str_repeat("=", 70) . "\n\n";
-        
-        $context .= "Öğrenci: {$student['adi']} {$student['soyadi']}\n";
-        $context .= "Doğum Tarihi: {$student['dogum_tarihi']}\n";
-        
-        // Eğitim programları
-        if (!empty($student['egitim_programi'])) {
-            $programs = is_string($student['egitim_programi']) 
-                ? json_decode($student['egitim_programi'], true) 
-                : $student['egitim_programi'];
-            
-            if (is_array($programs)) {
-                $context .= "\nEğitim Programları:\n";
-                foreach ($programs as $prog) {
-                    $context .= "  ✓ {$prog}\n";
-                }
-            }
-        }
-        
-        // Kalan ders hakları
-        $context .= "\n--- KALAN DERS HAKLARI ---\n";
-        $context .= "Normal Bireysel: " . ($student['normal_bireysel_hak'] ?? 0) . " saat\n";
-        $context .= "Normal Grup: " . ($student['normal_grup_hak'] ?? 0) . " saat\n";
-        $context .= "Telafi Bireysel: " . ($student['telafi_bireysel_hak'] ?? 0) . " saat\n";
-        $context .= "Telafi Grup: " . ($student['telafi_grup_hak'] ?? 0) . " saat\n";
-        
-        $totalHak = ($student['normal_bireysel_hak'] ?? 0) + ($student['normal_grup_hak'] ?? 0) + 
-                    ($student['telafi_bireysel_hak'] ?? 0) + ($student['telafi_grup_hak'] ?? 0);
-        
-        if ($totalHak < 10) {
-            $context .= "\n⚠️ DİKKAT: Öğrencinin ders hakkı azalmış durumda! Veli ile iletişime geçilmesi önerilir.\n";
-        }
-        
-        // Veli İletişim Bilgileri
-        $context .= "\n--- VELİ İLETİŞİM BİLGİLERİ ---\n";
-        if (!empty($student['veli_anne_adi_soyadi'])) {
-            $context .= "Anne: {$student['veli_anne_adi_soyadi']}\n";
-            $context .= "Anne Telefon: {$student['veli_anne_telefon']}\n";
-        }
-        if (!empty($student['veli_baba_adi_soyadi'])) {
-            $context .= "Baba: {$student['veli_baba_adi_soyadi']}\n";
-            $context .= "Baba Telefon: {$student['veli_baba_telefon']}\n";
+        $analysisModel = new RamReportAnalysisModel();
+        $analysis = $analysisModel->where('student_id', $studentId)->first();
+
+        if (!$analysis || empty($analysis['ram_text_content'])) {
+            return "Bu öğrenci için henüz bir RAM raporu analizi bulunmuyor. Lütfen RAM raporunun yüklendiğinden ve analiz edildiğinden emin olun.";
         }
 
-        // RAM DosyasÄ± Analizi - ÖĞRETMENLERİN EN ÖNEMLİ İHTİYACI
-        $context .= "\n" . str_repeat("=", 70) . "\n";
-        $context .= "RAM RAPORU ANALİZİ (KRİTİK ÖNEM)\n";
-        $context .= str_repeat("=", 70) . "\n\n";
+        $student = (new StudentModel())->find($studentId);
+        $ramReportText = $analysis['ram_text_content'];
+
+        $systemPrompt = "Sen özel eğitim alanında uzman bir yapay zeka asistanısın. Sana verilen RAM (Rehberlik ve Araştırma Merkezi) raporu metnini analiz et. Bu metinden yola çıkarak, öğrencinin tanısı, bilişsel, sosyal, duygusal ve fiziksel gelişim özelliklerini, eğitimsel performansını, güçlü ve desteklenmesi gereken yönlerini belirle. Bu bilgileri bir özel eğitim öğretmeninin kolayca anlayabileceği teknik ve pedagojik bir dille, başlıklar halinde (örn: Tanı, Bilişsel Gelişim, Güçlü Yönler, Öneriler vb.) özetle. Cevabın doğrudan analiz olsun, selamlama veya giriş cümlesi kullanma. Çıktıyı Markdown formatında yapılandır.";
         
-        if (!empty($student['ram_raporu'])) {
-            $ramPath = WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu'];
-            
-            if (file_exists($ramPath)) {
-                $ramContent = $this->readPdfContent($ramPath);
-                if (!empty(trim($ramContent))) {
-                    // RAM içeriğini daha detaylı şekilde ekle (öğretmenler için çok önemli)
-                    $ramSummary = mb_substr($ramContent, 0, 3000); // Daha uzun özet
-                    $context .= "RAM Raporu İçeriği:\n\n";
-                    $context .= $ramSummary;
-                    
-                    if (mb_strlen($ramContent) > 3000) {
-                        $context .= "\n\n[NOT: RAM raporu daha fazla içerik barındırıyor. Yukarıdaki özet öğrencinin temel profilini yansıtmaktadır.]\n";
-                    }
-                    
-                    $context .= "\n\n[ÖĞRETMENİMİZ İÇİN TAVSİYELER]\n";
-                    $context .= "Bu RAM raporuna göre:\n";
-                    $context .= "- Öğrencinin güçlü yanlarını destekleyin\n";
-                    $context .= "- Zayıf alanlarda sabırlı ve teşvik edici olun\n";
-                    $context .= "- Özel ihtiyaçlara dikkat edin\n";
-                    $context .= "- Ailesiyle düzenli iletişim kurun\n\n";
-                    
-                } else {
-                    $context .= "⚠️ RAM dosyası okunamadı. Dosya bozuk veya sadece görsel içeriyor olabilir.\n";
-                    $context .= "Lütfen idare ile iletişime geçerek RAM raporunun yeniden yüklenmesini talep edin.\n\n";
-                }
-            } else {
-                $context .= "⚠️ RAM dosyası sunucuda bulunamadı.\n";
-                $context .= "Dosya yolu: {$student['ram_raporu']}\n";
-                $context .= "Lütfen teknik destek ile iletişime geçin.\n\n";
-            }
-        } else {
-            $context .= "⚠️ Bu öğrenci için henüz RAM raporu yüklenmemiş.\n";
-            $context .= "RAM raporu olmadan öğrenciye optimal eğitim vermek zorlaşabilir.\n";
-            $context .= "Lütfen yönetim ile iletişime geçerek RAM raporunun yüklenmesini talep edin.\n\n";
+        $userPrompt = "Lütfen aşağıdaki RAM raporu metnini analiz ederek {$student['adi']} {$student['soyadi']} adlı öğrenci için bir özet oluştur:\n\n{$ramReportText}";
+
+        $aiService = new AIService();
+        $summary = $aiService->getChatResponse($userPrompt, $systemPrompt);
+
+        $response = "**{$student['adi']} {$student['soyadi']} için Yorumlanmış RAM Raporu Analizi:**\n\n";
+        $response .= $summary;
+        $response .= "\n\n---\n";
+        $response .= "Bu özet, RAM raporunun bir yorumudur. Detaylı ders stratejileri üzerine konuşabiliriz. Ne dersiniz? 🧠";
+
+        return $response;
+    }
+
+    private function handleProbableScheduleQuery(object $user, string $dateStr): string
+    {
+        try {
+            $date = new \DateTime($this->normalizeDate($dateStr));
+            $dayOfWeek = $date->format('N'); // 1 (Pazartesi) - 7 (Pazar)
+        } catch (\Exception $e) {
+            return "Lütfen geçerli bir tarih belirtin (örneğin, 'yarın', '25.10.2025').";
         }
 
-        // Bu öğrenciyle yapılan son dersler (öğretmenin kendi dersleri)
-        $lessonModel = new LessonModel();
-        $myLessons = $lessonModel
-            ->select('lessons.*')
-            ->where('lessons.student_id', $studentId)
-            ->where('lessons.teacher_id', $teacherId)
-            ->orderBy('lessons.lesson_date', 'DESC')
-            ->orderBy('lessons.lesson_time', 'DESC')
-            ->findAll(10);
+        $fixedLessonModel = new FixedLessonModel();
+        $lessons = $fixedLessonModel
+            ->select('fixed_lessons.start_time, fixed_lessons.end_time, students.adi, students.soyadi')
+            ->join('students', 'students.id = fixed_lessons.student_id')
+            ->where('fixed_lessons.teacher_id', $user->id)
+            ->where('fixed_lessons.day_of_week', $dayOfWeek)
+            ->orderBy('fixed_lessons.start_time', 'ASC')
+            ->findAll();
 
-        if (!empty($myLessons)) {
-            $context .= "\n--- SİZİN BU ÖĞRENCİYLE YAPTIĞINIZ SON DERSLER ---\n\n";
-            foreach ($myLessons as $lesson) {
-                $context .= "📅 {$lesson['lesson_date']} {$lesson['lesson_time']}";
-                if (!empty($lesson['lesson_type'])) {
-                    $context .= " [{$lesson['lesson_type']}]";
-                }
-                $context .= "\n";
-                
-                if (!empty($lesson['notes'])) {
-                    $context .= "   📝 Notlarınız: {$lesson['notes']}\n";
-                }
-                $context .= "\n";
-            }
-        } else {
-            $context .= "\n--- SİZİN BU ÖĞRENCİYLE YAPTIĞINIZ DERSLER ---\n";
-            $context .= "Henüz bu öğrenci ile ders yapmamışsınız veya not girişi yapmamışsınız.\n\n";
+        if (empty($lessons)) {
+            return $date->format('d.m.Y') . " tarihi için sabit programınızda bir ders bulunmuyor hocam.";
         }
 
-        // Diğer öğretmenlerin değerlendirmeleri - ÇOK ÖNEMLİ
-        $otherTeacherLessons = $lessonModel
-            ->select('lessons.notes, lessons.lesson_date, lessons.lesson_type, users.username, user_profiles.first_name, user_profiles.last_name')
-            ->join('users', 'users.id = lessons.teacher_id')
-            ->join('user_profiles', 'user_profiles.user_id = users.id', 'left')
-            ->where('lessons.student_id', $studentId)
-            ->where('lessons.teacher_id !=', $teacherId)
-            ->where('lessons.notes IS NOT NULL')
-            ->where('lessons.notes !=', '')
-            ->orderBy('lessons.lesson_date', 'DESC')
+        $response = "**" . $date->format('d.m.Y D') . " için Muhtemel Ders Programınız (Sabit Programa Göre):**\n\n";
+        foreach ($lessons as $lesson) {
+            $response .= "- **{$lesson['start_time']} - {$lesson['end_time']}:** {$lesson['adi']} {$lesson['soyadi']}\n";
+        }
+
+        return $response;
+    }
+
+    private function handleOtherTeacherCommentsQuery(object $user, ?int $studentId): string
+    {
+        if (!$studentId) {
+            return "Yorumları görmek için lütfen geçerli bir öğrenci adı belirtin.";
+        }
+
+        $evaluationModel = new StudentEvaluationModel();
+        $comments = $evaluationModel
+            ->where('student_id', $studentId)
+            ->where('teacher_id !=', $user->id)
+            ->orderBy('created_at', 'DESC')
             ->findAll(15);
 
-        if (!empty($otherTeacherLessons)) {
-            $context .= "\n" . str_repeat("=", 70) . "\n";
-            $context .= "DİĞER ÖĞRETMENLERİN DEĞERLENDİRMELERİ VE DENEYİMLERİ\n";
-            $context .= str_repeat("=", 70) . "\n\n";
-            $context .= "[NOT: Meslektaşlarınızın deneyimleri size yol gösterebilir]\n\n";
-            
-            foreach ($otherTeacherLessons as $tLesson) {
-                $teacherName = trim(($tLesson['first_name'] ?? '') . ' ' . ($tLesson['last_name'] ?? '')) ?: $tLesson['username'];
-                $context .= "👤 {$teacherName} ({$tLesson['lesson_date']})";
-                if (!empty($tLesson['lesson_type'])) {
-                    $context .= " [{$tLesson['lesson_type']}]";
-                }
-                $context .= ":\n";
-                $context .= "   \"{$tLesson['notes']}\"\n\n";
-            }
-            
-            $context .= "[TAVSİYE: Bu değerlendirmeleri dikkate alarak kendi stratejinizi geliştirebilirsiniz]\n\n";
-        } else {
-            $context .= "\n--- DİĞER ÖĞRETMENLERİN DEĞERLENDİRMELERİ ---\n";
-            $context .= "Henüz başka öğretmenler tarafından not girişi yapılmamış.\n\n";
+        if (empty($comments)) {
+            return "Bu öğrenci için diğer öğretmenler tarafından henüz bir yorum yapılmamış.";
         }
+
+        $student = (new StudentModel())->find($studentId);
+        
+        $commentsText = "";
+        foreach ($comments as $comment) {
+            $date = date('d.m.Y', strtotime($comment['created_at']));
+            $commentsText .= "Öğretmen: {$comment['teacher_snapshot_name']}, Tarih: {$date}, Yorum: \"{$comment['evaluation']}\"\n---\n";
+        }
+
+        $systemPrompt = "Sen bir öğretmen asistanısın. Sana verilen, bir öğrenci hakkındaki öğretmen yorumlarını analiz et. Bu yorumlardan yola çıkarak, öğrencinin genel durumu (akademik, davranışsal vb.), güçlü yönleri ve zayıf yönleri hakkında teknik ve pedagojik bir dille bir özet çıkar. Cevabın doğrudan analiz olsun, giriş veya selamlama cümlesi kullanma. Çıktıyı Markdown formatında, başlıklar ve listeler kullanarak yapılandır.";
+        
+        $userPrompt = "Lütfen aşağıdaki yorumları analiz ederek {$student['adi']} {$student['soyadi']} adlı öğrenci için bir özet oluştur:\n\n{$commentsText}";
+
+        $aiService = new AIService();
+        $summary = $aiService->getChatResponse($userPrompt, $systemPrompt);
+
+        $response = "**{$student['adi']} {$student['soyadi']} Hakkındaki Diğer Öğretmen Yorumlarının Özeti:**\n\n";
+        $response .= $summary;
+
+        return $response;
     }
 
-    /**
-     * PDF içeriğini okur (RAM raporları için)
-     */
-    private function readPdfContent(string $filePath): ?string
+    private function handleTeacherReportQuery(object $user): string
     {
-        if (!file_exists($filePath) || filesize($filePath) === 0) {
-            log_message('error', '[OgretmenAI] PDF dosyası bulunamadı: ' . $filePath);
+        $firstDay = date('Y-m-01');
+        $lastDay = date('Y-m-t');
+
+        // 1. Toplam ders saati
+        $lessonModel = new LessonModel();
+        $lessons = $lessonModel
+            ->select('start_time, end_time')
+            ->where('teacher_id', $user->id)
+            ->where('lesson_date >=', $firstDay)
+            ->where('lesson_date <=', $lastDay)
+            ->findAll();
+        
+        $totalMinutes = 0;
+        foreach ($lessons as $lesson) {
+            $start = new \DateTime($lesson['start_time']);
+            $end = new \DateTime($lesson['end_time']);
+            $totalMinutes += ($end->getTimestamp() - $start->getTimestamp()) / 60;
+        }
+        $totalHours = round($totalMinutes / 60, 1);
+
+        // 2. Gelişim raporu katkısı
+        $evaluationModel = new StudentEvaluationModel();
+        $evaluationCount = $evaluationModel
+            ->where('teacher_id', $user->id)
+            ->where('created_at >=', $firstDay . ' 00:00:00')
+            ->where('created_at <=', $lastDay . ' 23:59:59')
+            ->countAllResults();
+
+        // 3. En çok ders yapılan öğrenci
+        $mostFrequentStudentQuery = $lessonModel
+            ->select('ls.student_id, s.adi, s.soyadi, COUNT(ls.lesson_id) as lesson_count')
+            ->from('lesson_students ls')
+            ->join('lessons l', 'l.id = ls.lesson_id')
+            ->join('students s', 's.id = ls.student_id')
+            ->where('l.teacher_id', $user->id)
+            ->where('l.lesson_date >=', $firstDay)
+            ->where('l.lesson_date <=', $lastDay)
+            ->groupBy('ls.student_id, s.adi, s.soyadi')
+            ->orderBy('lesson_count', 'DESC')
+            ->first();
+
+        $report = "**Bu Ayki Performans Raporunuz (" . date('F Y') . "):**\n\n";
+        $report .= "- **Toplam Ders Saati:** Yaklaşık **{$totalHours}** saat derse girdiniz.\n";
+        $report .= "- **Gelişim Notu Katkısı:** Bu ay **{$evaluationCount}** adet öğrenci gelişim notu yazdınız.\n";
+
+        if ($mostFrequentStudentQuery) {
+            $studentId = $mostFrequentStudentQuery['student_id'];
+            $studentName = $mostFrequentStudentQuery['adi'] . ' ' . $mostFrequentStudentQuery['soyadi'];
+            $report .= "- **En Çok Ders Yaptığınız Öğrenci:** {$studentName} ({$mostFrequentStudentQuery['lesson_count']} ders)\n";
+
+            $hasEvaluated = $evaluationModel
+                ->where('teacher_id', $user->id)
+                ->where('student_id', $studentId)
+                ->where('created_at >=', $firstDay . ' 00:00:00')
+                ->countAllResults() > 0;
+
+            if (!$hasEvaluated) {
+                $report .= "\n💡 **Tavsiye:** Bu ay en çok {$studentName} ile ders yapmışsınız ancak henüz onun için bir gelişim notu girmemişsiniz. Öğrencinin ilerlemesini kayıt altına almak için bir not eklemeyi düşünebilirsiniz.";
+            }
+        }
+
+        return $report;
+    }
+
+    private function isGreeting(string $message): bool
+    {
+        return $this->fuzzyContainsKeywords($message, ['merhaba', 'selam', 'hey', 'iyi günler']);
+    }
+
+    private function generateRedirection(): string
+    {
+        return "Anlıyorum hocam, ancak bu isteğinizi tam olarak nasıl işleyeceğimden emin olamadım. Menüdeki seçenekleri deneyebilir veya sorunuzu farklı bir şekilde sorabilirsiniz.";
+    }
+    
+    private function normalizeDate(string $dateStr): string
+    {
+        $dateStr = str_replace(['bugün'], ['today'], $dateStr);
+        $dateStr = str_replace(['yarın'], ['tomorrow'], $dateStr);
+        $dateStr = str_replace(['dün'], ['yesterday'], $dateStr);
+        // Replace both dots and slashes with dashes to handle d.m.Y and d/m/Y
+        $dateStr = str_replace(['.', '/'], '-', $dateStr);
+        return $dateStr;
+    }
+
+    protected function findStudentIdInMessage(string $studentName): ?int
+    {
+        $parts = array_filter(explode(' ', trim($studentName)));
+        if (empty($parts)) {
             return null;
         }
 
-        try {
-            $parser = new Parser();
-            $pdf = $parser->parseFile($filePath);
-            $text = $pdf->getText();
-
-            if (!empty(trim($text))) {
-                return $text;
-            }
-        } catch (\Exception $e) {
-            log_message('debug', '[OgretmenAI] PDF Parser başarısız: ' . $e->getMessage());
-        }
-
-        if (function_exists('shell_exec')) {
-            try {
-                $command = 'pdftotext -layout -enc UTF-8 ' . escapeshellarg($filePath) . ' -';
-                $content = @shell_exec($command);
-
-                if ($content !== null && trim($content) !== '') {
-                    return $content;
-                }
-            } catch (\Exception $e) {
-                log_message('error', '[OgretmenAI] pdftotext hatası: ' . $e->getMessage());
-            }
-        }
-
-        return null;
-    }
-    
-    /**
-     * Öğretmenin ders programını gösterir
-     */
-    private function buildLessonScheduleContext(string &$context, string $userMessageLower, int $teacherId): void
-    {
-        $targetDate = $this->extractDateFromMessage($userMessageLower);
-        $lessonModel = new LessonModel();
-
-        $context .= "\n=== DERS PROGRAMINIZ ===\n";
-        $context .= "Tarih: {$targetDate}\n\n";
-
-        $lessons = $lessonModel
-            ->select('lessons.*, students.adi, students.soyadi')
-            ->join('students', 'students.id = lessons.student_id')
-            ->where('lessons.teacher_id', $teacherId)
-            ->where('lessons.lesson_date', $targetDate)
-            ->orderBy('lessons.lesson_time', 'ASC')
-            ->findAll();
-
-        if (!empty($lessons)) {
-            foreach ($lessons as $lesson) {
-                $context .= "🕐 {$lesson['lesson_time']} - {$lesson['adi']} {$lesson['soyadi']} [{$lesson['lesson_type']}]\n";
-                if (!empty($lesson['notes'])) {
-                    $context .= "   Not: {$lesson['notes']}\n";
-                }
-                $context .= "\n";
-            }
-        } else {
-            $context .= "Bu tarihte dersiniz bulunmamaktadır.\n";
-        }
-    }
-    
-    /**
-     * Sabit haftalık program
-     */
-    private function buildFixedScheduleContext(string &$context, int $teacherId): void
-    {
-        $fixedLessonModel = new FixedLessonModel();
+        $studentModel = new StudentModel();
+        $student = null;
         
-        $context .= "\n=== SABİT HAFTALIK PROGRAMINIZ ===\n\n";
+        if (count($parts) >= 2) {
+            $lastName = array_pop($parts);
+            $firstName = implode(' ', $parts);
 
-        $fixedLessons = $fixedLessonModel
-            ->select('fixed_lessons.*, students.adi, students.soyadi')
-            ->join('students', 'students.id = fixed_lessons.student_id')
-            ->where('fixed_lessons.teacher_id', $teacherId)
-            ->orderBy('fixed_lessons.day_of_week', 'ASC')
-            ->orderBy('fixed_lessons.lesson_time', 'ASC')
-            ->findAll();
-
-        if (!empty($fixedLessons)) {
-            $days = ['', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
-            $grouped = [];
-            
-            foreach ($fixedLessons as $fl) {
-                $day = $days[$fl['day_of_week']] ?? 'Bilinmeyen';
-                if (!isset($grouped[$day])) {
-                    $grouped[$day] = [];
-                }
-                $grouped[$day][] = $fl;
-            }
-
-            foreach ($grouped as $day => $lessons) {
-                $context .= "**{$day}:**\n";
-                foreach ($lessons as $lesson) {
-                    $context .= "  🕐 {$lesson['lesson_time']} - {$lesson['adi']} {$lesson['soyadi']} [{$lesson['lesson_type']}]\n";
-                }
-                $context .= "\n";
-            }
+            // Assuming DB collation is case-insensitive for Turkish (e.g., utf8mb4_turkish_ci)
+            $student = $studentModel->where('adi', $firstName)
+                                    ->where('soyadi', $lastName)
+                                    ->first();
         } else {
-            $context .= "Sabit haftalık programınız henüz oluşturulmamış.\n";
+            $name = $parts[0];
+            $student = $studentModel->where('adi', $name)
+                                    ->orWhere('soyadi', $name)
+                                    ->first();
         }
+
+        return $student ? (int)$student['id'] : null;
     }
 }
