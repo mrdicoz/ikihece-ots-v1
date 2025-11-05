@@ -126,7 +126,7 @@ public function dailyGrid($date = null)
             $studentModel = new StudentModel();
             $dayNames = ['', 'Pzt', 'Salı', 'Çrş', 'Perş', 'Cuma', 'Cmt', 'Paz'];
 
-            $studentDetails = $studentModel
+            $studentDetails = $studentModel->withDeleted()
                 ->select('students.id, students.profile_image, c.name as city_name, d.name as district_name')
                 ->join('cities c', 'c.id = students.city_id', 'left')
                 ->join('districts d', 'd.id = students.district_id', 'left')
@@ -162,8 +162,8 @@ public function dailyGrid($date = null)
                 
                 $studentInfoMap[$studentId] = [
                     'photo'         => $studentInfo['profile_image'] ?? 'assets/images/user.jpg',
-                    'city'          => $studentInfo['city_name'],
-                    'district'      => $studentInfo['district_name'],
+                    'city'          => $studentInfo['city_name'] ?? null,
+                    'district'      => $studentInfo['district_name'] ?? null,
                     'message'       => !empty($messageParts) ? implode('<br>', $messageParts) : 'Bu öğrencinin sabit dersi yok.',
                     'fixed_lessons' => $fixedInfo 
                 ];
@@ -187,6 +187,48 @@ public function dailyGrid($date = null)
             // Eğer o saatte zaten bir ders varsa, çakışma olabilir. Şimdilik üzerine yazıyoruz.
             // İdeal senaryoda çakışma kontrolü yapılmalı.
             $lessonMap[$evaluation['teacher_id']][$hourKey] = $evaluation;
+        }
+
+        // Öğretmenlerin izinlerini çek ve lessonMap'e ekle
+        $leaveModel = new \App\Models\TeacherLeaveModel();
+        $teacherIds = array_map(fn($t) => $t->id, $teachers);
+        if (!empty($teacherIds)) {
+            $leaves = $leaveModel
+                ->whereIn('teacher_id', $teacherIds)
+                ->where("DATE(start_date) <= ", $date)
+                ->where("DATE(end_date) >= ", $date)
+                ->findAll();
+
+            foreach ($leaves as $leave) {
+                if ($leave->leave_type === 'unpaid_daily' || $leave->leave_type === 'paid_daily') {
+                    // Günlük izinler için tüm günü (08:00 - 19:59 arası) kapalı olarak işaretle
+                    for ($hour = 8; $hour < 20; $hour++) {
+                        $hourKey = str_pad($hour, 2, '0', STR_PAD_LEFT);
+                        $lessonMap[$leave->teacher_id][$hourKey] = [
+                            'type'       => 'leave',
+                            'reason'     => $leave->reason,
+                            'leave_type' => $leave->leave_type,
+                        ];
+                    }
+                } else { // Saatlik izinler için
+                    $start = new \DateTime($leave->start_date);
+                    $end   = new \DateTime($leave->end_date);
+
+                    // Sadece mevcut grid günü için saatlik izni işle
+                    if ($start->format('Y-m-d') === $date) {
+                        $current = clone $start;
+                        while ($current < $end) {
+                            $hourKey = $current->format('H');
+                            $lessonMap[$leave->teacher_id][$hourKey] = [
+                                'type'       => 'leave',
+                                'reason'     => $leave->reason,
+                                'leave_type' => $leave->leave_type,
+                            ];
+                            $current->modify('+1 hour');
+                        }
+                    }
+                }
+            }
         }
 
         $data = [
@@ -639,6 +681,34 @@ public function addFixedLessonsForDay()
             return $this->response->setJSON(['success' => false, 'message' => 'Eksik parametre.']);
         }
 
+        // Öğretmenin izinlerini kontrol et
+        $leaveModel = new \App\Models\TeacherLeaveModel();
+        $leaves = $leaveModel
+            ->where('teacher_id', $teacherId)
+            ->where("DATE(start_date) <= ", $date)
+            ->where("DATE(end_date) >= ", $date)
+            ->findAll();
+
+        $blockedHours = [];
+        if (!empty($leaves)) {
+            foreach ($leaves as $leave) {
+                if ($leave->leave_type === 'unpaid_daily' || $leave->leave_type === 'paid_daily') {
+                    return $this->response->setJSON(['success' => true, 'message' => 'Öğretmen tüm gün izinli olduğu için sabit dersler eklenmedi.']);
+                }
+                
+                // Saatlik izin varsa, izinli saatleri topla
+                $start = new \DateTime($leave->start_date);
+                $end   = new \DateTime($leave->end_date);
+                if ($start->format('Y-m-d') === $date) {
+                    $current = clone $start;
+                    while ($current < $end) {
+                        $blockedHours[] = $current->format('H:i:s');
+                        $current->modify('+1 hour');
+                    }
+                }
+            }
+        }
+
         $fixedLessonModel = new FixedLessonModel();
         $lessonModel = new LessonModel();
         $lessonStudentModel = new LessonStudentModel();
@@ -675,9 +745,15 @@ public function addFixedLessonsForDay()
 
         $lessonsToAdd = [];
         $lessonStudentsToAdd = [];
+        $skippedCount = 0;
         
         foreach ($groupedFixedLessons as $startTime => $lessonsInSlot) {
             if (in_array($startTime, $existingLessons)) {
+                continue;
+            }
+
+            if (in_array($startTime, $blockedHours)) {
+                $skippedCount++;
                 continue;
             }
 
@@ -691,47 +767,50 @@ public function addFixedLessonsForDay()
             $lessonStudentsToAdd[$startTime] = array_column($lessonsInSlot, 'student_id');
         }
 
-        if (empty($lessonsToAdd)) {
+        if (empty($lessonsToAdd) && $skippedCount === 0) {
             return $this->response->setJSON(['success' => true, 'message' => 'Tüm sabit dersler zaten programda mevcut. Yeni ders eklenmedi.']);
         }
 
-        $db->transStart();
-
-        $lessonModel->insertBatch($lessonsToAdd);
-
-        $insertedLessons = $lessonModel
-            ->where('teacher_id', $teacherId)
-            ->where('lesson_date', $date)
-            ->whereIn('start_time', array_keys($lessonStudentsToAdd))
-            ->findAll();
-
-        $finalStudentData = [];
-        foreach ($insertedLessons as $lesson) {
-            $studentIds = $lessonStudentsToAdd[$lesson['start_time']] ?? [];
-            if (!empty($studentIds)) {
-                foreach($studentIds as $studentId) {
-                    $finalStudentData[] = [
-                        'lesson_id'  => $lesson['id'],
-                        'student_id' => $studentId,
-                    ];
+        if (!empty($lessonsToAdd)) {
+            $db->transStart();
+            $lessonModel->insertBatch($lessonsToAdd);
+            $insertedLessons = $lessonModel
+                ->where('teacher_id', $teacherId)
+                ->where('lesson_date', $date)
+                ->whereIn('start_time', array_keys($lessonStudentsToAdd))
+                ->findAll();
+            $finalStudentData = [];
+            foreach ($insertedLessons as $lesson) {
+                $studentIds = $lessonStudentsToAdd[$lesson['start_time']] ?? [];
+                if (!empty($studentIds)) {
+                    foreach($studentIds as $studentId) {
+                        $finalStudentData[] = ['lesson_id'  => $lesson['id'], 'student_id' => $studentId];
+                    }
                 }
             }
-        }
-        
-        if (!empty($finalStudentData)) {
-            $lessonStudentModel->insertBatch($finalStudentData);
+            if (!empty($finalStudentData)) {
+                $lessonStudentModel->insertBatch($finalStudentData);
+            }
+            if ($db->transStatus() === false) {
+                $db->transRollback();
+                return $this->response->setJSON(['success' => false, 'message' => 'Dersler eklenirken bir veritabanı hatası oluştu.']);
+            }
+            $db->transCommit();
+            \CodeIgniter\Events\Events::trigger('schedule.changed', ['date' => $date], $teacherId);
         }
 
-        if ($db->transStatus() === false) {
-            $db->transRollback();
-            return $this->response->setJSON(['success' => false, 'message' => 'Dersler eklenirken bir veritabanı hatası oluştu.']);
+        $message = '';
+        if (count($lessonsToAdd) > 0) {
+            $message .= count($lessonsToAdd) . ' adet yeni sabit ders programa başarıyla eklendi.';
+        }
+        if ($skippedCount > 0) {
+            $message .= ($message ? ' ' : '') . $skippedCount . ' ders, saatlik izinle çakıştığı için atlandı.';
+        }
+        if (empty($message)) {
+            $message = 'Tüm sabit dersler zaten programda mevcut veya izin saatleriyle çakışıyor.';
         }
 
-        $db->transCommit();
-        
-        \CodeIgniter\Events\Events::trigger('schedule.changed', ['date' => $date], $teacherId);
-
-        return $this->response->setJSON(['success' => true, 'message' => count($lessonsToAdd) . ' adet yeni sabit ders programa başarıyla eklendi.']);
+        return $this->response->setJSON(['success' => true, 'message' => $message]);
     }
 
     public function deleteLessonsForDay()
@@ -805,10 +884,54 @@ public function addFixedLessonsForDay()
         $targetWeekType = $weekMap[$weekOfMonth];
         
         $totalAddedCount = 0;
+        $dailyLeaveSkippedTeacherCount = 0;
+        $hourlyLeaveSkippedLessonCount = 0;
+
+        // Tüm öğretmenler için tüm izinleri tek seferde çek
+        $leaveModel = new \App\Models\TeacherLeaveModel();
+        $allLeaves = $leaveModel
+            ->whereIn('teacher_id', $teacherIds)
+            ->where("DATE(start_date) <= ", $date)
+            ->where("DATE(end_date) >= ", $date)
+            ->findAll();
+
+        // İzinleri öğretmen ID'sine göre grupla
+        $leavesByTeacher = [];
+        foreach ($allLeaves as $leave) {
+            $leavesByTeacher[$leave->teacher_id][] = $leave;
+        }
 
         $db->transStart();
 
         foreach ($teacherIds as $teacherId) {
+            $teacherLeaves = $leavesByTeacher[$teacherId] ?? [];
+            $blockedHours = [];
+            $hasDailyLeave = false;
+
+            if (!empty($teacherLeaves)) {
+                foreach ($teacherLeaves as $leave) {
+                    if ($leave->leave_type === 'unpaid_daily' || $leave->leave_type === 'paid_daily') {
+                        $hasDailyLeave = true;
+                        break; // Günlük izin bulundu, diğerlerini kontrol etmeye gerek yok
+                    }
+                    // Saatlik izinleri işle
+                    $start = new \DateTime($leave->start_date);
+                    $end   = new \DateTime($leave->end_date);
+                    if ($start->format('Y-m-d') === $date) {
+                        $current = clone $start;
+                        while ($current < $end) {
+                            $blockedHours[] = $current->format('H:i:s');
+                            $current->modify('+1 hour');
+                        }
+                    }
+                }
+            }
+
+            if ($hasDailyLeave) {
+                $dailyLeaveSkippedTeacherCount++;
+                continue; // Öğretmeni tamamen atla
+            }
+
             $fixedLessons = $fixedLessonModel
                 ->where('teacher_id', $teacherId)
                 ->where('day_of_week', $dayOfWeek)
@@ -832,6 +955,11 @@ public function addFixedLessonsForDay()
 
             foreach ($groupedFixedLessons as $startTime => $lessonsInSlot) {
                 if (in_array($startTime, $existingLessons)) continue;
+
+                if (!empty($blockedHours) && in_array($startTime, $blockedHours)) {
+                    $hourlyLeaveSkippedLessonCount++;
+                    continue;
+                }
 
                 $firstLesson = $lessonsInSlot[0];
                 $lessonData = [
@@ -864,14 +992,26 @@ public function addFixedLessonsForDay()
         }
 
         $db->transCommit();
-        
-        if ($totalAddedCount === 0) {
-            return $this->response->setJSON(['success' => true, 'message' => 'Tüm sabit dersler zaten programda mevcut. Yeni ders eklenmedi.']);
+
+        $message = '';
+        if ($totalAddedCount > 0) {
+            $message .= $totalAddedCount . ' adet yeni sabit ders eklendi.';
+        }
+        if ($dailyLeaveSkippedTeacherCount > 0) {
+            $message .= ($message ? ' ' : '') . $dailyLeaveSkippedTeacherCount . ' öğretmen tüm gün izinli olduğu için atlandı.';
+        }
+        if ($hourlyLeaveSkippedLessonCount > 0) {
+            $message .= ($message ? ' ' : '') . $hourlyLeaveSkippedLessonCount . ' ders, saatlik izinle çakıştığı için atlandı.';
+        }
+        if (empty($message)) {
+            $message = 'Tüm sabit dersler zaten programda mevcut veya öğretmenler izinli. Yeni ders eklenmedi.';
         }
 
-        \CodeIgniter\Events\Events::trigger('schedule.changed', ['date' => $date], $teacherIds);
+        if ($totalAddedCount > 0) {
+            \CodeIgniter\Events\Events::trigger('schedule.changed', ['date' => $date], $teacherIds);
+        }
 
-        return $this->response->setJSON(['success' => true, 'message' => $totalAddedCount . ' adet yeni sabit ders programa başarıyla eklendi.']);
+        return $this->response->setJSON(['success' => true, 'message' => $message]);
     }
 
     /**

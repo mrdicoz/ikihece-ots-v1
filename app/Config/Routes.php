@@ -6,10 +6,20 @@ use CodeIgniter\Router\RouteCollection;
  * @var RouteCollection $routes
  */
 
+service('auth')->routes($routes);
+
 // ====================================================================
 // TEMEL KURALLAR (Herkese Açık Alan)
 // ====================================================================
-service('auth')->routes($routes);
+$routes->get('tracking', 'TrackingController::index');
+
+// Teacher Leave Routes
+$routes->post('teachers/(:num)/leaves', 'TeacherController::addLeave/$1');
+$routes->post('teachers/(:num)/get-leaves', 'TeacherController::getTeacherLeaves/$1');
+$routes->get('teachers/(:num)/leaves/(:num)/delete', 'TeacherController::deleteLeave/$1/$2');
+
+
+$routes->get('vapid/publicKey', 'VapidController::getPublicKey');
 
 // Herkese açık rotalar
 $routes->GET('maintenance', 'Home::maintenance', ['as' => 'maintenance']);
@@ -58,6 +68,12 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->GET('/', 'ProfileController::index', ['as' => 'profile']);
         $routes->POST('update', 'ProfileController::update');
         $routes->GET('get-districts/(:num)', 'ProfileController::getDistricts/$1');
+    });
+
+    // --- ÖĞRETMEN YÖNETİMİ ---
+    $routes->group('teachers', ['filter' => 'group:admin,yonetici,mudur,sekreter'], static function ($routes) {
+        $routes->get('/', 'TeacherController::index', ['as' => 'teachers.index']);
+        $routes->get('show/(:num)', 'TeacherController::show/$1', ['as' => 'teachers.show']);
     });
     
     // Rol değiştirme

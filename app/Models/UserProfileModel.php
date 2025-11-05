@@ -54,4 +54,24 @@ class UserProfileModel extends Model
     protected $afterFind      = [];
     protected $beforeDelete   = [];
     protected $afterDelete    = [];
+
+    public function getTeachers()
+    {
+        return $this->select('user_profiles.user_id, user_profiles.first_name, user_profiles.last_name, user_profiles.branch, user_profiles.profile_photo')
+                    ->join('users', 'users.id = user_profiles.user_id')
+                    ->join('auth_groups_users', 'auth_groups_users.user_id = users.id')
+                    ->where('auth_groups_users.group', 'ogretmen')
+                    ->findAll();
+    }
+
+    public function getTeacherDetails($id)
+    {
+        return $this->select('user_profiles.*, auth_identities.secret as email, cities.name as city_name, districts.name as district_name')
+                    ->join('users', 'users.id = user_profiles.user_id')
+                    ->join('auth_identities', 'auth_identities.user_id = users.id AND auth_identities.type = \'email_password\'', 'left')
+                    ->join('cities', 'cities.id = user_profiles.city_id', 'left')
+                    ->join('districts', 'districts.id = user_profiles.district_id', 'left')
+                    ->where('user_profiles.user_id', $id)
+                    ->first();
+    }
 }

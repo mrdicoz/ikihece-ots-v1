@@ -36,6 +36,7 @@
     <?= $this->include('layouts/partials/_footer') ?>
 
     <?= $this->include('layouts/partials/_scripts') ?>
+    <?= $this->renderSection('scripts') ?>
 
 <div class="modal fade" id="roleSwitcherModal" tabindex="-1" aria-labelledby="roleSwitcherModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">

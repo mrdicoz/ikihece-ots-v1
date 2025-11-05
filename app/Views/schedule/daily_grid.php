@@ -56,7 +56,11 @@
                                                 <div class="d-flex align-items-center">
                                                     <img src="<?= base_url(ltrim($teacher->profile_photo ?? '/assets/images/user.jpg', '/')) ?>" class="rounded-circle me-3 d-print-none" width="40" height="40" style="object-fit: cover;">
                                                     <div>
-                                                        <div class="fw-bold text-nowrap text-start"><?= esc($teacher->first_name . ' ' . $teacher->last_name) ?></div>
+                                                        <div class="fw-bold text-nowrap text-start">
+															<a href="<?= site_url('teachers/show/' . $teacher->id) ?>" class="text-decoration-none text-dark">
+																<?= esc($teacher->first_name . ' ' . $teacher->last_name) ?>
+															</a>
+														</div>
                                                         <small class="text-muted d-block text-truncate fw-lighter text-start" style="max-width: 150px;"><?= esc($teacher->branch) ?></small>
                                                     </div>
                                                 </div>
@@ -76,6 +80,10 @@
                                                         <td class="align-middle bg-info-subtle has-evaluation" data-evaluation-id="<?= $slotContent['id'] ?>">
                                                             <span class="badge text-bg-info">DEĞERLENDİRME</span>
                                                             <i class="bi bi-pencil-square d-print-none"></i>
+                                                        </td>
+                                                    <?php elseif ($slotContent['type'] === 'leave'): ?>
+                                                        <td class="align-middle on-leave">
+                                                            <span class="badge text-bg-secondary"><i class="bi bi-person-walking"></i> İzinli</span>
                                                         </td>
                                                     <?php else: // type is 'lesson' or default ?>
                                                         <td class="align-middle bg-success-subtle has-lesson" data-lesson-id="<?= $slotContent['id'] ?>">
@@ -232,6 +240,12 @@
         background-color: transparent !important;
         color: #000 !important;
         font-weight: normal !important;
+    }
+    .on-leave {
+        background-color: #e9ecef !important;
+        color: #6c757d !important;
+        font-style: italic;
+        cursor: not-allowed;
     }
     
     a[href]:after { content: none !important; }

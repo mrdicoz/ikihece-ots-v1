@@ -113,4 +113,19 @@ class LessonModel extends Model
             ->findAll();
     }
 
+    public function getConflictingLessons($teacherId, $startDate, $endDate, $startTime = null, $endTime = null)
+    {
+        $builder = $this->where('teacher_id', $teacherId)
+                        ->where('lesson_date >=', $startDate)
+                        ->where('lesson_date <=', $endDate);
+
+        if ($startTime && $endTime) {
+            $builder->groupStart()
+                    ->where('start_time <', $endTime)
+                    ->where('end_time >', $startTime)
+                    ->groupEnd();
+        }
+
+        return $builder->findAll();
+    }
 }
