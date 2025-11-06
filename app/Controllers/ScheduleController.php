@@ -11,6 +11,7 @@ use App\Models\LessonStudentModel;
 use App\Models\StudentModel;
 use App\Models\UserProfileModel;
 use App\Models\DegerlendirmeModel;
+use App\Models\StudentAbsenceModel;
 use CodeIgniter\I18n\Time;
 use CodeIgniter\Shield\Models\UserModel;
 
@@ -1136,5 +1137,65 @@ public function addFixedLessonsForDay()
         } else {
             return $this->response->setJSON(['success' => false, 'message' => 'Değerlendirme silinirken bir hata oluştu.']);
         }
+    }
+
+    public function reportAbsenceAnddeleteLesson()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(403);
+        }
+
+        $lessonId  = $this->request->getPost('lesson_id');
+        $studentIds = $this->request->getPost('student_ids'); // Can be an array
+        $reason    = $this->request->getPost('reason');
+        $loggedInUserId = auth()->id();
+
+        if (empty($lessonId) || empty($studentIds)) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Eksik parametreler: Ders veya Öğrenci ID\'si eksik.']);
+        }
+        
+        if (!is_array($studentIds)) {
+            $studentIds = [$studentIds];
+        }
+
+        $lessonModel = new LessonModel();
+        $lesson = $lessonModel->find($lessonId);
+
+        if (!$lesson) {
+            return $this->response->setJSON(['success' => false, 'message' => 'İşlem yapılacak ders bulunamadı.']);
+        }
+
+        $db = \Config\Database::connect();
+        $db->transStart();
+
+        // 1. Devamsızlığı kaydet for each student
+        $absenceModel = new StudentAbsenceModel();
+        foreach ($studentIds as $studentId) {
+            $absenceData = [
+                'student_id'  => $studentId,
+                'teacher_id'  => $lesson['teacher_id'],
+                'lesson_date' => $lesson['lesson_date'],
+                'start_time'  => $lesson['start_time'],
+                'end_time'    => $lesson['end_time'],
+                'reason'      => $reason,
+                'created_by'  => $loggedInUserId,
+            ];
+            $absenceModel->insert($absenceData);
+        }
+
+        // 2. Dersi sil
+        $lessonModel->delete($lessonId); // This should also trigger deletion of lesson_students via DB constraints or model callbacks
+
+        if ($db->transStatus() === false) {
+            $db->transRollback();
+            return $this->response->setJSON(['success' => false, 'message' => 'Veritabanı hatası nedeniyle işlem tamamlanamadı.']);
+        }
+
+        $db->transCommit();
+        
+        // Olayı tetikle
+        \CodeIgniter\Events\Events::trigger('schedule.changed', $lesson, $lesson['teacher_id']);
+
+        return $this->response->setJSON(['success' => true, 'message' => 'Ders silindi ve devamsızlık(lar) başarıyla kaydedildi.']);
     }
 }

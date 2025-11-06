@@ -55,6 +55,11 @@
                         <i class="bi bi-pencil-square"></i> Bilgileri Düzenle
                     </a>
                     <?php endif; ?>
+                    <?php if (auth()->user()->inGroup('admin', 'yonetici', 'mudur', 'sekreter')): ?>
+                    <a href="<?= site_url('students/' . $student['id'] . '/attendance') ?>" class="btn btn-success w-100 mt-2">
+                        <i class="bi bi-calendar-check"></i> Devamsızlık Raporu
+                    </a>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

@@ -555,4 +555,53 @@ public function update($id = null)
             ]);
         }
     }
+
+    public function attendanceReport($studentId)
+    {
+        $studentModel = new StudentModel();
+        $lessonModel = new \App\Models\LessonModel();
+        $absenceModel = new \App\Models\StudentAbsenceModel();
+
+        $student = $studentModel->find($studentId);
+
+        if (!$student) {
+            throw new \CodeIgniter\Exceptions\PageNotFoundException('Öğrenci bulunamadı: ' . $studentId);
+        }
+
+        $year = $this->request->getGet('year') ?? date('Y');
+        $month = $this->request->getGet('month') ?? date('m');
+
+        $attendance = $lessonModel
+            ->select('lessons.lesson_date, lessons.start_time, lessons.end_time, user_profiles.first_name, user_profiles.last_name')
+            ->join('lesson_students', 'lesson_students.lesson_id = lessons.id')
+            ->join('users', 'users.id = lessons.teacher_id')
+            ->join('user_profiles', 'user_profiles.user_id = users.id')
+            ->where('lesson_students.student_id', $studentId)
+            ->where('YEAR(lessons.lesson_date)', $year)
+            ->where('MONTH(lessons.lesson_date)', $month)
+            ->orderBy('lessons.lesson_date', 'asc')
+            ->orderBy('lessons.start_time', 'asc')
+            ->findAll();
+
+        $absences = $absenceModel
+            ->select('student_absences.*, user_profiles.first_name, user_profiles.last_name')
+            ->join('users', 'users.id = student_absences.teacher_id')
+            ->join('user_profiles', 'user_profiles.user_id = users.id')
+            ->where('student_absences.student_id', $studentId)
+            ->where('YEAR(student_absences.lesson_date)', $year)
+            ->where('MONTH(student_absences.lesson_date)', $month)
+            ->orderBy('student_absences.lesson_date', 'asc')
+            ->findAll();
+
+        $data = [
+            'title' => $student['adi'] . ' ' . $student['soyadi'] . ' - Devamsızlık Raporu',
+            'student' => $student,
+            'attendance' => $attendance,
+            'absences' => $absences,
+            'selectedYear' => $year,
+            'selectedMonth' => $month,
+        ];
+
+        return view('students/attendance_report', array_merge($this->data, $data));
+    }
 }

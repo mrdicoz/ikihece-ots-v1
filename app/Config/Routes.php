@@ -113,6 +113,7 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         // ✅ DÜZELTME: Öğrenci silme rotası
         $routes->delete('(:num)', 'StudentController::delete/$1');
         $routes->POST('(:num)/delete', 'StudentController::delete/$1'); // Form compatibility için
+        $routes->get('(:num)/attendance', 'StudentController::attendanceReport/$1', ['as' => 'students.attendanceReport']);
         
         // RAM Raporu görüntüleme
         $routes->GET('view-ram-report/(:num)', 'StudentController::viewRamReport/$1', ['as' => 'students.viewRamReport']);
@@ -162,7 +163,7 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->POST('delete-lesson/(:num)', 'ScheduleController::deleteLesson/$1', ['as' => 'schedule.delete_lesson']);
         $routes->GET('get-lesson-dates', 'ScheduleController::getLessonDates', ['as' => 'schedule.get_lesson_dates']);
         $routes->POST('update-lesson/(:num)', 'ScheduleController::updateLesson/$1', ['as' => 'schedule.update']);
-        
+        $routes->POST('report-absence', 'ScheduleController::reportAbsenceAnddeleteLesson', ['as' => 'schedule.reportAbsence']);
         // Toplu ders işlemleri
         $routes->POST('add-fixed-lessons', 'ScheduleController::addFixedLessonsForDay', ['as' => 'schedule.addFixed']);
         $routes->POST('delete-day-lessons', 'ScheduleController::deleteLessonsForDay', ['as' => 'schedule.deleteForDay']);

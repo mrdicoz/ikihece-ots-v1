@@ -153,6 +153,7 @@
             <div class="modal-body" id="lessonFormModalBody"></div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                <button type="button" class="btn btn-warning" id="reportAbsenceTriggerBtn" style="display: none;">Devamsızlığı Bildir ve Sil</button>
                 <button type="button" class="btn btn-danger" id="deleteLessonBtn" style="display: none;">Dersi Sil</button>
                 <button type="button" class="btn btn-primary" id="updateLessonBtn" style="display: none;">Güncelle</button>
                 <button type="button" class="btn btn-success" id="saveLessonBtn" style="display: none;">Dersi Kaydet</button>
@@ -185,6 +186,28 @@
         </div>
     </div>
 </div>
+
+<!-- Absence Modal -->
+<div class="modal fade" id="absenceModal" tabindex="-1" aria-labelledby="absenceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="absenceModalLabel">Devamsızlık Bildir ve Dersi Sil</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="absence-form">
+                <div class="modal-body" id="absenceModalBody">
+                    <!-- JS will load content here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Vazgeç</button>
+                    <button type="submit" class="btn btn-primary" id="saveAbsenceBtn">Kaydet ve Dersi Sil</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <?= $this->endSection() ?>
 
 <?= $this->section('pageScripts') ?>
@@ -255,20 +278,33 @@
 
 <script>
 $(document).ready(function() {
+    // MODAL DEFINITIONS
     const lessonModal = new bootstrap.Modal(document.getElementById('lessonFormModal'));
+    const evaluationDetailModal = new bootstrap.Modal(document.getElementById('evaluationDetailModal'));
+    const absenceModal = new bootstrap.Modal(document.getElementById('absenceModal')); // New
+
+    // MODAL BODY AND LABEL DEFINITIONS
     const modalBody = $('#lessonFormModalBody');
     const modalLabel = $('#lessonFormModalLabel');
-    const saveBtn = $('#saveLessonBtn'), updateBtn = $('#updateLessonBtn'), deleteBtn = $('#deleteLessonBtn');
+    const absenceModalBody = $('#absenceModalBody'); // New
+
+    // BUTTON DEFINITIONS
+    const saveBtn = $('#saveLessonBtn');
+    const updateBtn = $('#updateLessonBtn');
+    const deleteBtn = $('#deleteLessonBtn');
+    const reportAbsenceTriggerBtn = $('#reportAbsenceTriggerBtn'); // New
+
     const teachersForSelect = <?= json_encode(array_map(fn($t) => ['value' => $t->id, 'text' => $t->first_name . ' ' . $t->last_name], $teachers)) ?>;
     let tomSelect;
 
+    // --- INITIALIZATIONS ---
     const teacherFilter = new TomSelect('#teacher-filter', {
         options: teachersForSelect,
         plugins: ['remove_button'],
         onChange: function(value) {
             const selectedIds = value;
             const allRows = $('#schedule-table tbody tr');
-            if (selectedIds.length === 0) { allRows.show(); } 
+            if (selectedIds.length === 0) { allRows.show(); }
             else {
                 allRows.hide();
                 selectedIds.forEach(id => allRows.filter(`[data-teacher-id="${id}"]`).show());
@@ -279,7 +315,7 @@ $(document).ready(function() {
     $('body').popover({ selector: '[data-bs-toggle="popover"]', html: true, trigger: 'hover', placement: 'top', container: 'body' });
     $('#printScheduleBtn').on('click', () => window.print());
 
-    // --- YENİ ANA YENİLEME FONKSİYONU ---
+    // --- CORE FUNCTIONS ---
     async function refreshSchedule(preserveScroll = false) {
         let scrollPosition = 0;
         if (preserveScroll) scrollPosition = window.scrollY;
@@ -304,10 +340,10 @@ $(document).ready(function() {
         }
     }
 
-    // --- SİZİN YARDIMCI FONKSİYONLARINIZ (EKSİKSİZ) ---
-    function showLoadingInModal() {
-        modalBody.html('<div class="text-center p-5"><div class="spinner-border text-success"></div><p class="mt-2">Yükleniyor...</p></div>');
+    function showLoadingInModal(bodyElement = modalBody) { // Modified to accept different modal bodies
+        bodyElement.html('<div class="text-center p-5"><div class="spinner-border text-success"></div><p class="mt-2">Yükleniyor...</p></div>');
     }
+
     function calculateEndTime(startTime) {
         const [hours, minutes] = startTime.split(':').map(Number);
         const date = new Date();
@@ -315,6 +351,7 @@ $(document).ready(function() {
         date.setMinutes(date.getMinutes() + <?= config('Ots')->lessonDurationMinutes ?? 50 ?>);
         return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
     }
+
     function createTomSelect(options = [], items = []) {
         if (tomSelect) tomSelect.destroy();
         tomSelect = new TomSelect('#student-select-modal', {
@@ -324,14 +361,14 @@ $(document).ready(function() {
             render: {
                 option: function(data, escape) {
                     let classes = 'd-flex align-items-center p-2'; let typeLabel = '';
-                    let warningIcon = data.warning ? '<i class="bi bi-exclamation-triangle-fill text-warning me-2" title="' + escape(data.warning) + '"></i>' : '';
+                    let warningIcon = data.warning ? `<i class="bi bi-exclamation-triangle-fill text-warning me-2" title="${escape(data.warning)}"></i>` : '';
                     if (data.type === 'fixed') { classes += ' text-success fw-bold'; typeLabel = '<span class="badge bg-success-subtle text-success-emphasis rounded-pill ms-auto">Sabit Program</span>'; } 
                     else if (data.type === 'history') { classes += ' text-primary'; typeLabel = '<span class="badge bg-primary-subtle text-primary-emphasis rounded-pill ms-auto">Sık Ders</span>'; }
                     let lessonCounts = `<span class="ms-2"><span class="badge bg-info-subtle text-info-emphasis" title="Bireysel Telafi Hakkı">B: ${escape(data.bireysel ?? 0)}</span><span class="badge bg-warning-subtle text-warning-emphasis" title="Grup Telafi Hakkı">G: ${escape(data.grup ?? 0)}</span></span>`;
                     return `<div class="${classes}"><div>${warningIcon}${escape(data.text)}${lessonCounts}</div>${typeLabel}</div>`;
                 },
                 item: function(data, escape) {
-                    let warningIcon = data.warning ? '<i class="bi bi-exclamation-triangle-fill text-warning me-2" title="' + escape(data.warning) + '"></i>' : '';
+                    let warningIcon = data.warning ? `<i class="bi bi-exclamation-triangle-fill text-warning me-2" title="${escape(data.warning)}"></i>` : '';
                     let lessonCounts = `<span class="ms-2"><span class="badge bg-info-subtle text-info-emphasis" title="Bireysel Telafi Hakkı">B: ${escape(data.bireysel ?? 0)}</span><span class="badge bg-warning-subtle text-warning-emphasis" title="Grup Telafi Hakkı">G: ${escape(data.grup ?? 0)}</span></span>`;
                     return `<div>${warningIcon}${escape(data.text)}${lessonCounts}</div>`;
                 }
@@ -339,13 +376,16 @@ $(document).ready(function() {
         });
     }
 
-    // --- EVENT DELEGATION ILE OLAY DİNLEYİCİLER ---
+    // --- EVENT LISTENERS (DELEGATED) ---
     $(document).on('click', '.available-slot', function() {
         const slot = $(this); const teacherId = slot.data('teacher-id'); const date = slot.data('date'); const time = slot.data('time');
-        modalLabel.text('Yeni Ders / Değerlendirme Ekle'); showLoadingInModal();
-        saveBtn.show(); updateBtn.hide(); deleteBtn.hide();
-        // Yeni değerlendirme butonu
-        $('#createEvaluationBtn').remove(); // Önceki butonu temizle
+        modalLabel.text('Yeni Ders / Değerlendirme Ekle');
+        showLoadingInModal();
+        saveBtn.show();
+        updateBtn.hide();
+        deleteBtn.hide();
+        reportAbsenceTriggerBtn.hide(); // New
+        $('#createEvaluationBtn').remove();
         $('#lessonFormModal .modal-footer').prepend(`<button type="button" class="btn btn-info" id="createEvaluationBtn" data-teacher-id="${teacherId}" data-date="${date}" data-time="${time}">Değerlendirme Ekle</button>`);
         lessonModal.show();
         $.get('<?= route_to("schedule.suggestions") ?>', { teacher_id: teacherId, date: date, start_time: time })
@@ -365,34 +405,22 @@ $(document).ready(function() {
     $(document).on('click', '#createEvaluationBtn', function() {
         const button = $(this); const teacherId = button.data('teacher-id'); const date = button.data('date'); const time = button.data('time');
         const endTime = calculateEndTime(time.substring(0, 5)) + ':00';
-
         button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Ekleniyor...');
-
-        $.post('<?= route_to("degerlendirme.create") ?>', {
-            '<?= csrf_token() ?>': '<?= csrf_hash() ?>',
-            teacher_id: teacherId,
-            evaluation_date: date,
-            start_time: time,
-            end_time: endTime
-        })
-        .done(res => {
-            lessonModal.hide();
-            if (res.success) {
-                refreshSchedule(true);
-            } else {
-                alert(res.message);
-            }
-        })
+        $.post('<?= route_to("degerlendirme.create") ?>', { '<?= csrf_token() ?>': '<?= csrf_hash() ?>', teacher_id: teacherId, evaluation_date: date, start_time: time, end_time: endTime })
+        .done(res => { lessonModal.hide(); if (res.success) { refreshSchedule(true); } else { alert(res.message); } })
         .fail(() => alert('Değerlendirme eklenirken bir hata oluştu.'))
         .always(() => button.prop('disabled', false).html('Değerlendirme Ekle'));
     });
     
     $(document).on('click', '.has-lesson', function() {
         const lessonId = $(this).data('lesson-id');
-        modalLabel.text('Dersi Düzenle'); showLoadingInModal();
-        saveBtn.hide(); updateBtn.data('lesson-id', lessonId).show(); deleteBtn.data('lesson-id', lessonId).show();
-        // Değerlendirme butonunu gizle
-        $('#createEvaluationBtn').hide();
+        modalLabel.text('Dersi Düzenle');
+        showLoadingInModal();
+        saveBtn.hide();
+        updateBtn.data('lesson-id', lessonId).show();
+        deleteBtn.data('lesson-id', lessonId).show();
+        reportAbsenceTriggerBtn.data('lesson-id', lessonId).show(); // New
+        $('#createEvaluationBtn').remove();
         lessonModal.show();
         $.get(`<?= site_url('schedule/get-lesson-details/') ?>${lessonId}`)
             .done(function(response) {
@@ -409,38 +437,11 @@ $(document).ready(function() {
             }).fail(() => modalBody.html('<div class="alert alert-danger">Ders detayları alınamadı.</div>'));
     });
 
-    $(document).on('click', '.has-lesson', function() {
-        const lessonId = $(this).data('lesson-id');
-        modalLabel.text('Dersi Düzenle'); showLoadingInModal();
-        saveBtn.hide(); updateBtn.data('lesson-id', lessonId).show(); deleteBtn.data('lesson-id', lessonId).show();
-        // Değerlendirme butonunu gizle
-        $('#createEvaluationBtn').hide();
-        lessonModal.show();
-        $.get(`<?= site_url('schedule/get-lesson-details/') ?>${lessonId}`)
-            .done(function(response) {
-                if (!response.success) { modalBody.html(`<div class="alert alert-danger">${response.message}</div>`); return; }
-                const lesson = response.lesson; const existingStudents = lesson.students.map(s => s.id);
-                $.get('<?= route_to("schedule.suggestions") ?>', { teacher_id: lesson.teacher_id, date: lesson.lesson_date, start_time: lesson.start_time })
-                    .done(function(students) {
-                        const tomSelectOptions = students.map(s => ({ value: s.id, text: s.name, type: s.type, bireysel: s.bireysel, grup: s.grup, warning: s.warning }));
-                        const form = $(`<form id="lesson-form"></form>`);
-                        form.append('<div class="mb-3"><label class="form-label">Öğrenci(ler)</label><select id="student-select-modal" name="students[]" multiple></select></div>');
-                        modalBody.html(form);
-                        createTomSelect(tomSelectOptions, existingStudents);
-                    }).fail(() => modalBody.html('<div class="alert alert-danger">Öğrenci listesi yüklenemedi.</div>'));
-            }).fail(() => modalBody.html('<div class="alert alert-danger">Ders detayları alınamadı.</div>'));
-    });
-
-    // Yeni Değerlendirme Detay Modalını başlat
-    const evaluationDetailModal = new bootstrap.Modal(document.getElementById('evaluationDetailModal'));
-
-    // Değerlendirme bloğuna tıklama olayı
     $(document).on('click', '.has-evaluation', function() {
         const evaluationId = $(this).data('evaluation-id');
         $('#evaluationId').val(evaluationId);
         $('#evaluationNotes').val('Yükleniyor...').prop('disabled', true);
         evaluationDetailModal.show();
-
         $.get(`<?= site_url("degerlendirme/get/") ?>${evaluationId}`)
             .done(function(response) {
                 if (response.success && response.data) {
@@ -456,13 +457,12 @@ $(document).ready(function() {
             });
     });
 
-    // Değerlendirme Notlarını Kaydet butonu
+    // --- BUTTON ACTIONS ---
     $('#updateEvaluationNotesBtn').on('click', function() {
         const evaluationId = $('#evaluationId').val();
         const notes = $('#evaluationNotes').val();
         const button = $(this);
         button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Kaydediliyor...');
-
         $.post(`<?= site_url("degerlendirme/update/") ?>${evaluationId}`, {
             '<?= csrf_token() ?>': '<?= csrf_hash() ?>',
             notes: notes
@@ -476,25 +476,16 @@ $(document).ready(function() {
                 alert(response.message || 'Notlar güncellenirken bir hata oluştu.');
             }
         })
-        .fail(function() {
-            alert('Sunucu hatası: Notlar güncellenemedi.');
-        })
-        .always(function() {
-            button.prop('disabled', false).html('Notları Kaydet');
-        });
+        .fail(function() { alert('Sunucu hatası: Notlar güncellenemedi.'); })
+        .always(function() { button.prop('disabled', false).html('Notları Kaydet'); });
     });
 
-    // Değerlendirmeyi Sil butonu
     $('#deleteEvaluationBtn').on('click', function() {
         if (!confirm('Bu değerlendirmeyi kalıcı olarak silmek istediğinizden emin misiniz?')) return;
-
         const evaluationId = $('#evaluationId').val();
         const button = $(this);
         button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Siliniyor...');
-
-        $.post(`<?= site_url("degerlendirme/delete/") ?>${evaluationId}`, {
-            '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
-        })
+        $.post(`<?= site_url("degerlendirme/delete/") ?>${evaluationId}`, { '<?= csrf_token() ?>': '<?= csrf_hash() ?>' })
         .done(function(response) {
             if (response.success) {
                 alert(response.message);
@@ -504,12 +495,8 @@ $(document).ready(function() {
                 alert(response.message || 'Değerlendirme silinirken bir hata oluştu.');
             }
         })
-        .fail(function() {
-            alert('Sunucu hatası: Değerlendirme silinemedi.');
-        })
-        .always(function() {
-            button.prop('disabled', false).html('Değerlendirmeyi Sil');
-        });
+        .fail(function() { alert('Sunucu hatası: Değerlendirme silinemedi.'); })
+        .always(function() { button.prop('disabled', false).html('Değerlendirmeyi Sil'); });
     });
 
     $(document).on('click', '.add-fixed-lessons', function() {
@@ -532,18 +519,19 @@ $(document).ready(function() {
             .always(() => button.prop('disabled', false).html('<i class="bi bi-calendar-x"></i>'));
     });
 
-    // --- MODAL & GLOBAL BUTON AKSİYONLARI ---
     saveBtn.on('click', function() {
         $.post('<?= route_to("schedule.create") ?>', $('#lesson-form').serialize() + '&<?= csrf_token() ?>=<?= csrf_hash() ?>')
             .done(res => { lessonModal.hide(); if (res.success) refreshSchedule(true); else alert(res.message); })
             .fail(() => alert('Hata oluştu.'));
     });
+
     updateBtn.on('click', function() {
         const lessonId = $(this).data('lesson-id');
         $.post(`<?= site_url('schedule/update-lesson/') ?>${lessonId}`, $('#lesson-form').serialize() + '&<?= csrf_token() ?>=<?= csrf_hash() ?>')
             .done(res => { lessonModal.hide(); if (res.success) refreshSchedule(true); else alert(res.message); })
             .fail(() => alert('Hata oluştu.'));
     });
+
     deleteBtn.on('click', function() {
         if (!confirm('Bu dersi kalıcı olarak silmek istediğinizden emin misiniz?')) return;
         const lessonId = $(this).data('lesson-id');
@@ -599,6 +587,82 @@ $(document).ready(function() {
         if (teacherIds.length > 0 && confirm(teacherIds.length + ' öğretmene program güncelleme bildirimi göndermek istediğinizden emin misiniz?')) {
             sendNotification(teacherIds, $(this));
         }
+    });
+
+    // --- NEW ABSENCE REPORTING LOGIC ---
+    reportAbsenceTriggerBtn.on('click', function() {
+        const lessonId = $(this).data('lesson-id');
+        if (!lessonId) {
+            alert('Hata: Ders ID bulunamadı.');
+            return;
+        }
+
+        lessonModal.hide();
+        showLoadingInModal(absenceModalBody);
+        absenceModal.show();
+
+        $.get(`<?= site_url('schedule/get-lesson-details/') ?>${lessonId}`)
+            .done(function(response) {
+                if (!response.success || !response.lesson.students || response.lesson.students.length === 0) {
+                    absenceModalBody.html('<div class="alert alert-warning">Bu derse kayıtlı öğrenci bulunamadı.</div>');
+                    return;
+                }
+
+                let studentCheckboxes = '<p>Devamsızlık kaydı yapılacak öğrenci(ler)i seçin:</p>';
+                response.lesson.students.forEach(student => {
+                    studentCheckboxes += `
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="student_ids[]" value="${student.id}" id="student_${student.id}">
+                            <label class="form-check-label" for="student_${student.id}">
+                                ${student.name}
+                            </label>
+                        </div>`;
+                });
+
+                const formContent = `
+                    <input type="hidden" name="lesson_id" value="${lessonId}">
+                    <div class="mb-3">${studentCheckboxes}</div>
+                    <div class="mb-3">
+                        <label for="absenceReason" class="form-label">Devamsızlık Nedeni (İsteğe Bağlı)</label>
+                        <textarea class="form-control" id="absenceReason" name="reason" rows="3"></textarea>
+                    </div>
+                `;
+                absenceModalBody.html(formContent);
+            })
+            .fail(() => {
+                absenceModalBody.html('<div class="alert alert-danger">Dersteki öğrenciler yüklenirken bir hata oluştu.</div>');
+            });
+    });
+
+    $('#absence-form').on('submit', function(e) {
+        e.preventDefault();
+        const saveButton = $('#saveAbsenceBtn');
+        const studentIds = $(this).find('input[name="student_ids[]"]:checked').map(function() { return $(this).val(); }).get();
+
+        if (studentIds.length === 0) {
+            alert('Lütfen en az bir öğrenci seçin.');
+            return;
+        }
+
+        saveButton.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Kaydediliyor...');
+
+        $.post('<?= route_to("schedule.reportAbsence") ?>', $(this).serialize() + '&<?= csrf_token() ?>=<?= csrf_hash() ?>')
+            .done(function(response) {
+                if (response.success) {
+                    absenceModal.hide();
+                    lessonModal.hide(); // Make sure the other modal is also hidden
+                    alert(response.message);
+                    refreshSchedule(true);
+                } else {
+                    alert(response.message || 'Bir hata oluştu.');
+                }
+            })
+            .fail(() => {
+                alert('Sunucu hatası: Devamsızlık kaydedilemedi.');
+            })
+            .always(() => {
+                saveButton.prop('disabled', false).html('Kaydet ve Dersi Sil');
+            });
     });
 
 });
