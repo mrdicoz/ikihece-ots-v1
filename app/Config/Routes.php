@@ -114,6 +114,7 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->delete('(:num)', 'StudentController::delete/$1');
         $routes->POST('(:num)/delete', 'StudentController::delete/$1'); // Form compatibility için
         $routes->get('(:num)/attendance', 'StudentController::attendanceReport/$1', ['as' => 'students.attendanceReport']);
+        $routes->get('absences', 'StudentController::absences', ['as' => 'students.absences', 'filter' => 'group:admin,yonetici,mudur,sekreter']);
         
         // RAM Raporu görüntüleme
         $routes->GET('view-ram-report/(:num)', 'StudentController::viewRamReport/$1', ['as' => 'students.viewRamReport']);

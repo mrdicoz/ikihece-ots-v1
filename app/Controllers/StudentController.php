@@ -604,4 +604,35 @@ public function update($id = null)
 
         return view('students/attendance_report', array_merge($this->data, $data));
     }
+
+    public function absences()
+    {
+        $absenceModel = new \App\Models\StudentAbsenceModel();
+        $studentModel = new \App\Models\StudentModel();
+
+        $year = $this->request->getGet('year') ?? date('Y');
+        $month = $this->request->getGet('month') ?? date('m');
+        $studentId = $this->request->getGet('student_id');
+
+        $absences = $absenceModel->getAbsencesByMonthYear($month, $year, $studentId);
+
+        // Sadece devamsızlığı olan öğrencileri al
+        $studentsWithAbsencesIds = $absenceModel->select('student_id')->distinct()->findColumn('student_id');
+
+        $students = [];
+        if (!empty($studentsWithAbsencesIds)) {
+            $students = $studentModel->whereIn('id', $studentsWithAbsencesIds)->orderBy('adi', 'ASC')->findAll();
+        }
+
+        $data = [
+            'title'           => 'Aylık Devamsızlık Raporu',
+            'absences'        => $absences,
+            'students'        => $students,
+            'selectedYear'    => $year,
+            'selectedMonth'   => $month,
+            'selectedStudent' => $studentId,
+        ];
+
+        return view('students/absences', array_merge($this->data, $data));
+    }
 }
