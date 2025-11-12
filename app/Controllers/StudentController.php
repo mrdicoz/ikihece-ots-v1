@@ -132,25 +132,27 @@ public function create()
         $data['egitim_programi'] = implode(',', $data['egitim_programi']);
     }
     
+    $ramReportPath = null;
     $reportFile = $this->request->getFile('ram_raporu');
     if ($reportFile && $reportFile->isValid() && !$reportFile->hasMoved()) {
         $newName = $reportFile->getRandomName();
         $reportFile->move(WRITEPATH . 'uploads/ram_reports', $newName);
         $data['ram_raporu'] = $newName;
-        // RAM raporu analizi
-        $filePath = WRITEPATH . 'uploads/ram_reports/' . $newName;
-        $this->analyzeAndSaveRamReport($id, $filePath);
+        $ramReportPath = WRITEPATH . 'uploads/ram_reports/' . $newName;
     }
 
     // Tek insert işlemi ve sonucunu kontrol et
     $insertResult = $model->insert($data);
-    
+
     if ($insertResult === false) {
         return redirect()->back()->withInput()->with('errors', $model->errors());
     }
 
     // Başarılı insert durumu
     $yeniOgrenciId = $model->getInsertID();
+    if ($ramReportPath) {
+        $this->analyzeAndSaveRamReport($yeniOgrenciId, $ramReportPath);
+    }
     $yeniOgrenciData = $model->find($yeniOgrenciId);
     \CodeIgniter\Events\Events::trigger('student.created', $yeniOgrenciData, auth()->user());
     
