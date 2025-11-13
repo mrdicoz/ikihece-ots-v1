@@ -334,7 +334,7 @@ public function dailyGrid($date = null)
         $lessonStudentModel = new LessonStudentModel();
         $db = \Config\Database::connect();
 
-        $studentIds = $this->request->getPost('students') ?? [];
+        $studentIds = array_unique($this->request->getPost('students') ?? []); // Düzeltme: Tekrar eden öğrenci ID'lerini kaldır.
 
         // Önce dersin var olup olmadığını kontrol et
         $lesson = $lessonModel->find($lessonId);
@@ -383,7 +383,7 @@ public function dailyGrid($date = null)
         $data = $this->request->getPost([
             'teacher_id', 'lesson_date', 'start_time', 'end_time'
         ]);
-        $studentIds = $this->request->getPost('students');
+        $studentIds = array_unique($this->request->getPost('students') ?? []); // Düzeltme: Tekrar eden öğrenci ID'lerini kaldır ve null kontrolü ekle.
 
         if (empty($studentIds)) {
             return $this->response->setJSON(['success' => false, 'message' => 'Lütfen en az bir öğrenci seçin.']);

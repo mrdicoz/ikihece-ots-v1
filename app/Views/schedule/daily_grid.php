@@ -78,8 +78,7 @@
                                                 <?php if ($slotContent): ?>
                                                     <?php if ($slotContent['type'] === 'evaluation'): ?>
                                                         <td class="align-middle bg-info-subtle has-evaluation" data-evaluation-id="<?= $slotContent['id'] ?>">
-                                                            <span class="badge text-bg-info">DEĞERLENDİRME</span>
-                                                            <i class="bi bi-pencil-square d-print-none"></i>
+                                                            <span class="badge text-bg-info"><i class="bi bi-chat-square-text"></i> DEĞER</span>
                                                         </td>
                                                     <?php elseif ($slotContent['type'] === 'leave'): ?>
                                                         <td class="align-middle on-leave">
@@ -258,6 +257,7 @@
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
+    
     .badge {
         border: 1px solid #333 !important;
         background-color: transparent !important;
