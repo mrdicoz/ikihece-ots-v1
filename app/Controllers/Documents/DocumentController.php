@@ -102,15 +102,13 @@ class DocumentController extends BaseController
         }
 
         // Form verilerini al
-        $formData = $this->request->getPost('fields');
+        $formData = $this->request->getPost('fields') ?? [];
         $documentNumber  = $this->request->getPost('document_number');
         $documentDate   = $this->request->getPost('document_date'); 
-        $subject  = $this->request->getPost('subject');
-        $recipient = $this->request->getPost('recipient');
         $attachments = $this->request->getPost('attachments');
 
         // Tarih girilmemişse, bugünün tarihini kullan
-        $documentDate = !empty($documentDate) ? $documentDate : date('Y-m-d'); // <-- 2. YENİ: Boş tarih kontrolü.
+        $documentDate = !empty($documentDate) ? $documentDate : date('Y-m-d');
 
         // Evrak numarası kontrolü
         if ($template->has_number) {
@@ -124,16 +122,16 @@ class DocumentController extends BaseController
             }
         }
 
-        // HTML'i render et (YENİ: Konu ve Evrak Numarası da gönderiliyor)
-            $renderedHtml = $this->renderDocument($template, $formData, $subject, $recipient, $documentNumber, $attachments, $documentDate);
+        // HTML'i render et
+        $renderedHtml = $this->renderDocument($template, $formData, $documentNumber, $attachments, $documentDate);
 
         // Veritabanına kaydet
         $this->documentModel->insert([
             'template_id' => $templateId,
             'document_number' => $template->has_number ? $documentNumber : null,
-            'document_date'   => $documentDate, // <-- 4. YENİ: Tarihi veritabanına ekliyoruz.
-            'subject' => $subject,
-            'recipient' => $recipient,
+            'document_date'   => $documentDate,
+            'subject' => $formData['KONU'] ?? '',
+            'recipient' => $formData['ALICI'] ?? '',
             'attachments' => json_encode($attachments),
             'form_data' => json_encode($formData),
             'rendered_html' => $renderedHtml,
@@ -143,13 +141,10 @@ class DocumentController extends BaseController
         return redirect()->to('/documents/archive')->with('success', 'Belge başarıyla oluşturuldu.');
     }
 
-        /**
-         * Nihai HTML'i oluşturur.
-         */
-        /**
+    /**
      * Belge içeriğini render eder.
      */
-    private function renderDocument($template, $formData, $subject, $recipient, $documentNumber, $attachments, $documentDate)
+    private function renderDocument($template, $formData, $documentNumber, $attachments, $documentDate)
     {
         $content = $template->content;
         $settings = $this->institutionModel->first();
@@ -157,10 +152,7 @@ class DocumentController extends BaseController
         // Tarihi formatla ve [TARIH] etiketiyle değiştir
         $formattedDate = date('d.m.Y', strtotime($documentDate));
         
-        // --- BURADAKİ TÜM replaceAll'LARI str_replace YAPACAĞIZ ---
         $content = str_replace('[TARIH]', $formattedDate, $content);
-        $content = str_replace('[KONU]', $subject, $content);
-        $content = str_replace('[ALICI]', $recipient, $content);
         $content = str_replace('[EVRAK_NO]', $documentNumber, $content);
         
         // Kurum bilgileri
@@ -174,7 +166,7 @@ class DocumentController extends BaseController
         $content = str_replace('[EPOSTA]', $settings->epostasi, $content);
         $content = str_replace('[WEB_SAYFA]', $settings->web_sayfasi, $content);
         
-// LOGO İŞLEMLERİ
+        // LOGO İŞLEMLERİ
         $logoHtml = ''; // Başlangıçta boş
         $logoDbPath = $settings->kurum_logo_path; // Veritabanından gelen yolu al (örn: uploads/institution/logo.png)
         if (!empty($logoDbPath)) {

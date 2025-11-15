@@ -34,18 +34,6 @@
                             </div>
                         </div>
 
-                        <div class="border-top pt-3 mb-3">
-                            <h6 class="text-success mb-3"><i class="bi bi-fonts me-2"></i>Genel Bilgiler</h6>
-                            <div class="mb-3">
-                                <label class="form-label">Konu <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control dynamic-field" name="subject" data-key="KONU" placeholder="Belgenin konusu" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Alıcı <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control dynamic-field" name="recipient" data-key="ALICI" placeholder="Serdivan İlçe Milli Eğitim Müdürlüğü'ne" required>
-                            </div>
-                        </div>
-
                         <?php if(!empty($template->dynamic_fields)): ?>
                             <div class="border-top pt-3 mb-3">
                                 <h6 class="text-success mb-3"><i class="bi bi-file-text me-2"></i>İçerik Bilgileri</h6>
@@ -446,8 +434,6 @@ document.addEventListener('DOMContentLoaded', function() {
             '[EVRAK_NO]': documentNumber,
             '[EVRAK_PREFIX]': settings?.evrak_prefix || '',
             '[EVRAK_BASLANGIC_NO]': settings?.evrak_baslangic_no || '',
-            '[KONU]': document.querySelector('input[name="subject"]')?.value || '',
-            '[ALICI]': document.querySelector('input[name="recipient"]')?.value || '',
             '[LOGO]': settings?.kurum_logo_path ? `<img src="<?= base_url() ?>${settings.kurum_logo_path}" style="max-width:150px">` : '',
             '[QR_KOD]': settings?.kurum_qr_kod_path ? `<img src="<?= base_url() ?>${settings.kurum_qr_kod_path}" style="max-width:80px">` : ''
         };

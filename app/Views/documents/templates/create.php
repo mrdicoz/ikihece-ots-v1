@@ -68,14 +68,14 @@
                     <div class="card-header bg-success text-white"><h6 class="mb-0"><i class="bi bi-file-text me-2"></i>Şablon Metni</h6></div>
                     <div class="card-body">
                         <div class="mb-3 d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="{KONU}">{KONU}</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="{ALICI}">{ALICI}</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[LOGO]">[LOGO]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[QR_KOD]">[QR_KOD]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[KURUM_ADI]">[KURUM_ADI]</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[ALICI]">[ALICI]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[MUDUR]">[MUDUR]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[KURUCU_MUDUR]">[KURUCU_MUDUR]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[ADRES]">[ADRES]</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[KONU]">[KONU]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[SABIT_TELEFON]">[SABIT_TELEFON]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[EPOSTA]">[EPOSTA]</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm static-variable-btn" data-value="[EVRAK_NO]">[EVRAK_NO]</button>
