@@ -166,29 +166,6 @@
         transition: transform 0.2s ease;
     }
     
-    /* A4 Sayfa Stilleri */
-    .a4-paper {
-        width: 21cm;
-        height: 29.7cm !important;
-        min-height: 29.7cm;
-        max-height: 29.7cm;
-        background: white;
-        box-shadow: 0 8px 16px rgba(0,0,0,0.3);
-        margin: 0 auto;
-        padding: 25mm 15mm 15mm 15mm;
-        overflow: hidden;
-        position: relative;
-        box-sizing: border-box;
-        border: 1px solid #ddd;
-        font-family: 'Times New Roman', serif;
-        font-size: 11pt;
-        line-height: 1.2;
-    }
-    
-    .a4-paper.active-page {
-        box-shadow: 0 8px 20px rgba(133, 133, 133, 0.4);
-        border: 2px solid #b8b8b8ff;
-    }
     
     /* Toolbar Kontrolleri */
     .zoom-controls button,
@@ -251,16 +228,42 @@
     @media (max-width: 992px) {
         .preview-container {
             position: relative;
-            top: 0;
+            top: 50px;
             max-height: 60vh;
         }
     }
     
+    /* A4 Sayfa Stilleri */
+    .a4-paper {
+        width: 21cm;
+        height: 29.7cm !important;
+        min-height: 29.7cm;
+        max-height: 29.7cm;
+        background: white;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        padding: 25mm 15mm 15mm 15mm;
+        overflow: hidden;
+        position: relative;
+        box-sizing: border-box;
+        border: 1px solid #ddd;
+        font-family: 'Times New Roman', serif;
+        font-size: 11pt;
+        line-height: 1.2;
+    }
+    
+    .a4-paper.active-page {
+        box-shadow: 0 8px 20px rgba(133, 133, 133, 0.4);
+        border: 2px solid #b8b8b8ff;
+    }
     /* İçerik stilleri */
     .a4-paper h1, .a4-paper h2, .a4-paper h3 {
         color: #2c3e50;
-        margin-top: 0px;
-        margin-bottom: 0px;
+        margin-top: 0; /* Rely on container padding */
+        margin-bottom: 10mm;
+    }
+    
+    .a4-paper h1 {
+        font-size: 18pt; /* Normalized from 1px */
     }
     
     .a4-paper table {
@@ -273,6 +276,8 @@
         border: 0px solid #ddd;
         padding: 0px;
     }
+
+    
 </style>
 
 <script>

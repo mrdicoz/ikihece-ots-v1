@@ -187,7 +187,7 @@ class DocumentController extends BaseController
             $qrPhysicalPath = FCPATH . $qrDbPath;
              // Dosyanın varlığını kontrol et
             if (is_file($qrPhysicalPath)) {
-                $qrHtml = '<img src="' . $qrPhysicalPath . '" style="max-width:80px">';
+                $qrHtml = '<img src="' . $qrPhysicalPath . '" style="max-width:50px">';
             }
         }
         $content = str_replace('[QR_KOD]', $qrHtml, $content);
