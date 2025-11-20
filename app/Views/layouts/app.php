@@ -68,7 +68,7 @@
 
 
     <!-- AI Asistanı Tetikleyici Buton -->
-    <button id="aiAssistantButton" class="btn btn-success rounded-pill shadow-lg d-flex align-items-center gap-2 position-fixed" 
+    <button id="aiAssistantButton" class="btn btn-success rounded-pill shadow-lg d-flex align-items-center gap-2 position-fixed d-print-none" 
             type="button" 
             data-bs-toggle="offcanvas" 
             data-bs-target="#aiAssistantOffcanvas" 
