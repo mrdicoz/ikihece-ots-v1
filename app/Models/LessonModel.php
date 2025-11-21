@@ -128,4 +128,25 @@ class LessonModel extends Model
 
         return $builder->findAll();
     }
+
+    /**
+     * Belirli bir öğretmenin, belirtilen yıl ve aydaki tüm derslerini getirir.
+     *
+     * @param int $teacherId
+     * @param int $year
+     * @param int $month
+     * @return array
+     */
+    public function getLessonsForTeacherByMonth(int $teacherId, int $year, int $month)
+    {
+        return $this->select('lessons.*, s.adi, s.soyadi')
+            ->join('lesson_students ls', 'ls.lesson_id = lessons.id')
+            ->join('students s', 's.id = ls.student_id')
+            ->where('lessons.teacher_id', $teacherId)
+            ->where('YEAR(lessons.lesson_date)', $year)
+            ->where('MONTH(lessons.lesson_date)', $month)
+            ->orderBy('lessons.lesson_date', 'ASC')
+            ->orderBy('lessons.start_time', 'ASC')
+            ->findAll();
+    }
 }
