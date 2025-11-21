@@ -18,6 +18,7 @@ class AssignmentController extends BaseController
             ->join('user_profiles up', 'up.user_id = users.id', 'left')
             ->join('auth_groups_users agu', 'agu.user_id = users.id')
             ->where('agu.group', 'sekreter')
+            ->where('users.active', 1)
             ->orderBy('up.first_name', 'ASC')
             ->findAll();
 

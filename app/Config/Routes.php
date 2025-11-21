@@ -184,7 +184,14 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
     // --- YÖNETİM GRUBU ROTALARI (admin, yonetici, mudur, sekreter) ---
     // Bu grup, birden fazla yönetimsel rolün erişebileceği özellikleri barındırır.
     $routes->group('admin', ['filter' => 'group:admin,yonetici,mudur,sekreter'], static function($routes) {
-            
+        
+        // ATAMALAR
+        $routes->group('assignments', static function ($routes) {
+            $routes->GET('/', 'Admin\AssignmentController::index', ['as' => 'admin.assignments.index']);
+            $routes->POST('save', 'Admin\AssignmentController::save', ['as' => 'admin.assignments.save']);
+            $routes->GET('get-assigned/(:num)', 'Admin\AssignmentController::getAssigned/$1', ['as' => 'admin.assignments.getAssigned']);
+        });
+        
         // DUYURU YÖNETİMİ
         $routes->group('announcements', static function ($routes) {
             $routes->GET('/', 'Admin\AnnouncementController::index', ['as' => 'admin.announcements.index']);
@@ -251,12 +258,6 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
             $routes->POST('save', 'Admin\InstitutionController::save', ['as' => 'admin.institution.save']);
         });
         
-        // ATAMALAR
-        $routes->group('assignments', static function ($routes) {
-            $routes->GET('/', 'Admin\AssignmentController::index', ['as' => 'admin.assignments.index']);
-            $routes->POST('save', 'Admin\AssignmentController::save', ['as' => 'admin.assignments.save']);
-            $routes->GET('get-assigned/(:num)', 'Admin\AssignmentController::getAssigned/$1', ['as' => 'admin.assignments.getAssigned']);
-        });
         
         // GENEL AYARLAR
         $routes->group('settings', static function ($routes) {
