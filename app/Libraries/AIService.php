@@ -162,7 +162,6 @@ class AIService
                     ]
                 ]
             ],
-            // ... (other tools remain unchanged) ...
             [
                 'type' => 'function',
                 'function' => [
@@ -309,62 +308,15 @@ class AIService
         }
     }
 
-    // ... (Other helper methods remain unchanged) ...
-
-    private function toolRunSqlQuery($query)
+    /**
+     * Türkçe karakter duyarlı küçük harfe çevirme
+     */
+    private function turkishToLower($string)
     {
-        // GÜVENLİK KONTROLÜ: Sadece SELECT sorgularına izin ver
-        $query = trim($query);
-        
-        // Sadece SELECT ile başlamak zorunda değil, SELECT içeren güvenli bir sorgu olmalı
-        // Örn: "SELECT ..." veya "(SELECT ...)"
-        if (stripos($query, 'SELECT') === false) {
-            return "GÜVENLİK UYARISI: Sadece veri okuma (SELECT) işlemleri yapabilirsiniz.";
-        }
-        
-        // Tehlikeli komutları engelle (Daha katı kontrol)
-        // UPDATE, DELETE, DROP, ALTER, TRUNCATE, INSERT, GRANT, REVOKE
-        if (preg_match('/^\s*(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|REPLACE|GRANT|REVOKE)\b/i', $query)) {
-            return "GÜVENLİK UYARISI: Veri değiştirme veya silme komutları yasaktır.";
-        }
-        
-        // İkinci katman: Sorgu içinde noktalı virgül (;) varsa ve sonrasında tehlikeli komut geliyorsa engelle
-        if (preg_match('/;\s*(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|REPLACE|GRANT|REVOKE)\b/i', $query)) {
-             return "GÜVENLİK UYARISI: Çoklu sorgularda yasaklı komut tespit edildi.";
-        }
-
-        try {
-            $db = db_connect();
-            $result = $db->query($query)->getResultArray();
-            
-            if (empty($result)) {
-                return "Sorgu çalıştı ancak sonuç dönmedi.";
-            }
-            
-            // Çok fazla veri dönmesini engelle
-            if (count($result) > 20) {
-                $result = array_slice($result, 0, 20);
-                $result[] = "... (Toplam " . count($result) . " satır, ilk 20 gösteriliyor)";
-            }
-            
-            return $result;
-        } catch (\Exception $e) {
-            return "SQL Hatası: " . $e->getMessage();
-        }
-    }
-
-    private function getDatabaseSchema()
-    {
-        return <<<SCHEMA
-- students (id, adi, soyadi, tckn, dogum_tarihi, iletisim, ram_raporu, egitim_programi, created_at, deleted_at)
-  * İPUCU: Yaş hesabı için MySQL fonksiyonu: TIMESTAMPDIFF(YEAR, dogum_tarihi, CURDATE())
-- users (id, username, active)
-- user_profiles (user_id, first_name, last_name, branch, phone_number) -> users.id ile user_id eşleşir
-- lessons (id, teacher_id, lesson_date, start_time, end_time) -> teacher_id, users.id'dir
-- lesson_students (lesson_id, student_id) -> lessons ve students tablolarını bağlar
-- student_evaluations (id, student_id, teacher_id, evaluation, created_at) -> Gelişim raporları
-- student_absences (id, student_id, lesson_date, reason) -> Devamsızlıklar
-SCHEMA;
+        $search = ['Ç', 'Ğ', 'I', 'İ', 'Ö', 'Ş', 'Ü'];
+        $replace = ['ç', 'ğ', 'ı', 'i', 'ö', 'ş', 'ü'];
+        $string = str_replace($search, $replace, $string);
+        return mb_strtolower($string, 'UTF-8');
     }
 
     /**
@@ -374,30 +326,48 @@ SCHEMA;
     {
         $model = new StudentModel();
         $name = trim($name);
+        // Çoklu boşlukları tek boşluğa indir
+        $name = preg_replace('/\s+/', ' ', $name);
         
-        // Tam eşleşme ara
+        // 1. Tam Eşleşme (Orijinal)
         $student = $model->where("CONCAT(adi, ' ', soyadi)", $name)
                         ->where('deleted_at', null)
                         ->first();
-                        
         if ($student) return $student['id'];
+
+        // 2. Türkçe Normalizasyon ile Arama
+        $normalizedInput = $this->turkishToLower($name);
         
-        // Benzerlik ara
-        $students = $model->like("CONCAT(adi, ' ', soyadi)", $name)
-                         ->where('deleted_at', null)
-                         ->findAll(2);
-                         
-        // Eğer tek bir benzer sonuç varsa onu kabul et
-        if (count($students) === 1) {
-            return $students[0]['id'];
+        // İsim parçalarını ayır
+        $parts = explode(' ', $name);
+        $first = $parts[0];
+
+        $students = $model->groupStart()
+                        ->like("CONCAT(adi, ' ', soyadi)", $name)
+                        ->orLike('adi', $first)
+                        ->groupEnd()
+                        ->where('deleted_at', null)
+                        ->findAll(20);
+
+        foreach ($students as $s) {
+            $fullName = $s['adi'] . ' ' . $s['soyadi'];
+            // DB'den gelen ismin boşluklarını da normalize et
+            $fullName = preg_replace('/\s+/', ' ', $fullName);
+            $normalizedDb = $this->turkishToLower($fullName);
+            
+            if ($normalizedDb === $normalizedInput) {
+                return $s['id'];
+            }
+            
+            // Fuzzy match (Ufak yazım hataları veya karakter farkları için)
+            // İsim yeterince uzunsa (yanlış eşleşmeyi önlemek için)
+            if (strlen($normalizedInput) > 4 && levenshtein($normalizedInput, $normalizedDb) < 3) {
+                return $s['id'];
+            }
         }
         
         return null;
     }
-
-    // -------------------------------------------------------------------------
-    // TOOL IMPLEMENTATIONS
-    // -------------------------------------------------------------------------
 
     private function toolGetGeneralStats()
     {
@@ -417,62 +387,62 @@ SCHEMA;
     private function toolSearchStudent($query)
     {
         $query = trim($query);
+        $query = preg_replace('/\s+/', ' ', $query);
         $model = new StudentModel();
+        $normalizedQuery = $this->turkishToLower($query);
         
-        // Gelişmiş arama: Ad, Soyad veya "Ad Soyad" kombinasyonu
+        // Split query to find first word for broader search
+        $parts = explode(' ', $query);
+        $firstWord = $parts[0];
+
         $students = $model->groupStart()
                 ->like('adi', $query)
                 ->orLike('soyadi', $query)
                 ->orLike("CONCAT(adi, ' ', soyadi)", $query)
+                ->orLike('adi', $firstWord) // Broaden search
             ->groupEnd()
             ->where('deleted_at', null)
-            ->findAll(5);
+            ->findAll(50); // Increase limit
         
-        if (empty($students)) {
-            $parts = explode(' ', $query);
-            if (count($parts) > 1) {
-                $students = $model->groupStart()
-                    ->groupStart()
-                        ->like('adi', $parts[0])
-                        ->like('soyadi', end($parts))
-                    ->groupEnd()
-                    ->orGroupStart()
-                        ->like('adi', end($parts))
-                        ->like('soyadi', $parts[0])
-                    ->groupEnd()
-                ->groupEnd()
-                ->where('deleted_at', null)
-                ->findAll(5);
-            }
-        }
-        
-        if (empty($students)) return "Aradığınız kriterlere uygun öğrenci bulunamadı.";
-        
-        $result = [];
+        $results = [];
+        $seenIds = [];
+
         foreach ($students as $s) {
-            $age = 'Bilinmiyor';
-            if (!empty($s['dogum_tarihi'])) {
-                $age = date_diff(date_create($s['dogum_tarihi']), date_create('today'))->y;
-            }
+            if (in_array($s['id'], $seenIds)) continue;
 
-            // RAM Raporu bir dosya yoluysa (pdf, jpg vs) kullanıcıya gösterme
-            $diagnosis = $s['ram_raporu'] ?? '';
-            if (preg_match('/\.(pdf|jpg|jpeg|png|doc|docx)$/i', $diagnosis)) {
-                $diagnosis = "RAM Raporu Dosyası Mevcut";
-            }
-            if (empty($diagnosis) && !empty($s['egitim_programi'])) {
-                $diagnosis = "Program: " . $s['egitim_programi'];
-            }
+            $fullName = $s['adi'] . ' ' . $s['soyadi'];
+            $fullName = preg_replace('/\s+/', ' ', $fullName);
+            $normalizedDb = $this->turkishToLower($fullName);
+            
+            if (strpos($normalizedDb, $normalizedQuery) !== false || levenshtein($normalizedQuery, $normalizedDb) < 3) {
+                $seenIds[] = $s['id'];
+                
+                $age = 'Bilinmiyor';
+                if (!empty($s['dogum_tarihi'])) {
+                    $age = date_diff(date_create($s['dogum_tarihi']), date_create('today'))->y;
+                }
 
-            $result[] = [
-                // ID'yi kaldırdık ki "Öğrenci No" sanmasın
-                'name' => $s['adi'] . ' ' . $s['soyadi'],
-                'age' => $age,
-                'info' => $diagnosis ?: 'Tanı bilgisi girilmemiş',
-                'parent_phone' => $s['iletisim'] ?? 'Telefon yok'
-            ];
+                $diagnosis = $s['ram_raporu'] ?? '';
+                if (preg_match('/\.(pdf|jpg|jpeg|png|doc|docx)$/i', $diagnosis)) {
+                    $diagnosis = "RAM Raporu Dosyası Mevcut";
+                }
+                if (empty($diagnosis) && !empty($s['egitim_programi'])) {
+                    $diagnosis = "Program: " . $s['egitim_programi'];
+                }
+
+                $results[] = [
+                    'name' => $fullName,
+                    'age' => $age,
+                    'info' => $diagnosis ?: 'Tanı bilgisi girilmemiş',
+                    'parent_phone' => $s['iletisim'] ?? 'Telefon yok',
+                    'location' => $s['google_konum'] ?? 'Konum yok'
+                ];
+            }
         }
-        return $result;
+        
+        if (empty($results)) return "Aradığınız kriterlere ('$query') uygun öğrenci bulunamadı.";
+        
+        return array_slice($results, 0, 5);
     }
 
     private function toolGetStudentDetails($studentId)
@@ -484,7 +454,6 @@ SCHEMA;
         $student = $sModel->find($studentId);
         if (!$student) return "Öğrenci bulunamadı.";
 
-        // Gelişim günlükleri
         $evaluations = $eModel->getEvaluationsForStudent($studentId);
         $logs = [];
         foreach (array_slice($evaluations, 0, 3) as $eval) {
@@ -495,7 +464,6 @@ SCHEMA;
             ];
         }
 
-        // RAM Analizi
         $ramAnalysis = $rModel->where('student_id', $studentId)->first();
         
         $age = 'Bilinmiyor';
@@ -503,7 +471,6 @@ SCHEMA;
             $age = date_diff(date_create($student['dogum_tarihi']), date_create('today'))->y;
         }
 
-        // RAM Raporu dosya kontrolü
         $diagnosis = $student['ram_raporu'] ?? '';
         if (preg_match('/\.(pdf|jpg|jpeg|png|doc|docx)$/i', $diagnosis)) {
             $diagnosis = "RAM Raporu Dosyası Mevcut";
@@ -517,7 +484,8 @@ SCHEMA;
                 'name' => $student['adi'] . ' ' . $student['soyadi'],
                 'age' => $age,
                 'diagnosis' => $diagnosis,
-                'education_program' => $student['egitim_programi']
+                'education_program' => $student['egitim_programi'],
+                'location' => $student['google_konum'] ?? 'Konum yok'
             ],
             'latest_logs' => $logs,
             'ram_analysis' => $ramAnalysis['ram_text_content'] ?? 'RAM analizi bulunamadı.'
@@ -533,7 +501,6 @@ SCHEMA;
 
         $report = [];
         foreach ($teachers as $t) {
-            // Object veya array kontrolü
             $firstName = is_object($t) ? $t->first_name : $t['first_name'];
             $lastName = is_object($t) ? $t->last_name : $t['last_name'];
             $branch = is_object($t) ? $t->branch : ($t['branch'] ?? '');
@@ -546,6 +513,48 @@ SCHEMA;
             ];
         }
         return $report;
+    }
+
+    private function toolRunSqlQuery($query)
+    {
+        $query = trim($query);
+        if (stripos($query, 'SELECT') === false) {
+            return "GÜVENLİK UYARISI: Sadece veri okuma (SELECT) işlemleri yapabilirsiniz.";
+        }
+        if (preg_match('/^\s*(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|REPLACE|GRANT|REVOKE)\b/i', $query)) {
+            return "GÜVENLİK UYARISI: Veri değiştirme veya silme komutları yasaktır.";
+        }
+        if (preg_match('/;\s*(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|REPLACE|GRANT|REVOKE)\b/i', $query)) {
+             return "GÜVENLİK UYARISI: Çoklu sorgularda yasaklı komut tespit edildi.";
+        }
+
+        try {
+            $db = db_connect();
+            $result = $db->query($query)->getResultArray();
+            
+            if (empty($result)) {
+                return "Sorgu çalıştı ancak sonuç dönmedi.";
+            }
+            if (count($result) > 20) {
+                $result = array_slice($result, 0, 20);
+                $result[] = "... (Toplam " . count($result) . " satır, ilk 20 gösteriliyor)";
+            }
+            return $result;
+        } catch (\Exception $e) {
+            return "SQL Hatası: " . $e->getMessage();
+        }
+    }
+
+    private function getDatabaseSchema()
+    {
+        return "- students (id, adi, soyadi, tckn, dogum_tarihi, iletisim, ram_raporu, egitim_programi, created_at, deleted_at)\n" .
+               "  * İPUCU: Yaş hesabı için MySQL fonksiyonu: TIMESTAMPDIFF(YEAR, dogum_tarihi, CURDATE())\n" .
+               "- users (id, username, active)\n" .
+               "- user_profiles (user_id, first_name, last_name, branch, phone_number) -> users.id ile user_id eşleşir\n" .
+               "- lessons (id, teacher_id, lesson_date, start_time, end_time) -> teacher_id, users.id'dir\n" .
+               "- lesson_students (lesson_id, student_id) -> lessons ve students tablolarını bağlar\n" .
+               "- student_evaluations (id, student_id, teacher_id, evaluation, created_at) -> Gelişim raporları\n" .
+               "- student_absences (id, student_id, lesson_date, reason) -> Devamsızlıklar";
     }
 
     private function toolGetEmptyLessons($date)
