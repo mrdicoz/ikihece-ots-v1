@@ -9,6 +9,7 @@ use App\Models\InstitutionModel;
 use App\Models\StudentEvaluationModel;
 use App\Models\FixedLessonModel;
 use App\Models\RamReportAnalysisModel;
+use App\Libraries\AIService;
 
 class AdminAIController extends BaseAIController
 {
@@ -26,15 +27,23 @@ class AdminAIController extends BaseAIController
         }
 
         // 2. Öğretmen Detay Raporu
-        if (preg_match('/(.+?)\s+öğretmenin.*raporu/i', $userMessage, $matches)) {
+        if (preg_match('/(.+?)\s+öğretmenin.*raporu/iu', $userMessage, $matches)) {
             $teacherName = trim($matches[1]);
             return $this->handleTeacherDetailReport($teacherName);
         }
 
         // 3. Öğrenci Detay Raporu
-        if (preg_match('/(.+?)\s+hakkında\s+rapor/i', $userMessage, $matches)) {
+        if (preg_match('/(.+?)\s+hakkında.*rapor/iu', $userMessage, $matches)) {
             $studentName = trim($matches[1]);
             return $this->handleStudentDetailReport($studentName);
+        }
+
+        // 3.5. RAM Raporu Analizi
+        if (preg_match("/(.+?).*öğrencinin.*ram.*raporu.*(analizi|analizini).*ver/iu", $userMessage, $matches) || 
+            preg_match("/(.+?).*ram.*raporu.*(analiz.*yap|analizi nedir|analizini ver)/iu", $userMessage, $matches)) {
+            $studentName = trim($matches[1]);
+            $studentId = $this->findStudentIdInMessage($studentName);
+            return $this->handleRamReportQuery($studentId, $studentName);
         }
 
         // 4. Yeni Kayıt Olan Öğrenciler
@@ -53,7 +62,7 @@ class AdminAIController extends BaseAIController
         }
 
         // 7. Öğretmenin Gelişim Günlüklerini Listele
-        if (preg_match('/(.+?)\s+yazdığı\s+gelişim\s+günlüklerini\s+listele/i', $userMessage, $matches)) {
+        if (preg_match('/(.+?)\s+yazdığı.*gelişim.*listele/iu', $userMessage, $matches)) {
             $teacherName = trim($matches[1]);
             return $this->handleTeacherEvaluations($teacherName);
         }
@@ -73,10 +82,11 @@ class AdminAIController extends BaseAIController
         $response .= "1. **`Kurumun genel raporunu oluştur.`**\n";
         $response .= "2. **`{Öğretmen Adı} öğretmenin raporunu oluştur.`**\n";
         $response .= "3. **`{Öğrenci Adı} hakkında rapor sun.`**\n";
-        $response .= "4. **`Bu ay yeni kayıt olan öğrencileri listele.`**\n";
-        $response .= "5. **`Bu ay kurumdan ayrılan öğrencileri listele.`**\n";
-        $response .= "6. **`Kurumdaki öğretmenleri listele.`**\n";
-        $response .= "7. **`{Öğretmen Adı} yazdığı gelişim günlüklerini listele.`**\n\n";
+        $response .= "4. **`{Öğrenci Adı} ram raporu analizini ver.`**\n";
+        $response .= "5. **`Bu ay yeni kayıt olan öğrencileri listele.`**\n";
+        $response .= "6. **`Bu ay kurumdan ayrılan öğrencileri listele.`**\n";
+        $response .= "7. **`Kurumdaki öğretmenleri listele.`**\n";
+        $response .= "8. **`{Öğretmen Adı} yazdığı gelişim günlüklerini listele.`**\n\n";
         $response .= "Ayrıca veritabanı hakkında `sql` komutuyla doğrudan sorgulama yapabilirsiniz.";
         return $response;
     }
@@ -274,6 +284,38 @@ class AdminAIController extends BaseAIController
     }
 
     /**
+     * Rapor 3.5: RAM Raporu Yapay Zeka Özeti ve Analizi
+     */
+    private function handleRamReportQuery(?int $studentId, string $studentNameFallback): string
+    {
+        if (!$studentId) {
+            return "Analiz için lütfen geçerli bir öğrenci adı belirtin. '{$studentNameFallback}' adında bir öğrenci bulunamadı.";
+        }
+
+        $analysisModel = new RamReportAnalysisModel();
+        $analysis = $analysisModel->where('student_id', $studentId)->first();
+
+        if (!$analysis || empty($analysis['ram_text_content'])) {
+            return "Bu öğrenci için henüz bir RAM raporu analizi bulunmuyor. Öncelikle PDF veya Word formatında bir RAM raporunun yüklendiğinden ve sistemin bunu okuyabildiğinden emin olun.";
+        }
+
+        $student = (new StudentModel())->find($studentId);
+        $ramReportText = $analysis['ram_text_content'];
+
+        $systemPrompt = "Sen özel eğitim alanında uzman bir yapay zeka asistanısın. Sana verilen RAM (Rehberlik ve Araştırma Merkezi) raporu metnini analiz et. Bu metinden yola çıkarak, öğrencinin tanısı, bilişsel, sosyal, duygusal ve fiziksel gelişim özelliklerini, eğitimsel performansını, güçlü ve desteklenmesi gereken yönlerini belirle. Bu bilgileri kurum yöneticisinin kolayca anlayabileceği profesyonel bir dille, başlıklar halinde (örn: Tanı, Bilişsel Gelişim, Güçlü Yönler, Yönetici Notu vb.) özetle. Cevabın doğrudan analiz olsun, gereksiz selamlama kullanma. Çıktıyı Markdown formatında yapılandır.";
+        
+        $userPrompt = "Lütfen aşağıdaki RAM raporu metnini analiz ederek {$student['adi']} {$student['soyadi']} adlı öğrenci için detaylı bir akademik özet oluştur:\n\n{$ramReportText}";
+
+        $aiService = new AIService();
+        $summary = $aiService->getChatResponse($userPrompt, $systemPrompt, $this->getChatHistoryForAI());
+
+        $response = "**{$student['adi']} {$student['soyadi']}** öğrencisine ait yapay zeka destekli RAM Raporu analizi:\n\n";
+        $response .= $summary;
+
+        return $response;
+    }
+
+    /**
      * Rapor 4: Bu ay yeni kayıt olan öğrenciler
      */
     private function handleNewStudentsList(): string
@@ -348,47 +390,38 @@ class AdminAIController extends BaseAIController
     private function findUserByName(string $name, string $group): ?object
     {
         $db = db_connect();
-        $builder = $db->table('users');
-        $builder->select('users.id, user_profiles.first_name, user_profiles.last_name');
-        $builder->join('user_profiles', 'user_profiles.user_id = users.id');
-        $builder->join('auth_groups_users', 'auth_groups_users.user_id = users.id');
-        $builder->where('auth_groups_users.group', $group);
+        $users = $db->table('users')
+            ->select('users.id, user_profiles.first_name, user_profiles.last_name')
+            ->join('user_profiles', 'user_profiles.user_id = users.id')
+            ->join('auth_groups_users', 'auth_groups_users.user_id = users.id')
+            ->where('auth_groups_users.group', $group)
+            ->get()->getResult();
 
-        $nameParts = explode(' ', trim($name));
-        if (count($nameParts) > 1) {
-            $firstName = $nameParts[0];
-            $lastName = end($nameParts);
-            $builder->where('user_profiles.first_name', $firstName);
-            $builder->where('user_profiles.last_name', $lastName);
-        } else {
-            $builder->groupStart();
-            $builder->like('user_profiles.first_name', $name);
-            $builder->orLike('user_profiles.last_name', $name);
-            $builder->groupEnd();
+        $searchLower = $this->turkish_strtolower(trim($name));
+
+        foreach ($users as $u) {
+            $fullNameLower = $this->turkish_strtolower($u->first_name . ' ' . $u->last_name);
+            if ($searchLower === $fullNameLower || str_contains($fullNameLower, $searchLower)) {
+                return $u;
+            }
         }
-
-        return $builder->get()->getRow();
+        return null;
     }
 
     private function findStudentByName(string $name): ?array
     {
-        $db = db_connect();
-        $builder = $db->table('students');
+        $studentModel = new StudentModel();
+        $students = $studentModel->where('deleted_at', null)->asArray()->findAll();
 
-        $nameParts = explode(' ', trim($name));
-        if (count($nameParts) > 1) {
-            $firstName = $nameParts[0];
-            $lastName = end($nameParts);
-            $builder->where('adi', $firstName);
-            $builder->where('soyadi', $lastName);
-        } else {
-            $builder->groupStart();
-            $builder->like('adi', $name);
-            $builder->orLike('soyadi', $name);
-            $builder->groupEnd();
+        $searchLower = $this->turkish_strtolower(trim($name));
+
+        foreach ($students as $s) {
+            $fullNameLower = $this->turkish_strtolower($s['adi'] . ' ' . $s['soyadi']);
+            if ($searchLower === $fullNameLower || str_contains($fullNameLower, $searchLower)) {
+                return $s;
+            }
         }
-
-        return $builder->get()->getRowArray();
+        return null;
     }
 
     private function handleListTeachers(): string

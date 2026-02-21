@@ -20,20 +20,21 @@ class OgretmenAIController extends BaseAIController
         }
 
         // Intent 1: RAM Raporu Analizi
-        if (preg_match("/(.+?) adlı öğrencinin ram raporu analizi nedir/i", $userMessage, $matches)) {
+        if (preg_match("/(.+?).*öğrencinin.*ram.*raporu.*(analizi|analizini).*ver/iu", $userMessage, $matches) || 
+            preg_match("/(.+?).*ram.*raporu.*(analiz.*yap|analizi nedir|analizini ver)/iu", $userMessage, $matches)) {
             $studentName = trim($matches[1]);
             $studentId = $this->findStudentIdInMessage($studentName);
-            return $this->handleRamReportQuery($user, $studentId);
+            return $this->handleRamReportQuery($user, $studentId, $studentName);
         }
 
         // Intent 2: Muhtemel Ders Programı
-        if (preg_match("/(.+?)(?:'de| de) muhtemel ders programın nedir/i", $userMessage, $matches)) {
+        if (preg_match("/(.+?)(?:'de| de).*ders.*programın.*nedir/iu", $userMessage, $matches)) {
             $dateStr = trim($matches[1]);
             return $this->handleProbableScheduleQuery($user, $dateStr);
         }
 
         // Intent 3: Diğer Öğretmenlerin Yorumları
-        if (preg_match("/diğer öğretmenlerin (.+?) hakkında yorumları nedir/i", $userMessage, $matches)) {
+        if (preg_match("/diğer öğretmenlerin (.+?) hakkında yorumları nedir/iu", $userMessage, $matches)) {
             $studentName = trim($matches[1]);
             $studentId = $this->findStudentIdInMessage($studentName);
             return $this->handleOtherTeacherCommentsQuery($user, $studentId);
@@ -58,38 +59,16 @@ class OgretmenAIController extends BaseAIController
         return $response;
     }
 
-    private function handleRamReportQuery(object $user, ?int $studentId): string
+    private function handleRamReportQuery(object $user, ?int $studentId, string $studentNameFallback): string
     {
         if (!$studentId) {
-            return "Analiz için lütfen geçerli bir öğrenci adı belirtin.";
+            return "Analiz için lütfen geçerli bir öğrenci adı belirtin. '{$studentNameFallback}' bulunamadı.";
         }
         if (!(new StudentModel())->isStudentOfTeacher($studentId, $user->id)) {
             return "Hocam, sadece kendi ders verdiğiniz öğrencilerin RAM raporu analizlerine erişebilirsiniz.";
         }
 
-        $analysisModel = new RamReportAnalysisModel();
-        $analysis = $analysisModel->where('student_id', $studentId)->first();
-
-        if (!$analysis || empty($analysis['ram_text_content'])) {
-            return "Bu öğrenci için henüz bir RAM raporu analizi bulunmuyor. Lütfen RAM raporunun yüklendiğinden ve analiz edildiğinden emin olun.";
-        }
-
-        $student = (new StudentModel())->find($studentId);
-        $ramReportText = $analysis['ram_text_content'];
-
-        $systemPrompt = "Sen özel eğitim alanında uzman bir yapay zeka asistanısın. Sana verilen RAM (Rehberlik ve Araştırma Merkezi) raporu metnini analiz et. Bu metinden yola çıkarak, öğrencinin tanısı, bilişsel, sosyal, duygusal ve fiziksel gelişim özelliklerini, eğitimsel performansını, güçlü ve desteklenmesi gereken yönlerini belirle. Bu bilgileri bir özel eğitim öğretmeninin kolayca anlayabileceği teknik ve pedagojik bir dille, başlıklar halinde (örn: Tanı, Bilişsel Gelişim, Güçlü Yönler, Öneriler vb.) özetle. Cevabın doğrudan analiz olsun, selamlama veya giriş cümlesi kullanma. Çıktıyı Markdown formatında yapılandır.";
-        
-        $userPrompt = "Lütfen aşağıdaki RAM raporu metnini analiz ederek {$student['adi']} {$student['soyadi']} adlı öğrenci için bir özet oluştur:\n\n{$ramReportText}";
-
-        $aiService = new AIService();
-        $summary = $aiService->getChatResponse($userPrompt, $systemPrompt, $this->getChatHistoryForAI());
-
-        $response = "**{$student['adi']} {$student['soyadi']} için Yorumlanmış RAM Raporu Analizi:**\n\n";
-        $response .= $summary;
-        $response .= "\n\n---\n";
-        $response .= "Bu özet, RAM raporunun bir yorumudur. Detaylı ders stratejileri üzerine konuşabiliriz. Ne dersiniz? 🧠";
-
-        return $response;
+        return $this->handleSharedRamReportQuery($studentId, $studentNameFallback, 'özel eğitim öğretmeni');
     }
 
     private function handleProbableScheduleQuery(object $user, string $dateStr): string

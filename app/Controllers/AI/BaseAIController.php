@@ -4,6 +4,8 @@ namespace App\Controllers\AI;
 
 use App\Libraries\AIService;
 use CodeIgniter\Controller;
+use App\Models\RamReportAnalysisModel;
+use App\Models\StudentModel;
 
 abstract class BaseAIController extends Controller
 {
@@ -150,29 +152,40 @@ abstract class BaseAIController extends Controller
      * Mesajdan öğrenci ID'sini bulur (STUDENTS TABLOSUNDAN)
      */
     protected function findStudentIdInMessage(string $msg): ?int
-{
-    $studentModel = new \App\Models\StudentModel();
-    
-    // Tüm öğrencileri çek
-    $students = $studentModel
-        ->select('id, adi, soyadi')
-        ->where('deleted_at', null)
-        ->asArray()
-        ->findAll();
-    
-    // RAM raporu analizi ile AYNI MANTIK
-    foreach ($students as $s) {
-        $fullName = $s['adi'] . ' ' . $s['soyadi'];
-        $lowerName = $this->turkish_strtolower($fullName);
-        $msgLower = $this->turkish_strtolower($msg);
+    {
+        $studentModel = new \App\Models\StudentModel();
         
-        if (str_contains($msgLower, $lowerName)) {
-            return $s['id'];
+        // Tüm öğrencileri çek
+        $students = $studentModel
+            ->select('id, adi, soyadi')
+            ->where('deleted_at', null)
+            ->asArray()
+            ->findAll();
+        
+        $msgLower = trim(preg_replace('/\s+/', ' ', $this->turkish_strtolower($msg)));
+        
+        $bestMatchId = null;
+        $highestSimilarity = 0;
+
+        foreach ($students as $s) {
+            $fullName = preg_replace('/\s+/', ' ', $s['adi'] . ' ' . $s['soyadi']);
+            $lowerName = $this->turkish_strtolower($fullName);
+            
+            // Tam Eşleşme veya Cümlenin içinde geçme, VEYA ismin bir parçasının eşleşmesi
+            if ($lowerName === $msgLower || str_contains($msgLower, $lowerName) || str_contains($lowerName, $msgLower)) {
+                return $s['id'];
+            }
+            
+            // Fuzzy match (Yazım hataları için)
+            similar_text($msgLower, $lowerName, $percent);
+            if ($percent > $highestSimilarity && $percent > 65) {
+                $highestSimilarity = $percent;
+                $bestMatchId = $s['id'];
+            }
         }
+        
+        return $bestMatchId;
     }
-    
-    return null;
-}
     
     /**
      * DÜZELTME: Hem object hem array desteği
@@ -180,20 +193,64 @@ abstract class BaseAIController extends Controller
     protected function findSystemUserIdInMessage(string $userMessageLower): ?int
     {
         $profiles = (new \App\Models\UserProfileModel())->select('user_id, first_name, last_name')->findAll();
+        $msgLower = trim(preg_replace('/\s+/', ' ', $this->turkish_strtolower($userMessageLower)));
+
+        $bestMatchId = null;
+        $highestSimilarity = 0;
+
         foreach ($profiles as $profile) {
             // Array veya object olabilir
             $firstName = is_object($profile) ? ($profile->first_name ?? '') : ($profile['first_name'] ?? '');
             $lastName = is_object($profile) ? ($profile->last_name ?? '') : ($profile['last_name'] ?? '');
             $userId = is_object($profile) ? ($profile->user_id ?? 0) : ($profile['user_id'] ?? 0);
             
-            $fullNameLower = $this->turkish_strtolower(trim($firstName . ' ' . $lastName));
-            if (!empty($fullNameLower) && str_contains($userMessageLower, $fullNameLower)) {
+            $fullNameLower = preg_replace('/\s+/', ' ', $this->turkish_strtolower(trim($firstName . ' ' . $lastName)));
+            if (empty($fullNameLower)) continue;
+
+            if ($fullNameLower === $msgLower || str_contains($msgLower, $fullNameLower) || str_contains($fullNameLower, $msgLower)) {
                 return (int) $userId;
             }
+
+            similar_text($msgLower, $fullNameLower, $percent);
+            if ($percent > $highestSimilarity && $percent > 65) {
+                $highestSimilarity = $percent;
+                $bestMatchId = (int) $userId;
+            }
         }
-        return null;
+        return $bestMatchId;
     }
     
+    /**
+     * RAM Raporu Yapay Zeka Özeti ve Analizi (Ortak Fonksiyon)
+     */
+    protected function handleSharedRamReportQuery(?int $studentId, string $studentNameFallback, string $roleText = 'kurum çalışanı'): string
+    {
+        if (!$studentId) {
+            return "Analiz için lütfen geçerli bir öğrenci adı belirtin. '{$studentNameFallback}' adında bir öğrenci bulunamadı.";
+        }
+
+        $analysisModel = new RamReportAnalysisModel();
+        $analysis = $analysisModel->where('student_id', $studentId)->first();
+
+        if (!$analysis || empty($analysis['ram_text_content'])) {
+            return "Bu öğrenci için henüz bir RAM raporu analizi bulunmuyor. Öncelikle PDF veya Word formatında bir RAM raporunun yüklendiğinden ve sistemin bunu okuyabildiğinden emin olun.";
+        }
+
+        $student = (new StudentModel())->find($studentId);
+        $ramReportText = $analysis['ram_text_content'];
+
+        $systemPrompt = "Sen özel eğitim alanında uzman bir yapay zeka asistanısın. Sana verilen RAM (Rehberlik ve Araştırma Merkezi) raporu metnini analiz et. Bu metinden yola çıkarak, öğrencinin tanısı, bilişsel, sosyal, duygusal ve fiziksel gelişim özelliklerini, eğitimsel performansını, güçlü ve desteklenmesi gereken yönlerini belirle. Bu bilgileri {$roleText}nın kolayca anlayabileceği profesyonel ve teknik bir dille, başlıklar halinde (örn: Tanı, Bilişsel Gelişim, Güçlü Yönler, {$roleText} Notu/Önerileri vb.) özetle. Cevabın doğrudan analiz olsun, gereksiz selamlama kullanma. Çıktıyı Markdown formatında yapılandır.";
+        
+        $userPrompt = "Lütfen aşağıdaki RAM raporu metnini analiz ederek {$student['adi']} {$student['soyadi']} adlı öğrenci için detaylı bir akademik özet oluştur:\n\n{$ramReportText}";
+
+        $summary = $this->aiService->getChatResponse($userPrompt, $systemPrompt, $this->getChatHistoryForAI());
+
+        $response = "**{$student['adi']} {$student['soyadi']}** öğrencisine ait yapay zeka destekli RAM Raporu analizi:\n\n";
+        $response .= $summary;
+
+        return $response;
+    }
+
     /**
      * DÜZELTME: Kurum bilgileri - object kullanımı, doğru sütun isimleri
      */

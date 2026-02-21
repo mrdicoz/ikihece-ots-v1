@@ -42,6 +42,14 @@ class SekreterAIController extends BaseAIController
                 return "Devamsızlık raporu için lütfen bir öğretmen adı belirtin. Örneğin: `Ahmet öğretmenin bu ayki sabit ders devamsızlıklarını listele`.\n\n";
             }
         }
+        
+        // YENİ HALİ: RAM Raporu Analizi
+        if (preg_match("/(.+?).*öğrencinin.*ram.*raporu.*(analizi|analizini).*ver/iu", $userMessage, $matches) || 
+            preg_match("/(.+?).*ram.*raporu.*(analiz.*yap|analizi nedir|analizini ver)/iu", $userMessage, $matches)) {
+            $studentName = trim($matches[1]);
+            $studentId = $this->findStudentIdInMessage($studentName);
+            return $this->handleSharedRamReportQuery($studentId, $studentName, 'Sorumlu Sekreter');
+        }
 
         // 3. AI için Bağlam Oluşturma
         $context = "";

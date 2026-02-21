@@ -11,6 +11,15 @@ class YoneticiAIController extends BaseAIController
     {
         $role = $this->getUserRole($user);
         
+        // RAM Raporu Analizi
+        $userMessageLower = $this->turkish_strtolower($userMessage);
+        if (preg_match("/(.+?).*öğrencinin.*ram.*raporu.*(analizi|analizini).*ver/iu", $userMessage, $matches) || 
+            preg_match("/(.+?).*ram.*raporu.*(analiz.*yap|analizi nedir|analizini ver)/iu", $userMessage, $matches)) {
+            $studentName = trim($matches[1]);
+            $studentId = $this->findStudentIdInMessage($studentName);
+            return $this->handleSharedRamReportQuery($studentId, $studentName, $role);
+        }
+
         // 1. Sistem Promptunu Hazırla
         $systemPrompt = $this->getSystemPrompt($role, $user);
 
