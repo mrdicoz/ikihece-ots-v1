@@ -39,12 +39,76 @@ class TrackingController extends BaseController
             ];
         }
         
+        // Öğrencileri getir (Google konumu olanlar)
+        $studentModel = new \App\Models\StudentModel();
+        $studentsRaw = $studentModel->select('id, adi, soyadi, google_konum, profile_image, iletisim, adres_detayi, servis, egitim_programi')
+                                    ->where('deleted_at', null)
+                                    ->where("google_konum != ''")
+                                    ->where("google_konum IS NOT NULL")
+                                    ->findAll();
+
+        $students = [];
+        foreach ($studentsRaw as $s) {
+            $coords = $this->parseCoordinates($s['google_konum']);
+            if ($coords) {
+                $s['latitude'] = $coords['lat'];
+                $s['longitude'] = $coords['lng'];
+                // Profil resmi yoksa varsayılan
+                if (empty($s['profile_image'])) {
+                    $s['profile_image'] = 'default_student.png'; // Veya uygun bir placeholder
+                }
+                $students[] = $s;
+            }
+        }
+
         $data['drivers'] = $drivers;
+        $data['students'] = $students; // View'a aktar
         $data['driverCount'] = count($drivers);
         $data['companyLocation'] = $companyLocation;
         $data['title'] = 'Servis Takip Sistemi';
         
         return view('tracking/map', array_merge($this->data, $data));
+    }
+
+    /**
+     * Google Konum string'inden latitude ve longitude ayıklar.
+     * Desteklenen formatlar:
+     * - "40.1234, 29.1234"
+     * - "https://...q=40.1234,29.1234..."
+     * - "@40.1234,29.1234"
+     */
+    private function parseCoordinates($input)
+    {
+        if (empty($input)) return null;
+
+        $input = trim($input);
+        $lat = null;
+        $lng = null;
+
+        // 1. Google Maps URL'den çıkarma (?q=lat,lng)
+        if (preg_match('/q=(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/', $input, $matches)) {
+            $lat = $matches[1];
+            $lng = $matches[3];
+        }
+        // 2. @lat,lng formatı (Google Maps URL'lerinde sıkça bulunur)
+        elseif (preg_match('/@(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/', $input, $matches)) {
+            $lat = $matches[1];
+            $lng = $matches[3];
+        }
+        // 3. Doğrudan "lat, lng" formatı
+        elseif (preg_match('/^(-?\d+(\.\d+)?),\s*(-?\d+(\.\d+)?)$/', $input, $matches)) {
+            $lat = $matches[1];
+            $lng = $matches[3];
+        }
+
+        if ($lat && $lng) {
+            return [
+                'lat' => (float)$lat,
+                'lng' => (float)$lng
+            ];
+        }
+
+        return null;
     }
     
     /**

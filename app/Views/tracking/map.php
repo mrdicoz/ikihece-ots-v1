@@ -5,7 +5,7 @@
 // tekrar etmemek için bir yardımcı fonksiyon oluşturuldu.
 // Bu fonksiyon hem masaüstü hem de mobil panelde çağrılıyor.
 // =================================================================
-function renderControlPanelBody($drivers, $driverCount, $companyLocation, $isMobile = false) {
+function renderControlPanelBody($drivers, $driverCount, $companyLocation, $students, $isMobile = false) {
     // Mobil ve masaüstü için farklı ID'ler oluşturmak amacıyla sonek belirleniyor.
     $suffix = $isMobile ? 'Mobile' : 'Desktop';
 ?>
@@ -35,6 +35,16 @@ function renderControlPanelBody($drivers, $driverCount, $companyLocation, $isMob
             </div>
         <?php endif; ?>
 
+        <div class="mb-3">
+            <label class="form-label small text-muted">Yakınlık Çapı</label>
+            <select class="form-select form-select-sm radius-select">
+                <option value="500">500 Metre</option>
+                <option value="1000" selected>1 Kilometre</option>
+                <option value="3000">3 Kilometre</option>
+                <option value="5000">5 Kilometre</option>
+            </select>
+        </div>
+
         <div class="control-buttons">
             <?php if ($driverCount > 0): ?>
                 <button class="btn btn-outline-info btn-sm w-100" data-action="show-all">
@@ -45,6 +55,11 @@ function renderControlPanelBody($drivers, $driverCount, $companyLocation, $isMob
             <?php if (!empty($companyLocation)): ?>
                 <button class="btn btn-outline-secondary btn-sm w-100" data-action="focus-company">
                     <i class="bi bi-building"></i> Kuruma Odaklan
+                </button>
+            <?php endif; ?>
+            <?php if (!empty($students)): ?>
+                <button class="btn btn-outline-primary btn-sm w-100" data-action="toggle-students">
+                    <i class="bi bi-mortarboard"></i> Öğrencileri Gizle
                 </button>
             <?php endif; ?>
         </div>
@@ -92,7 +107,7 @@ function renderControlPanelBody($drivers, $driverCount, $companyLocation, $isMob
                 </h5>
                 <span class="badge bg-success"><?= $driverCount ?> Servis</span>
             </div>
-            <?php renderControlPanelBody($drivers, $driverCount, $companyLocation, false); ?>
+            <?php renderControlPanelBody($drivers, $driverCount, $companyLocation, $students ?? [], false); ?>
         </div>
     </div>
 
@@ -111,7 +126,7 @@ function renderControlPanelBody($drivers, $driverCount, $companyLocation, $isMob
 
     <div class="offcanvas-body">
         <div class="panel-wrapper">
-            <?php renderControlPanelBody($drivers, $driverCount, $companyLocation, true); ?>
+            <?php renderControlPanelBody($drivers, $driverCount, $companyLocation, $students ?? [], true); ?>
         </div>
     </div>
 </div>
@@ -124,6 +139,16 @@ function renderControlPanelBody($drivers, $driverCount, $companyLocation, $isMob
             <div class="small text-muted" id="desktopLiveTime">Başlatılıyor...</div>
         </div>
     </div>
+
+    <!-- Yakındaki Öğrenciler Listesi (Desktop) -->
+    <div id="desktopNearbyStudents" class="d-none">
+        <div class="d-flex align-items-center justify-content-between px-2 mt-2 mb-1">
+            <span class="small text-muted fw-bold">Yakındaki Ö. (<span class="nearby-radius-label">1km</span>)</span>
+            <span class="badge bg-success rounded-pill" id="desktopNearbyCount">0</span>
+        </div>
+        <div id="desktopNearbyList" class="list-group list-group-flush small bg-white rounded shadow-sm border" style="max-height: 200px; overflow-y: auto;"></div>
+    </div>
+
     <div id="desktopDriverCards"></div>
 </div>
 
@@ -142,10 +167,58 @@ function renderControlPanelBody($drivers, $driverCount, $companyLocation, $isMob
                 <div class="small text-muted" id="mobileLiveTime">Başlatılıyor...</div>
             </div>
         </div>
+        
+        <!-- Yakındaki Öğrenciler Listesi (Mobil) -->
+        <div id="mobileNearbyStudents" class="d-none mt-2">
+             <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="small text-muted fw-bold">Yakındaki Ö. (<span class="nearby-radius-label">1km</span>)</span>
+                <span class="badge bg-success rounded-pill" id="mobileNearbyCount">0</span>
+            </div>
+            <div id="mobileNearbyList" class="list-group list-group-flush small bg-white rounded border"></div>
+        </div>
         <div id="mobileDriverCards" class="mt-2"></div>
     </div>
 </div>
 
+<?= $this->endSection() ?>
+
+<?= $this->section('modals') ?>
+<!-- Student Detail Modal -->
+<div class="modal fade" id="studentModal" tabindex="-1" aria-hidden="true" style="z-index: 1055;">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 pb-0 justify-content-end">
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center pt-0">
+                <div class="mb-3 position-relative d-inline-block">
+                     <img id="modalStudentImage" src="" class="rounded-circle shadow-sm" style="width: 100px; height: 100px; object-fit: cover; border: 4px solid #fff;">
+                     <span class="position-absolute bottom-0 end-0 bg-primary border border-white rounded-circle p-1" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+                         <i class="bi bi-mortarboard-fill text-white" style="font-size: 12px;"></i>
+                     </span>
+                </div>
+                <h5 class="modal-title fw-bold text-dark mb-1" id="modalStudentName"></h5>
+                
+                <div class="card bg-light border-0 mt-3 text-start rounded-3">
+                    <div class="card-body p-3">
+                        <div class="d-flex align-items-start mb-2">
+                             <i class="bi bi-geo-alt-fill text-danger me-2 mt-1"></i>
+                             <span id="modalStudentAddress" class="small text-muted" style="line-height: 1.4;"></span>
+                        </div>
+                         <div class="d-flex align-items-center mb-2">
+                             <i class="bi bi-telephone-fill text-success me-2"></i>
+                             <a id="modalStudentPhone" href="" class="small text-decoration-none fw-medium text-dark"></a>
+                        </div>
+                        <div class="d-flex align-items-start">
+                             <i class="bi bi-journal-bookmark-fill text-primary me-2 mt-1"></i>
+                             <span id="modalStudentProgram" class="small text-muted" style="line-height: 1.4;"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 <?= $this->endSection() ?>
 
 <?= $this->section('pageStyles') ?>
@@ -269,7 +342,7 @@ function renderControlPanelBody($drivers, $driverCount, $companyLocation, $isMob
     .bus-icon-main i { transform: rotate(45deg); color: white; font-size: 20px; }
     .bus-icon-wrapper.idle .bus-icon-main { background: linear-gradient(135deg, #ffc107 0%, #d39e00 100%); }
     .bus-icon-wrapper.offline .bus-icon-main { background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%); }
-    .company-marker-wrapper { position: relative; }
+    .company-marker-wrapper { /* position: relative removed */ }
     .company-marker {
         width: 44px; height: 44px;
         background: linear-gradient(135deg, #dc3545 0%, #b02a37 100%);
@@ -281,6 +354,19 @@ function renderControlPanelBody($drivers, $driverCount, $companyLocation, $isMob
         0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.6); }
         50% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(220, 53, 69, 0); }
     }
+    
+    .student-marker-wrapper { z-index: 900 !important; }
+    .student-marker {
+        width: 32px; height: 32px;
+        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+        border-radius: 50%; color: white;
+        display: flex; align-items: center; justify-content: center;
+        border: 2px solid white;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+        transition: transform 0.2s;
+    }
+    .student-marker:hover { transform: scale(1.1); }
+    .student-marker i { font-size: 14px; }
 
     @media (max-width: 576px) {
         .mobile-controls { bottom: 15px; padding: 8px; }
@@ -326,18 +412,24 @@ class TrackingSystem {
             driverCount: <?= $driverCount ?? 0 ?>,
             companyLocation: <?= json_encode($companyLocation ?? null) ?>,
             drivers: <?= json_encode($drivers ?? []) ?>,
+            students: <?= json_encode($students ?? []) ?>,
             locationsUrl: `<?= site_url('tracking/locations') ?>`,
-            updateInterval: 15000 // 15 saniye
+            updateInterval: 15000, // 15 saniye
+            proximityRadius: 1000 // Varsayılan 1km
         };
 
         // Leaflet Map instance
         this.map = null;
         this.markers = {};
+        this.studentMarkers = {};
+        this.driverCircles = {}; // Sürücü çevre çemberleri (ID -> Circle)
         this.companyMarker = null;
+        this.initialFitDone = false;
 
         // Timers
         this.updateTimer = null;
         this.liveTimeTimer = null;
+        this.studentsVisible = true;
 
         // UI Elements (cached for performance)
         this.elements = {
@@ -349,10 +441,22 @@ class TrackingSystem {
             mobileDriverCount: document.getElementById('mobileDriverCount'),
             liveTimeDesktop: document.getElementById('desktopLiveTime'),
             liveTimeMobile: document.getElementById('mobileLiveTime'),
+            
+            // Yakındaki öğrenciler elementleri
+            desktopNearbyContainer: document.getElementById('desktopNearbyStudents'),
+            desktopNearbyList: document.getElementById('desktopNearbyList'),
+            desktopNearbyCount: document.getElementById('desktopNearbyCount'),
+            
+            mobileNearbyContainer: document.getElementById('mobileNearbyStudents'),
+            mobileNearbyList: document.getElementById('mobileNearbyList'),
+            mobileNearbyCount: document.getElementById('mobileNearbyCount'),
+
             pulseIndicators: document.querySelectorAll('.pulse-indicator'),
             driverSelects: document.querySelectorAll('.driver-select'), // Ortak class
+            radiusSelects: document.querySelectorAll('.radius-select'), // Ortak class
             showAllBtns: document.querySelectorAll('[data-action="show-all"]'),
             focusCompanyBtns: document.querySelectorAll('[data-action="focus-company"]'),
+            toggleStudentsBtns: document.querySelectorAll('[data-action="toggle-students"]'),
         };
 
         // TomSelect instances
@@ -377,7 +481,9 @@ class TrackingSystem {
             center: [this.config.companyLocation?.lat || 40.7889, this.config.companyLocation?.lng || 30.4008],
             zoom: 13,
             zoomControl: false,
-            preferCanvas: true
+            preferCanvas: true,
+            wheelPxPerZoomLevel: 150, // Tekerlek hassasiyeti (Daha yüksek değer = Daha yavaş zoom)
+            zoomSnap: 0.2 // Ara zoom seviyeleri
         });
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -390,6 +496,9 @@ class TrackingSystem {
         if (this.config.companyLocation?.lat && this.config.companyLocation?.lng) {
             this.addCompanyMarker();
         }
+
+        // Öğrenci markerlarını ekle
+        this.addStudentMarkers();
 
         // Harita boyutunu ayarla
         setTimeout(() => this.map.invalidateSize(), 100);
@@ -443,6 +552,31 @@ class TrackingSystem {
                 }
             });
         });
+
+        // Öğrencileri göster/gizle butonları
+        this.elements.toggleStudentsBtns.forEach(btn => {
+            btn.addEventListener('click', () => this.toggleStudentMarkers(btn));
+        });
+
+        // Yarıçap değişimi
+        this.elements.radiusSelects.forEach(select => {
+            select.addEventListener('change', (e) => {
+                const newVal = parseInt(e.target.value);
+                // Tüm selectleri senkronize et
+                this.elements.radiusSelects.forEach(s => s.value = newVal);
+                this.config.proximityRadius = newVal;
+                
+                // Textleri güncelle
+                const text = newVal >= 1000 ? (newVal / 1000) + 'km' : newVal + 'm';
+                document.querySelectorAll('.nearby-radius-label').forEach(el => el.textContent = text);
+                
+                // Yakınlık güncellemesini tetikle (tekrar fetch yapmaya gerek yok, cache'den çalışabilir ama
+                // updateProximity fonksiyonu driver listesi istiyor. O yüzden manuel tetikleme yerine
+                // updateDriverLocations çağırabiliriz veya mevcut markerlardan konum alabiliriz.
+                // Basitlik için updateDriverLocations çağıralım.
+                this.updateDriverLocations();
+            });
+        });
     }
 
     // =================================================================
@@ -469,6 +603,7 @@ class TrackingSystem {
             const driversData = await response.json();
             this.updateMarkers(driversData);
             this.renderDriverCards(driversData);
+            this.updateProximity(driversData); // Dinamik Çap
             this.elements.pulseIndicators.forEach(p => p.classList.add('live'));
 
         } catch (error) {
@@ -524,8 +659,9 @@ class TrackingSystem {
             this.markers[driver.user_id].bindPopup(this.createPopupContent(driver));
         });
 
-        if (Object.keys(this.markers).length > 0) {
+        if (Object.keys(this.markers).length > 0 && !this.initialFitDone) {
             this.fitBounds();
+            this.initialFitDone = true;
         }
     }
 
@@ -539,6 +675,98 @@ class TrackingSystem {
         this.companyMarker.bindPopup(`<div class="text-center p-2"><h6 class="text-danger mb-1">${this.config.companyLocation.name || 'Merkez'}</h6><small>${this.config.companyLocation.address || ''}</small></div>`);
     }
 
+    addStudentMarkers() {
+        if (!this.config.students || this.config.students.length === 0) return;
+
+        // Öğrenci markerları için bir FeatureGroup oluşturup bounding box hesaplamasına dahil edebiliriz
+        // ancak şimdilik ayrı tutuyoruz.
+        
+        this.config.students.forEach(student => {
+            if (!student.latitude || !student.longitude) return;
+
+            const icon = L.divIcon({
+                className: 'student-marker-wrapper',
+                html: `<div class="student-marker"><i class="bi bi-person-fill"></i></div>`,
+                iconSize: [32, 32], iconAnchor: [16, 16]
+            });
+            
+            const marker = L.marker([student.latitude, student.longitude], { 
+                icon: icon,
+                title: student.adi + ' ' + student.soyadi
+            }).addTo(this.map); // Varsayılan olarak göster
+            
+            marker.on('click', () => {
+                this.openStudentModal(student);
+            });
+            
+            this.studentMarkers[student.id] = marker;
+        });
+    }
+
+    toggleStudentMarkers(clickedBtn) {
+        this.studentsVisible = !this.studentsVisible;
+        const btnText = this.studentsVisible ? 'Öğrencileri Gizle' : 'Öğrencileri Göster';
+        const btnIcon = this.studentsVisible ? 'bi-mortarboard' : 'bi-mortarboard-fill';
+
+        // Tüm butonları güncelle (mobil ve masaüstü senkronizasyonu için)
+        this.elements.toggleStudentsBtns.forEach(btn => {
+            btn.innerHTML = `<i class="bi ${btnIcon}"></i> ${btnText}`;
+        });
+
+        const markers = Object.values(this.studentMarkers);
+        if (this.studentsVisible) {
+            markers.forEach(marker => marker.addTo(this.map));
+        } else {
+            markers.forEach(marker => this.map.removeLayer(marker));
+        }
+    }
+
+    openStudentModal(student) {
+        document.getElementById('modalStudentName').textContent = student.adi + ' ' + student.soyadi;
+        
+        // Adres
+        document.getElementById('modalStudentAddress').textContent = student.adres_detayi || 'Adres bilgisi yok';
+        
+        // Telefon
+        const phoneLink = document.getElementById('modalStudentPhone');
+        if (student.iletisim) {
+            phoneLink.href = 'tel:' + student.iletisim;
+            phoneLink.textContent = student.iletisim;
+            phoneLink.parentElement.classList.remove('d-none');
+        } else {
+            phoneLink.parentElement.classList.add('d-none');
+        }
+        
+        // Program
+        document.getElementById('modalStudentProgram').textContent = student.egitim_programi || 'Program bilgisi yok';
+        
+        // Resim
+        const imgEl = document.getElementById('modalStudentImage');
+        if (student.profile_image && student.profile_image !== 'default_student.png') {
+            const baseUrl = '<?= base_url() ?>/';
+            // Resim yolunun zaten tam yol olup olmadığını veya 'uploads/' ile başlayıp başlamadığını kontrol et
+            if (student.profile_image.startsWith('http') || student.profile_image.startsWith('//')) {
+                imgEl.src = student.profile_image;
+            } else if (student.profile_image.includes('uploads/student_photos')) {
+                // Önündeki taksim slash'ı temizleyelim
+                const cleanPath = student.profile_image.startsWith('/') ? student.profile_image.substring(1) : student.profile_image;
+                imgEl.src = baseUrl + cleanPath;
+            } else {
+                imgEl.src = '<?= base_url("uploads/student_photos/") ?>/' + student.profile_image;
+            }
+        } else {
+            // Placeholder base64 or default image
+            imgEl.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2NjYyIgc3Ryb2tlLXdpZHRoPSIxIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIj48L2NpcmNsZT48cGF0aCBkPSJNMTIgMTRhNCA0IDAgMSAwLTgtOCA0IDQgMCAwIDAgOCA4eiI+PC9wYXRoPjxwYXRoIGQ9Ik0xMiAxNGMuNjYgMCAxLjMyLjExIDEuOTQuMzMiPjwvcGF0aD48L3N2Zz4='; // Simple placeholder
+            // Eğer projenizde varsayılan bir resim varsa onu kullanın:
+            // imgEl.src = '<?= base_url("assets/img/default-avatar.png") ?>';
+        }
+        
+        // Modalı aç
+        const modalEl = document.getElementById('studentModal');
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+
     createDriverIcon(status) {
         return L.divIcon({
             className: 'bus-marker',
@@ -548,6 +776,9 @@ class TrackingSystem {
     }
 
     createPopupContent(driver) {
+        // Tarihi JS Date objesine çevirip saat formatını alalım
+        const updateTime = driver.created_at ? new Date(driver.created_at).toLocaleTimeString('tr-TR') : 'Bilinmiyor';
+
         const etaInfo = driver.eta ? `
             <div class="d-flex justify-content-between small mb-1">
                 <span><i class="bi bi-geo-alt"></i> Mesafe:</span>
@@ -562,7 +793,10 @@ class TrackingSystem {
                     <h6 class="text-success mb-2"><i class="bi bi-person-circle"></i> ${driver.first_name} ${driver.last_name}</h6>
                     ${etaInfo}
                     <hr class="my-2">
-                    <div class="text-muted small"><i class="bi bi-clock"></i> ${driver.last_update_text || 'Bilinmiyor'}</div>
+                    <div class="d-flex justify-content-between text-muted small">
+                        <span><i class="bi bi-clock"></i> Son Veri:</span>
+                        <strong>${updateTime}</strong>
+                    </div>
                 </div>`;
     }
 
@@ -617,6 +851,7 @@ class TrackingSystem {
         const status = this.getDriverStatus(driver.created_at);
         const statusColors = { 'active': 'success', 'idle': 'warning', 'offline': 'secondary' };
         const eta = driver.eta || { distance: '...', text: '...' };
+        const updateTime = driver.created_at ? new Date(driver.created_at).toLocaleTimeString('tr-TR') : '--:--';
 
         return `
             <div class="driver-card-icon bg-${statusColors[status]} text-white"><i class="bi bi-bus-front-fill"></i></div>
@@ -624,7 +859,7 @@ class TrackingSystem {
                 <div class="driver-card-name">${driver.first_name} ${driver.last_name}</div>
                 <div class="driver-card-details">
                     <span><i class="bi bi-geo-alt"></i> ${eta.distance} km</span>
-                    <span class="driver-card-eta"><i class="bi bi-clock-history"></i> ${eta.text}</span>
+                    <span class="driver-card-eta"><i class="bi bi-clock"></i> ${updateTime}</span>
                 </div>
             </div>`;
     }
@@ -639,6 +874,130 @@ class TrackingSystem {
             if (offcanvasElement?.classList.contains('show')) {
                 bootstrap.Offcanvas.getInstance(offcanvasElement)?.hide();
             }
+        }
+    }
+
+    // =================================================================
+    // PROXIMITY LOGIC (DYNAMIC CIRCLE)
+    // =================================================================
+
+    updateProximity(drivers) {
+        const radius = this.config.proximityRadius || 1000;
+        const correctDriverIds = new Set();
+        const nearbyStudents = new Set();
+
+        drivers.forEach(driver => {
+            if (!driver.latitude || !driver.longitude) return;
+
+            const driverId = driver.user_id; // user_id kullandığımızdan emin olalım
+            correctDriverIds.add(driverId.toString());
+
+            const driverLatLng = L.latLng(driver.latitude, driver.longitude);
+
+            if (this.driverCircles[driverId]) {
+                // Varsa güncelle
+                this.driverCircles[driverId].setLatLng(driverLatLng);
+                this.driverCircles[driverId].setRadius(radius);
+            } else {
+                // Yoksa oluştur
+                this.driverCircles[driverId] = L.circle(driverLatLng, {
+                    color: '#198754',
+                    fillColor: '#198754',
+                    fillOpacity: 0.1,
+                    radius: radius,
+                    weight: 1
+                }).addTo(this.map);
+            }
+
+            // Öğrencileri kontrol et
+            if (this.config.students) {
+                this.config.students.forEach(student => {
+                    if (student.latitude && student.longitude) {
+                        const studentLatLng = L.latLng(student.latitude, student.longitude);
+                        const distance = driverLatLng.distanceTo(studentLatLng); // Metre cinsinden
+                        
+                        if (distance <= radius) {
+                            // JS Set objesi referans bazlı çalıştığı için id üzerinden kontrol etmek daha sağlıklı olabilir
+                            // Ancak render fonksiyonunda unique kontrolü yapacağız, buraya obje atalım.
+                            nearbyStudents.add(JSON.stringify(student)); 
+                        }
+                    }
+                });
+            }
+        });
+
+        // Artık olmayan çemberleri temizle
+        for (const id in this.driverCircles) {
+            if (!correctDriverIds.has(id)) {
+                this.map.removeLayer(this.driverCircles[id]);
+                delete this.driverCircles[id];
+            }
+        }
+
+        // 3. UI Güncelle
+        // Set içindeki stringleri tekrar objeye çevir
+        const uniqueStudents = Array.from(nearbyStudents).map(s => JSON.parse(s));
+        this.renderNearbyStudents(uniqueStudents);
+    }
+
+    renderNearbyStudents(students) {
+        const containers = [
+            { div: this.elements.desktopNearbyContainer, list: this.elements.desktopNearbyList, count: this.elements.desktopNearbyCount },
+            { div: this.elements.mobileNearbyContainer, list: this.elements.mobileNearbyList, count: this.elements.mobileNearbyCount }
+        ];
+
+        if (students.length === 0) {
+            containers.forEach(c => {
+                if (c.div) c.div.classList.add('d-none');
+            });
+            return;
+        }
+
+        const html = students.map(student => `
+            <a href="#" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 border-0 border-bottom" onclick="window.trackingSystem.focusStudent(${student.id}); return false;">
+                <div class="avatar-sm" style="width: 32px; height: 32px;">
+                    <img src="${this.getStudentImage(student)}" class="rounded-circle w-100 h-100 object-fit-cover border">
+                </div>
+                <div class="flex-grow-1 min-width-0">
+                    <div class="fw-bold text-truncate" style="font-size: 0.85rem;">${student.adi} ${student.soyadi}</div>
+                    <div class="text-muted small text-truncate" style="font-size: 0.75rem;">${student.adres_detayi || 'Adres yok'}</div>
+                </div>
+                <i class="bi bi-chevron-right text-muted small"></i>
+            </a>
+        `).join('');
+
+        containers.forEach(c => {
+            if (c.div) {
+                c.div.classList.remove('d-none');
+                c.list.innerHTML = html;
+                c.count.textContent = students.length;
+            }
+        });
+    }
+
+    focusStudent(studentId) {
+        const marker = this.studentMarkers[studentId];
+        if (marker) {
+            // Marker'a tıkla (bu modalı açar)
+            marker.fire('click');
+            // Haritayı oraya götür
+            this.map.setView(marker.getLatLng(), 16);
+        }
+    }
+
+    getStudentImage(student) {
+        const baseUrl = '<?= base_url() ?>/';
+        if (!student.profile_image || student.profile_image === 'default_student.png') {
+           return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2NjYyIgc3Ryb2tlLXdpZHRoPSIxIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIj48L2NpcmNsZT48cGF0aCBkPSJNMTIgMTRhNCA0IDAgMSAwLTgtOCA0IDQgMCAwIDAgOCA4eiI+PC9wYXRoPjxwYXRoIGQ9Ik0xMiAxNGMuNjYgMCAxLjMyLjExIDEuOTQuMzMiPjwvcGF0aD48L3N2Zz4=';
+        }
+        
+        if (student.profile_image.startsWith('http') || student.profile_image.startsWith('//')) {
+            return student.profile_image;
+        } else if (student.profile_image.includes('uploads/student_photos')) {
+            const cleanPath = student.profile_image.startsWith('/') ? student.profile_image.substring(1) : student.profile_image;
+            return baseUrl + cleanPath;
+        } else {
+            return '<?= base_url("uploads/student_photos/") ?>/' + student.profile_image;
         }
     }
 
@@ -663,6 +1022,10 @@ class TrackingSystem {
     fitBounds() {
         const markersInView = Object.values(this.markers);
         if (this.companyMarker) markersInView.push(this.companyMarker);
+        
+        // Öğrenci markerlarını da dahil et (isteğe bağlı, eğer çok fazla öğrenci varsa devre dışı bırakılabilir)
+        // const studentMarkers = Object.values(this.studentMarkers);
+        // markersInView.push(...studentMarkers);
 
         if (markersInView.length > 0) {
             const group = new L.featureGroup(markersInView);

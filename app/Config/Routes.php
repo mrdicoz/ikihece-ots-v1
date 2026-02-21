@@ -114,7 +114,6 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->delete('(:num)', 'StudentController::delete/$1');
         $routes->POST('(:num)/delete', 'StudentController::delete/$1'); // Form compatibility için
         $routes->get('(:num)/attendance', 'StudentController::attendanceReport/$1', ['as' => 'students.attendanceReport']);
-        $routes->get('absences', 'StudentController::absences', ['as' => 'students.absences', 'filter' => 'group:admin,yonetici,mudur,sekreter']);
         
         // RAM Raporu görüntüleme
         $routes->GET('view-ram-report/(:num)', 'StudentController::viewRamReport/$1', ['as' => 'students.viewRamReport']);
@@ -184,14 +183,7 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
     // --- YÖNETİM GRUBU ROTALARI (admin, yonetici, mudur, sekreter) ---
     // Bu grup, birden fazla yönetimsel rolün erişebileceği özellikleri barındırır.
     $routes->group('admin', ['filter' => 'group:admin,yonetici,mudur,sekreter'], static function($routes) {
-        
-        // ATAMALAR
-        $routes->group('assignments', static function ($routes) {
-            $routes->GET('/', 'Admin\AssignmentController::index', ['as' => 'admin.assignments.index']);
-            $routes->POST('save', 'Admin\AssignmentController::save', ['as' => 'admin.assignments.save']);
-            $routes->GET('get-assigned/(:num)', 'Admin\AssignmentController::getAssigned/$1', ['as' => 'admin.assignments.getAssigned']);
-        });
-        
+            
         // DUYURU YÖNETİMİ
         $routes->group('announcements', static function ($routes) {
             $routes->GET('/', 'Admin\AnnouncementController::index', ['as' => 'admin.announcements.index']);
@@ -258,6 +250,12 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
             $routes->POST('save', 'Admin\InstitutionController::save', ['as' => 'admin.institution.save']);
         });
         
+        // ATAMALAR
+        $routes->group('assignments', static function ($routes) {
+            $routes->GET('/', 'Admin\AssignmentController::index', ['as' => 'admin.assignments.index']);
+            $routes->POST('save', 'Admin\AssignmentController::save', ['as' => 'admin.assignments.save']);
+            $routes->GET('get-assigned/(:num)', 'Admin\AssignmentController::getAssigned/$1', ['as' => 'admin.assignments.getAssigned']);
+        });
         
         // GENEL AYARLAR
         $routes->group('settings', static function ($routes) {
@@ -301,6 +299,13 @@ $routes->group('api/mobile', static function ($routes) {
     $routes->get('students/daily', 'Api\StudentController::dailyList');
     // Diğer mobil API rotalarınız...
 });
+
+// ============================================
+// WEB UYGULAMASI - SERVİS TAKİP API
+// ============================================
+// Web arayüzü (servis.php) oturum tabanlı çalıştığı için 
+// yetkilendirmeyi session üzerinden yapan controller'ı kullanmalı.
+$routes->post('api/location/save', 'Api\LocationController::saveLocation', ['filter' => 'session']);
 
 
 // ============================================

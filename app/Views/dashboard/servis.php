@@ -9,10 +9,10 @@
         <i class="bi bi-exclamation-triangle-fill me-2 fs-4"></i>
         <div>
             <strong>ÖNEMLİ TALİMAT:</strong><br>
-            • Konum takibi sırasında <strong>Chrome/tarayıcıyı KAPATMAYIN</strong><br>
-            • Telefon ekranı kilitli olabilir (sorun yok)<br>
-            • Başka uygulamalar açabilirsiniz (sorun yok)<br>
-            • Sadece tarayıcı arka planda açık kalsın
+            • Konum takibi sırasında <strong>LÜTFEN TELEFON EKRANINI KİLİTLEMEYİN</strong><br>
+            • Uygulama açıkken ekran otomatik açık kalacaktır, müdahale etmeyin.<br>
+            • Chrome/tarayıcıyı veya uygulamayı <strong>KAPATMAYIN</strong><br>
+            • Başka bir uygulamaya geçiş yapmayın, bu ekran açık kalsın.
         </div>
     </div>
 </div>
@@ -157,7 +157,9 @@
 // --- TÜM JAVASCRIPT KODLARI BURADA, TEMİZ VE TEK BİR BLOK İÇİNDE ---
 
 // Değişkenleri en üstte tanımlayalım
-let gprsInterval = null; 
+// Değişkenleri en üstte tanımlayalım
+let watchId = null; 
+let lastSentTime = 0;
 let isTracking = false; 
 let wakeLock = null;
 
@@ -241,19 +243,41 @@ async function startTracking() {
         }
     }
 
-    // İlk konum
-    sendLocation();
+    // Bildirim İzni İste (Android'de kalıcılık sağlamak için)
+    if ("Notification" in window && Notification.permission !== "granted") {
+        await Notification.requestPermission();
+    }
+
+    // Seçenekler: Yüksek hassasiyet ve gerçek zamanlı takip
+    const options = {
+        enableHighAccuracy: true, // GPS kullanımını zorla
+        timeout: 10000,           // 10 saniye içinde yanıt gelmezse hata ver
+        maximumAge: 0             // Önbellekten konum alma
+    };
+
+    // İlk konumu hızlıca al
+    navigator.geolocation.getCurrentPosition(processPosition, null, options);
     
-    // 30 saniyede bir
-    gprsInterval = setInterval(sendLocation, 30000);
+    // Sürekli takip başlat
+    watchId = navigator.geolocation.watchPosition(
+        processPosition,
+        (err) => showGprsStatus('❌ GPS Sinyal Hatası: ' + err.message, 'warning'),
+        options
+    );
     
-    showGprsStatus('✅ Konum takibi aktif! Tarayıcıyı KAPATMAYIN', 'success');
+    showGprsStatus('✅ Yüksek Hassasiyetli Takip Başlatıldı...', 'success');
+    updateTrackingNotification('Takip Başlatıldı...');
 }
 
 // KONUM DURDUR
 async function stopTracking() {
-    clearInterval(gprsInterval);
+    if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+    }
+    
     isTracking = false;
+    closeTrackingNotification(); // Bildirimi kaldır
     
     if (wakeLock) {
         await wakeLock.release();
@@ -262,28 +286,102 @@ async function stopTracking() {
     
     $('#gprsButton').removeClass('btn-danger').addClass('btn-success')
         .html('<i class="bi bi-broadcast"></i> Konum Aç');
-    showGprsStatus('⏸️ Durduruldu', 'secondary');
+    showGprsStatus('⏸️ Takip Durduruldu', 'secondary');
 }
 
-// KONUM GÖNDER
-function sendLocation() {
-    navigator.geolocation.getCurrentPosition(
-        (pos) => {
-            $.post('<?= base_url('api/location/save') ?>', {
-                latitude: pos.coords.latitude,
-                longitude: pos.coords.longitude,
-                timestamp: new Date().toISOString()
-            })
-            .done(() => {
-                showGprsStatus(`✅ Konum OK - ${new Date().toLocaleTimeString()}`, 'success');
-            })
-            .fail(() => {
-                showGprsStatus('❌ Gönderilemedi!', 'danger');
-            });
+// Konum İşleme (Throttle: 3 saniye)
+function processPosition(pos) {
+    const now = Date.now();
+    // En az 3 saniye geçmiş olmalı
+    if (now - lastSentTime >= 3000) {
+        lastSentTime = now;
+        sendLocationAPI(pos.coords);
+    }
+}
+
+// API'ye Gönderme
+function sendLocationAPI(coords) {
+    const speedKmH = Math.round((coords.speed || 0) * 3.6); // m/s -> km/h
+    
+    // CSRF Token bilgilerini al
+    const csrfName = '<?= csrf_token() ?>';
+    const csrfHash = '<?= csrf_hash() ?>'; // İlk yüklemedeki hash (ancak meta tagdan almak daha güvenli olabilir)
+
+    const locationData = {
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        speed: speedKmH,
+        accuracy: Math.round(coords.accuracy),
+        heading: coords.heading || 0,
+        timestamp: new Date().toISOString(),
+        [csrfName]: csrfHash // CSRF Token ekle
+    };
+
+    $.ajax({
+        url: '<?= base_url('api/location/save') ?>',
+        type: 'POST',
+        data: locationData,
+        success: function(response) {
+            const time = new Date().toLocaleTimeString();
+            const statusText = `✅ Veri Aktarılıyor (${speedKmH} km/s) - ${time}`;
+            showGprsStatus(statusText, 'success');
+            
+            updateTrackingNotification(`Hız: ${speedKmH} km/s - Konum iletiliyor...`);
         },
-        (err) => showGprsStatus('❌ GPS hatası: ' + err.message, 'danger'),
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 5000 }
-    );
+        error: function(xhr, status, error) {
+            console.error("API Hatası:", xhr.responseText);
+            let errorMsg = 'Sunucu Bağlantı Hatası!';
+            if(xhr.status === 403) errorMsg = 'Güvenlik (CSRF) Hatası! Sayfayı yenileyin.';
+            else if(xhr.status === 400) errorMsg = 'Eksik Veri Hatası!';
+            
+            showGprsStatus(`❌ ${errorMsg}`, 'danger');
+            updateTrackingNotification(`⚠️ ${errorMsg}`);
+        }
+    });
+}
+
+// ==========================================
+// BİLDİRİM YÖNETİMİ (Android PWA Hack)
+// ==========================================
+async function updateTrackingNotification(text) {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    
+    try {
+        if ('serviceWorker' in navigator) {
+            const registration = await navigator.serviceWorker.getRegistration();
+            if (registration) {
+                registration.showNotification('ikihece Servis Takip', {
+                    body: text,
+                    icon: '<?= base_url("assets/images/favicon-192x192.png") ?>',
+                    tag: 'tracking-status', 
+                    renotify: false, 
+                    silent: true
+                });
+                return;
+            }
+        }
+    } catch (e) { console.error(e); }
+
+    // Fallback
+    new Notification('ikihece Servis Takip', {
+        body: text,
+        tag: 'tracking-status',
+        silent: true
+    });
+}
+
+function closeTrackingNotification() {
+    if (!("Notification" in window)) return;
+    
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(reg => {
+            if (reg) {
+                reg.getNotifications({tag: 'tracking-status'}).then(notifications => {
+                    notifications.forEach(notification => notification.close());
+                });
+            }
+        });
+    }
 }
 
 function showGprsStatus(msg, type) {
