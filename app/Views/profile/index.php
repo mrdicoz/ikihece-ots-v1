@@ -62,13 +62,7 @@
                                 </div>
                                <div class="mb-3">
                                     <label for="phone_number" class="form-label">Telefon Numarası</label>
-                                    <input type="tel" 
-                                        class="form-control phone-mask" 
-                                        id="phone_number" 
-                                        name="phone_number" 
-                                        value="<?= esc(old('phone_number', $profile->phone_number ?? '')) ?>"
-                                        placeholder="(0___) ___ __ __"
-                                        maxlength="16">
+                                    <input type="tel" class="form-control" id="phone_number" name="phone_number" value="<?= esc(old('phone_number', isset($profile->phone_number) ? $profile->phone_number : '')) ?>" placeholder="(05__) ___ __ __" maxlength="17">
                                 </div>
 
                                 <?php if (auth()->user()->inGroup('ogretmen')): ?>
