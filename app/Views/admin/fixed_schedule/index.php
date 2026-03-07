@@ -24,7 +24,13 @@
                              </div>
                          </div>
                          <div class="col-md-6">
-                             <label for="teacher-filter" class="form-label fw-bold"><i class="bi bi-person-video3 me-2"></i>Öğretmen Filtrele</label>
+                             <div class="d-flex justify-content-between align-items-center mb-2">
+                                 <label for="teacher-filter" class="form-label fw-bold mb-0"><i class="bi bi-person-video3 me-2"></i>Öğretmen Filtrele</label>
+                                 <div class="form-check form-switch m-0">
+                                     <input class="form-check-input" type="checkbox" id="show-passive-teachers">
+                                     <label class="form-check-label" style="font-size:0.85rem;" for="show-passive-teachers">Ayrılan Öğretmenleri Göster</label>
+                                 </div>
+                             </div>
                              <select id="teacher-filter" multiple placeholder="Tüm öğretmenler gösteriliyor..."></select>
                          </div>
                     </div>
@@ -103,12 +109,14 @@
     .student-popover-list li { display: flex; align-items: center; margin-bottom: 8px; }
     .student-popover-list li:last-child { margin-bottom: 0; }
     .student-popover-list .student-info { text-align: left; }
+    .passive-teacher-row .teacher-cell { background-color: #f1f3f5 !important; }
+    .passive-teacher-row .lesson-slot { background-color: #f8f9fa !important; }
+    .passive-teacher-img { filter: grayscale(100%); opacity: 0.7; }
 </style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         // --- Değişkenler ---
-        const teachersForSelect = <?= json_encode($teachersForSelect) ?>;
         const allTeachersData = <?= json_encode($teachers) ?>;
         const allStudentsData = <?= json_encode($students) ?>;
         const csrfName = '<?= csrf_token() ?>';
@@ -116,9 +124,33 @@
         const displayArea = document.getElementById('schedule-display-area');
         const lessonModal = new bootstrap.Modal(document.getElementById('lessonModal'));
         let scheduleData = {}, currentModalSlotId = '', currentModalWeekType = '';
+        let isShowPassive = false;
 
         // --- TomSelect Tanımlamaları ---
-        const teacherFilter = new TomSelect('#teacher-filter', { options: teachersForSelect, plugins: ['remove_button'], onChange: renderSchedule });
+        let teacherFilter;
+        
+        function initTeacherSelect() {
+            const filteredTeachers = isShowPassive ? allTeachersData : allTeachersData.filter(t => t.active == 1);
+            const options = filteredTeachers.map(t => ({ value: t.id, text: t.first_name + ' ' + t.last_name + (t.active == 0 ? ' (Pasif)' : '') }));
+            
+            if (teacherFilter) {
+                // Mevcut seçimleri sakla
+                const currentSelections = teacherFilter.getValue();
+                
+                // Tüm seçenekleri temizle ve yenilerini ekle
+                teacherFilter.clearOptions();
+                teacherFilter.addOption(options);
+                
+                // Sadece geçerli olan seçimleri geri yükle (eğer pasif kapatıldıysa ve pasif seçiliyse seçimi iptal etmiş oluruz)
+                const validSelections = currentSelections.filter(val => options.find(opt => opt.value == val));
+                teacherFilter.setValue(validSelections);
+                
+            } else {
+                teacherFilter = new TomSelect('#teacher-filter', { options: options, plugins: ['remove_button'], onChange: renderSchedule });
+            }
+        }
+        
+        initTeacherSelect();
         const newStudentSelect = new TomSelect('#new-student-select', {
             options: allStudentsData.map(s => ({ value: s.id, text: `${s.adi} ${s.soyadi}`, subtext: `${s.city_name || ''} / ${s.district_name || ''}` })),
             placeholder: 'Eklemek için öğrenci adını yazın...', multiple: true, plugins: ['remove_button'],
@@ -130,6 +162,11 @@
         document.getElementById('week-selector').addEventListener('click', e => toggleWeekButton(e, renderSchedule));
         document.getElementById('save-slot-btn').addEventListener('click', saveSlotData);
         document.getElementById('clear-slot-btn').addEventListener('click', clearSlotData);
+        document.getElementById('show-passive-teachers').addEventListener('change', function(e) {
+            isShowPassive = e.target.checked;
+            initTeacherSelect();
+            renderSchedule();
+        });
         displayArea.addEventListener('click', e => { if (e.target.closest('.lesson-slot')) openLessonModal(e.target.closest('.lesson-slot')); });
         displayArea.addEventListener('mouseover', e => {
             const popoverEl = e.target.closest('.lesson-slot');
@@ -143,7 +180,8 @@
         const toggleWeekButton = (e, cb) => { const btn = e.target.closest('button'); if (!btn) return; btn.classList.toggle('active'); const color = btn.dataset.color; btn.classList.toggle(`btn-${color}`); btn.classList.toggle(`btn-outline-${color}`); if (cb) cb(); };
 
         async function fetchScheduleData() {
-            const selectedTeacherIds = teacherFilter.getValue().length > 0 ? teacherFilter.getValue() : teachersForSelect.map(t => t.value);
+            let availableTeacherIds = isShowPassive ? allTeachersData.map(t => String(t.id)) : allTeachersData.filter(t => t.active == 1).map(t => String(t.id));
+            const selectedTeacherIds = teacherFilter.getValue().length > 0 ? teacherFilter.getValue() : availableTeacherIds;
             const selectedDayNumbers = [...document.querySelectorAll('#day-selector button.active')].map(b => b.dataset.day);
             if (selectedTeacherIds.length === 0 || selectedDayNumbers.length === 0) { scheduleData = {}; return; }
             const params = new URLSearchParams();
@@ -180,26 +218,30 @@
         function createDayTable(dayNum, weekType) {
             const days = { 1: 'Pazartesi', 2: 'Salı', 3: 'Çarşamba', 4: 'Perşembe', 5: 'Cuma', 6: 'Cumartesi', 7: 'Pazar' };
             const hours = Array.from({length: (<?= config('Ots')->scheduleEndHour ?? 18 ?> - <?= config('Ots')->scheduleStartHour ?? 10 ?>)}, (_, i) => <?= config('Ots')->scheduleStartHour ?? 10 ?> + i);
-            const selectedTeacherIds = teacherFilter.getValue().length > 0 ? teacherFilter.getValue() : teachersForSelect.map(t => t.value);
+            let availableTeacherIds = isShowPassive ? allTeachersData.map(t => String(t.id)) : allTeachersData.filter(t => t.active == 1).map(t => String(t.id));
+            const selectedTeacherIds = teacherFilter.getValue().length > 0 ? teacherFilter.getValue() : availableTeacherIds;
             const filteredTeachers = allTeachersData.filter(t => selectedTeacherIds.includes(String(t.id)));
             return `<div class="card mb-4 shadow-sm"><div class="card-body p-0"><div class=""><table class="table schedule-table table-hover mb-0">
                 <thead class="thead-week-${weekType}">
                     <tr><th colspan="${hours.length + 1}">${days[dayNum]} - ${weekType} Haftası</th></tr>
                     <tr><th class="teacher-cell">Öğretmenler</th>${hours.map(h => `<th>${h}:00</th>`).join('')}</tr>
                 </thead><tbody>${filteredTeachers.map(teacher => `
-                    <tr>
+                    <tr class="${teacher.active == 0 ? 'passive-teacher-row text-muted' : ''}">
                         <td class="teacher-cell">
                             <div class="d-flex align-items-center">
                                 <img src="<?= base_url() ?>${teacher.profile_photo || 'assets/images/user.jpg'}" 
-                                    class="rounded-circle me-3" 
+                                    class="rounded-circle me-3 ${teacher.active == 0 ? 'passive-teacher-img' : ''}" 
                                     width="40" 
                                     height="40" 
                                     alt="${teacher.first_name}" 
                                     style="object-fit:cover;">
 
-                                <div class="flex-grow-1 text-start"> <!-- Burayı değiştirdim -->
-                                    <div class="fw-bold text-nowrap text-start">${teacher.first_name} ${teacher.last_name}</div> <!-- text-start eklendi -->
-                                    <small class="text-muted d-block text-truncate text-start" style="max-width: 150px;">${teacher.branch || ''}</small> <!-- text-start eklendi -->
+                                <div class="flex-grow-1 text-start">
+                                    <div class="fw-bold text-nowrap text-start">
+                                        ${teacher.first_name} ${teacher.last_name}
+                                        ${teacher.active == 0 ? '<span class="badge bg-secondary ms-1" style="font-size:0.6rem;">Pasif</span>' : ''}
+                                    </div>
+                                    <small class="text-muted d-block text-truncate text-start" style="max-width: 150px;">${teacher.branch || ''}</small>
                                 </div>
                             </div>
                         </td>

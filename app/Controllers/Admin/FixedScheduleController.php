@@ -30,11 +30,11 @@ class FixedScheduleController extends BaseController
         // 'Öğretmen' grubundaki tüm aktif kullanıcıları profilleriyle birlikte alıyoruz.
         // --- DÜZELTME BURADA: asArray() metodu eklendi ---
         $teachers = $this->userModel
-            ->select('users.id, p.first_name, p.last_name, p.profile_photo, p.branch')
+            ->select('users.id, p.first_name, p.last_name, p.profile_photo, p.branch, users.active')
             ->join('user_profiles p', 'p.user_id = users.id', 'left')
             ->join('auth_groups_users gu', 'gu.user_id = users.id')
             ->where('gu.group', 'ogretmen')
-            ->where('users.active', 1)
+            ->orderBy('users.active', 'DESC')
             ->orderBy('p.first_name', 'ASC')
             ->asArray() // SONUÇLARI NESNE YERİNE DİZİ OLARAK ALMAK İÇİN BU EKLENDİ
             ->findAll();
