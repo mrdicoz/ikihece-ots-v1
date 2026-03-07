@@ -79,13 +79,13 @@
                 foreach ($months as $key => $value):
                     $isActive = ($selected_year == $value['year'] && $selected_month == $value['month']);
                 ?>
-                    <a href="<?= site_url('teachers/show/' . $teacher->id . '?year=' . $value['year'] . '&month=' . $value['month']) ?>" 
+                    <a href="<?= site_url('teachers/show/' . $teacher->user_id . '?year=' . $value['year'] . '&month=' . $value['month']) ?>" 
                        class="btn <?= $isActive ? 'btn-success' : 'btn-outline-success' ?> btn-sm m-1">
                         <?= esc($value['name']) ?>
                     </a>
                 <?php endforeach; ?>
 
-                <a href="<?= site_url('teachers/show/' . $teacher->id) ?>" 
+                <a href="<?= site_url('teachers/show/' . $teacher->user_id) ?>" 
                    class="btn <?= (empty($selected_year) && empty($selected_month)) ? 'btn-success' : 'btn-outline-success' ?> btn-sm m-1">
                     Tüm Zamanlar
                 </a>
@@ -303,7 +303,7 @@
                 <?php endif; ?>
 
                 <h6>Yeni İzin Ekle</h6>
-                <form action="<?= site_url('teachers/' . $teacher->id . '/leaves') ?>" method="post">
+                <form action="<?= site_url('teachers/' . $teacher->user_id . '/leaves') ?>" method="post">
                     <?= csrf_field() ?>
                     <div class="row">
                         <div class="col-md-4">
@@ -362,7 +362,7 @@
                                     <td><?= esc($leave->end_date) ?></td>
                                     <td><?= esc($leave->reason) ?></td>
                                     <td>
-                                        <a href="<?= site_url('teachers/' . $teacher->id . '/leaves/' . $leave->id . '/delete') ?>" class="btn btn-danger btn-sm" onclick="return confirm('Bu izni silmek istediğinizden emin misiniz?')">Sil</a>
+                                        <a href="<?= site_url('teachers/' . $teacher->user_id . '/leaves/' . $leave->id . '/delete') ?>" class="btn btn-danger btn-sm" onclick="return confirm('Bu izni silmek istediğinizden emin misiniz?')">Sil</a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

@@ -37,6 +37,34 @@
 
     <?= $this->include('layouts/partials/_scripts') ?>
     <?= $this->renderSection('scripts') ?>
+  
+  <!-- Profil Fotoğrafı Zorunlu Modal -->
+<div class="modal fade" id="profilePhotoRequiredModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle-fill"></i> Profil Fotoğrafı Gerekli
+                </h5>
+            </div>
+            <div class="modal-body text-center">
+                <div class="mb-3">
+                    <i class="bi bi-person-circle" style="font-size: 80px; color: #6c757d;"></i>
+                </div>
+                <h5 class="mb-3">Profilinizi Tamamlayın</h5>
+                <p class="text-muted">
+                    Devam edebilmek için lütfen bir profil fotoğrafı ekleyin. 
+                    Profil fotoğrafınız sistemi daha kişisel ve profesyonel hale getirir.
+                </p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <a href="<?= site_url('profile') ?>" class="btn btn-warning btn-lg">
+                    <i class="bi bi-camera-fill"></i> Profil Fotoğrafı Ekle
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="modal fade" id="roleSwitcherModal" tabindex="-1" aria-labelledby="roleSwitcherModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">

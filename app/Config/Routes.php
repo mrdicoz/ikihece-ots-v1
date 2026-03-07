@@ -118,7 +118,8 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         // RAM Raporu görüntüleme
         $routes->GET('view-ram-report/(:num)', 'StudentController::viewRamReport/$1', ['as' => 'students.viewRamReport']);
         $routes->POST('analyze-single-ram/(:num)', 'StudentController::analyzeSingleRam/$1');
-        $routes->get('absences', 'StudentController::absences', ['as' => 'students.absences']);
+      	$routes->get('absences', 'StudentController::absences', ['as' => 'students.absences']);
+
 
     });
 

@@ -29,5 +29,20 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+    // Profil fotoğrafı kontrol ve zorunlu modal
+    <?php if (auth()->loggedIn()): ?>
+        <?php
+        $profileModel = new \App\Models\UserProfileModel();
+        $userProfile = $profileModel->where('user_id', auth()->id())->first();
+        $hasProfilePhoto = !empty($userProfile->profile_photo) && $userProfile->profile_photo !== '/assets/images/user.jpg';
+        $isProfilePage = (uri_string() === 'profile' || strpos(uri_string(), 'profile/') === 0);
+        ?>
 
+        <?php if (!$hasProfilePhoto && !$isProfilePage): ?>
+            document.addEventListener('DOMContentLoaded', function() {
+                const profilePhotoModal = new bootstrap.Modal(document.getElementById('profilePhotoRequiredModal'));
+                profilePhotoModal.show();
+            });
+        <?php endif; ?>
+    <?php endif; ?>
 </script>

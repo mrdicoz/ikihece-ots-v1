@@ -325,32 +325,48 @@ class AIService
     private function resolveStudentIdByName($name)
     {
         $model = new StudentModel();
-        $name = trim(preg_replace('/\s+/', ' ', $name));
+        $name = trim($name);
+        // Çoklu boşlukları tek boşluğa indir
+        $name = preg_replace('/\s+/', ' ', $name);
+        
+        // 1. Tam Eşleşme (Orijinal)
+        $student = $model->where("CONCAT(adi, ' ', soyadi)", $name)
+                        ->where('deleted_at', null)
+                        ->first();
+        if ($student) return $student['id'];
+
+        // 2. Türkçe Normalizasyon ile Arama
         $normalizedInput = $this->turkishToLower($name);
         
-        $students = $model->where('deleted_at', null)->asArray()->findAll();
+        // İsim parçalarını ayır
+        $parts = explode(' ', $name);
+        $first = $parts[0];
 
-        $bestMatchId = null;
-        $highestSimilarity = 0;
+        $students = $model->groupStart()
+                        ->like("CONCAT(adi, ' ', soyadi)", $name)
+                        ->orLike('adi', $first)
+                        ->groupEnd()
+                        ->where('deleted_at', null)
+                        ->findAll(20);
 
         foreach ($students as $s) {
-            $fullName = preg_replace('/\s+/', ' ', $s['adi'] . ' ' . $s['soyadi']);
+            $fullName = $s['adi'] . ' ' . $s['soyadi'];
+            // DB'den gelen ismin boşluklarını da normalize et
+            $fullName = preg_replace('/\s+/', ' ', $fullName);
             $normalizedDb = $this->turkishToLower($fullName);
             
-            // 1. Exact match or Contains
-            if ($normalizedDb === $normalizedInput || str_contains($normalizedDb, $normalizedInput)) {
+            if ($normalizedDb === $normalizedInput) {
                 return $s['id'];
             }
             
-            // 2. Similar text for typos
-            similar_text($normalizedInput, $normalizedDb, $percent);
-            if ($percent > $highestSimilarity && $percent > 65) {
-                $highestSimilarity = $percent;
-                $bestMatchId = $s['id'];
+            // Fuzzy match (Ufak yazım hataları veya karakter farkları için)
+            // İsim yeterince uzunsa (yanlış eşleşmeyi önlemek için)
+            if (strlen($normalizedInput) > 4 && levenshtein($normalizedInput, $normalizedDb) < 3) {
+                return $s['id'];
             }
         }
         
-        return $bestMatchId;
+        return null;
     }
 
     private function toolGetGeneralStats()
@@ -370,21 +386,37 @@ class AIService
 
     private function toolSearchStudent($query)
     {
-        $query = trim(preg_replace('/\s+/', ' ', $query));
+        $query = trim($query);
+        $query = preg_replace('/\s+/', ' ', $query);
+        $model = new StudentModel();
         $normalizedQuery = $this->turkishToLower($query);
         
-        $model = new StudentModel();
-        $allStudents = $model->where('deleted_at', null)->asArray()->findAll();
+        // Split query to find first word for broader search
+        $parts = explode(' ', $query);
+        $firstWord = $parts[0];
+
+        $students = $model->groupStart()
+                ->like('adi', $query)
+                ->orLike('soyadi', $query)
+                ->orLike("CONCAT(adi, ' ', soyadi)", $query)
+                ->orLike('adi', $firstWord) // Broaden search
+            ->groupEnd()
+            ->where('deleted_at', null)
+            ->findAll(50); // Increase limit
         
         $results = [];
+        $seenIds = [];
 
-        foreach ($allStudents as $s) {
-            $fullName = preg_replace('/\s+/', ' ', $s['adi'] . ' ' . $s['soyadi']);
+        foreach ($students as $s) {
+            if (in_array($s['id'], $seenIds)) continue;
+
+            $fullName = $s['adi'] . ' ' . $s['soyadi'];
+            $fullName = preg_replace('/\s+/', ' ', $fullName);
             $normalizedDb = $this->turkishToLower($fullName);
             
-            similar_text($normalizedQuery, $normalizedDb, $percent);
-            
-            if (str_contains($normalizedDb, $normalizedQuery) || $percent > 65) {
+            if (strpos($normalizedDb, $normalizedQuery) !== false || levenshtein($normalizedQuery, $normalizedDb) < 3) {
+                $seenIds[] = $s['id'];
+                
                 $age = 'Bilinmiyor';
                 if (!empty($s['dogum_tarihi'])) {
                     $age = date_diff(date_create($s['dogum_tarihi']), date_create('today'))->y;
@@ -403,22 +435,13 @@ class AIService
                     'age' => $age,
                     'info' => $diagnosis ?: 'Tanı bilgisi girilmemiş',
                     'parent_phone' => $s['iletisim'] ?? 'Telefon yok',
-                    'location' => $s['google_konum'] ?? 'Konum yok',
-                    'matched_percent' => $percent
+                    'location' => $s['google_konum'] ?? 'Konum yok'
                 ];
             }
         }
         
         if (empty($results)) return "Aradığınız kriterlere ('$query') uygun öğrenci bulunamadı.";
         
-        // Sort by matched percent
-        usort($results, function($a, $b) {
-            return $b['matched_percent'] <=> $a['matched_percent'];
-        });
-
-        // Clean up internal keys
-        $results = array_map(function($r) { unset($r['matched_percent']); return $r; }, $results);
-
         return array_slice($results, 0, 5);
     }
 

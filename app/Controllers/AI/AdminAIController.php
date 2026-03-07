@@ -2,477 +2,190 @@
 
 namespace App\Controllers\AI;
 
-use App\Models\StudentModel;
-use App\Models\LessonModel;
-use App\Models\UserProfileModel;
-use App\Models\InstitutionModel;
-use App\Models\StudentEvaluationModel;
-use App\Models\FixedLessonModel;
-use App\Models\RamReportAnalysisModel;
-use App\Libraries\AIService;
-
 class AdminAIController extends BaseAIController
 {
-    public function process(string $userMessage, object $user): string
-    {
-        $userMessageLower = $this->turkish_strtolower($userMessage);
-
-        if ($this->isGreeting($userMessageLower)) {
-            return $this->handleGreetingAndPresentMenu();
-        }
-
-        // 1. Kurumun Genel Raporu
-        if ($this->containsKeywords($userMessageLower, ['kurumun genel raporu', 'genel rapor'])) {
-            return $this->handleGeneralInstitutionReport();
-        }
-
-        // 2. Öğretmen Detay Raporu
-        if (preg_match('/(.+?)\s+öğretmenin.*raporu/iu', $userMessage, $matches)) {
-            $teacherName = trim($matches[1]);
-            return $this->handleTeacherDetailReport($teacherName);
-        }
-
-        // 3. Öğrenci Detay Raporu
-        if (preg_match('/(.+?)\s+hakkında.*rapor/iu', $userMessage, $matches)) {
-            $studentName = trim($matches[1]);
-            return $this->handleStudentDetailReport($studentName);
-        }
-
-        // 3.5. RAM Raporu Analizi
-        if (preg_match("/(.+?).*öğrencinin.*ram.*raporu.*(analizi|analizini).*ver/iu", $userMessage, $matches) || 
-            preg_match("/(.+?).*ram.*raporu.*(analiz.*yap|analizi nedir|analizini ver)/iu", $userMessage, $matches)) {
-            $studentName = trim($matches[1]);
-            $studentId = $this->findStudentIdInMessage($studentName);
-            return $this->handleRamReportQuery($studentId, $studentName);
-        }
-
-        // 4. Yeni Kayıt Olan Öğrenciler
-        if ($this->containsKeywords($userMessageLower, ['yeni kayıt olan öğrenciler', 'yeni öğrenciler'])) {
-            return $this->handleNewStudentsList();
-        }
-
-        // 5. Kurumdan Ayrılan Öğrenciler
-        if ($this->containsKeywords($userMessageLower, ['kurumdan ayrılan öğrenciler', 'ayrılan öğrenciler'])) {
-            return $this->handleChurnedStudentsList();
-        }
-
-        // 6. Kurumdaki Öğretmenleri Listele
-        if ($this->containsKeywords($userMessageLower, ['öğretmenleri listele', 'öğretmenler kimler', 'kurumdaki öğretmenler'])) {
-            return $this->handleListTeachers();
-        }
-
-        // 7. Öğretmenin Gelişim Günlüklerini Listele
-        if (preg_match('/(.+?)\s+yazdığı.*gelişim.*listele/iu', $userMessage, $matches)) {
-            $teacherName = trim($matches[1]);
-            return $this->handleTeacherEvaluations($teacherName);
-        }
-
-        return $this->handleConversationalFallback($userMessage, $user, 'Yönetici/Admin');
-    }
-
-    private function isGreeting(string $message): bool
-    {
-        return $this->fuzzyContainsKeywords($message, ['merhaba', 'selam', 'hey', 'iyi günler', 'kolay gelsin']);
-    }
-
-    private function handleGreetingAndPresentMenu(): string
-    {
-        $response = "Merhaba, ben Pusula. Kurumumuzun stratejik yönetimi için size nasıl yardımcı olabilirim? 🧭\n\n";
-        $response .= "Aşağıdaki gibi spesifik raporlar isteyebilirsiniz:\n\n";
-        $response .= "1. **`Kurumun genel raporunu oluştur.`**\n";
-        $response .= "2. **`{Öğretmen Adı} öğretmenin raporunu oluştur.`**\n";
-        $response .= "3. **`{Öğrenci Adı} hakkında rapor sun.`**\n";
-        $response .= "4. **`{Öğrenci Adı} ram raporu analizini ver.`**\n";
-        $response .= "5. **`Bu ay yeni kayıt olan öğrencileri listele.`**\n";
-        $response .= "6. **`Bu ay kurumdan ayrılan öğrencileri listele.`**\n";
-        $response .= "7. **`Kurumdaki öğretmenleri listele.`**\n";
-        $response .= "8. **`{Öğretmen Adı} yazdığı gelişim günlüklerini listele.`**\n\n";
-        $response .= "Ayrıca veritabanı hakkında `sql` komutuyla doğrudan sorgulama yapabilirsiniz.";
-        return $response;
-    }
-
     /**
-     * Rapor 1: Kurumun bu ayki genel durum raporu
+     * Admin mesajını işler ve gerekli istatistikleri toplayarak prompt oluşturur.
      */
-    private function handleGeneralInstitutionReport(): string
+    public function process(string $userMessage, object $user, array $history = []): string
     {
-        $firstDay = date('Y-m-01');
-        $lastDay = date('Y-m-t');
-        $db = db_connect();
-
-        $activeTeachers = $db->table('auth_groups_users')->where('group', 'ogretmen')->countAllResults();
-
-        $activeStudentsCount = $db->table('lesson_students')
-            ->select('lesson_students.student_id')
-            ->join('lessons', 'lessons.id = lesson_students.lesson_id')
-            ->where('lessons.lesson_date >=', $firstDay)
-            ->where('lessons.lesson_date <=', $lastDay)
-            ->distinct()
-            ->get()->getNumRows();
-
-        $newStudentsCount = $db->table('students')->where('created_at >=', $firstDay)->countAllResults();
-
-        $firstDayLastMonth = date('Y-m-01', strtotime('-1 month'));
-        $lastDayLastMonth = date('Y-m-t', strtotime('-1 month'));
-        $churnedStudentsCountQuery = $db->query(" 
-            SELECT COUNT(DISTINCT s.id) as count FROM students s
-            WHERE
-                (SELECT COUNT(l.id) FROM lessons l JOIN lesson_students ls ON l.id = ls.lesson_id WHERE ls.student_id = s.id AND l.lesson_date BETWEEN '{$firstDayLastMonth}' AND '{$lastDayLastMonth}') > 0
-            AND
-                (SELECT COUNT(l.id) FROM lessons l JOIN lesson_students ls ON l.id = ls.lesson_id WHERE ls.student_id = s.id AND l.lesson_date BETWEEN '{$firstDay}' AND '{$lastDay}') = 0
-        ");
-        $churnedRow = $churnedStudentsCountQuery->getRow();
-        $churnedStudentsCount = $churnedRow ? $churnedRow->count : 0;
-
-        $topTeacherQuery = $db->table('lessons')
-            ->select('teacher_id, CONCAT(p.first_name, " ", p.last_name) as name, COUNT(lessons.id) as count')
-            ->join('user_profiles p', 'p.user_id = lessons.teacher_id', 'left')
-            ->where('lesson_date >=', $firstDay)->where('lesson_date <=', $lastDay)
-            ->groupBy('teacher_id, name')->orderBy('count', 'DESC')->limit(1)->get()->getRow();
-
-        $topStudentQuery = $db->table('lesson_students ls')
-            ->select('ls.student_id, s.adi, s.soyadi, COUNT(ls.id) as count')
-            ->join('students s', 's.id = ls.student_id')
-            ->join('lessons l', 'l.id = ls.lesson_id')
-            ->where('l.lesson_date >=', $firstDay)->where('l.lesson_date <=', $lastDay)
-            ->groupBy('ls.student_id, s.adi, s.soyadi')->orderBy('count', 'DESC')->limit(1)->get()->getRow();
-
-        $topEvaluatorQuery = $db->table('student_evaluations e')
-            ->select('e.teacher_id, CONCAT(p.first_name, " ", p.last_name) as name, COUNT(e.id) as count')
-            ->join('user_profiles p', 'p.user_id = e.teacher_id', 'left')
-            ->where('e.created_at >=', $firstDay)->where('e.created_at <=', $lastDay . ' 23:59:59')
-            ->groupBy('e.teacher_id, name')->orderBy('count', 'DESC')->limit(1)->get()->getRow();
-
-        $report = "**KURUM GENEL RAPORU (" . date('F Y') . ")**\n\n";
-        $report .= "- Aktif Öğretmen Sayısı: **{$activeTeachers}**\n";
-        $report .= "- Bu Ay Ders Alan Öğrenci Sayısı: **{$activeStudentsCount}**\n";
-        $report .= "- Yeni Kayıt Olan Öğrenci Sayısı: **{$newStudentsCount}**\n";
-        $report .= "- Kurumdan Ayrılan (Pasif) Öğrenci Sayısı: **{$churnedStudentsCount}**\n\n";
-        $report .= "**🏆 AYIN EN'LERİ:**\n";
-        $report .= "- En Fazla Ders Veren Öğretmen: **" . ($topTeacherQuery ? $topTeacherQuery->name : 'N/A') . " (" . ($topTeacherQuery ? $topTeacherQuery->count : 0) . " ders)**\n";
-        $report .= "- En Fazla Ders Alan Öğrenci: **" . ($topStudentQuery ? $topStudentQuery->adi : 'N/A') . " " . ($topStudentQuery ? $topStudentQuery->soyadi : '') . " (" . ($topStudentQuery ? $topStudentQuery->count : 0) . " ders)**\n";
-        $report .= "- En Aktif Gelişim Yazarı: **" . ($topEvaluatorQuery ? $topEvaluatorQuery->name : 'N/A') . " (" . ($topEvaluatorQuery ? $topEvaluatorQuery->count : 0) . " rapor)**\n";
-
-        return $report;
-    }
-
-    /**
-     * Rapor 2: {ÖGRETMENADI} öğretmenin genel raporu
-     */
-    private function handleTeacherDetailReport(string $teacherName): string
-    {
-        $db = db_connect();
-        $teacher = $this->findUserByName($teacherName, 'ogretmen');
-        if (!$teacher) {
-            return "`{$teacherName}` adında bir öğretmen bulunamadı.";
-        }
-
-        $firstDay = date('Y-m-01');
-        $lastDay = date('Y-m-t');
-
-        $totalLessons = $db->table('lessons')
-            ->where('teacher_id', $teacher->id)
-            ->where('lesson_date >=', $firstDay)
-            ->where('lesson_date <=', $lastDay)
-            ->countAllResults();
-
-        $topStudentQuery = $db->table('lesson_students ls')
-            ->select('s.adi, s.soyadi, COUNT(ls.id) as count')
-            ->join('students s', 's.id = ls.student_id')
-            ->join('lessons l', 'l.id = ls.lesson_id')
-            ->where('l.teacher_id', $teacher->id)
-            ->where('l.lesson_date >=', $firstDay)->where('l.lesson_date <=', $lastDay)
-            ->groupBy('s.adi, s.soyadi')->orderBy('count', 'DESC')->limit(1)->get()->getRow();
-
-        $evaluationCount = $db->table('student_evaluations')
-            ->where('teacher_id', $teacher->id)
-            ->where('created_at >=', $firstDay)
-            ->countAllResults();
-
-        $fixedLessonModel = new FixedLessonModel();
-        $fixedLessons = $fixedLessonModel->where('teacher_id', $teacher->id)->findAll();
-        $schedule = [];
-        $allSlots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
-        $days = [1 => 'Pazartesi', 2 => 'Salı', 3 => 'Çarşamba', 4 => 'Perşembe', 5 => 'Cuma', 6 => 'Cumartesi', 7 => 'Pazar'];
-        foreach ($days as $dayNum => $dayName) {
-            foreach ($allSlots as $slot) {
-                $schedule[$dayNum][$slot] = 'BOŞ';
-            }
-        }
-        foreach ($fixedLessons as $lesson) {
-            $time = date('H:i', strtotime($lesson['start_time']));
-            if (isset($schedule[$lesson['day_of_week']][$time])) {
-                $schedule[$lesson['day_of_week']][$time] = 'DOLU';
-            }
-        }
-
-        $report = "**" . strtoupper($teacherName) . " ÖĞRETMEN RAPORU (" . date('F Y') . ")**\n\n";
-        $report .= "- Bu Ay Girdiği Toplam Ders: **{$totalLessons} saat**\n";
-        $report .= "- En Çok Ders Yaptığı Öğrenci: **" . ($topStudentQuery ? $topStudentQuery->adi : 'N/A') . " " . ($topStudentQuery ? $topStudentQuery->soyadi : '') . " (" . ($topStudentQuery ? $topStudentQuery->count : 0) . " ders)**\n";
-        $report .= "- Yazdığı Gelişim Raporu Sayısı: **{$evaluationCount} adet** " . ($evaluationCount > 0 ? '✅' : '❌') . "\n\n";
-        $report .= "**HAFTALIK SABİT PROGRAM BOŞLUKLARI:**\n";
-        foreach ($days as $dayNum => $dayName) {
-            $freeSlots = array_keys($schedule[$dayNum], 'BOŞ');
-            if (!empty($freeSlots)) {
-                $report .= "- **{$dayName}:** " . implode(', ', $freeSlots) . "\n";
-            }
-        }
-
-        return $report;
-    }
-
-    /**
-     * Rapor 3: {ÖĞRENCİADI} öğrenci hakkında rapor
-     */
-    private function handleStudentDetailReport(string $studentName): string
-    {
-        $student = $this->findStudentByName($studentName);
-        if (!$student) {
-            return "`{$studentName}` adında bir öğrenci bulunamadı.";
-        }
-
-        $db = db_connect();
-
-        $fixedLessons = $db->table('fixed_lessons f')
-            ->select('f.day_of_week, f.start_time, CONCAT(p.first_name, " ", p.last_name) as teacher_name')
-            ->join('user_profiles p', 'p.user_id = f.teacher_id', 'left')
-            ->where('f.student_id', $student['id'])->orderBy('f.day_of_week')->get()->getResultArray();
+        $role = $this->getUserRole($user);
         
-        $evaluations = $db->table('student_evaluations')
-            ->select('evaluation, teacher_snapshot_name, created_at')
-            ->where('student_id', $student['id'])->orderBy('created_at', 'DESC')->limit(5)->get()->getResultArray();
+        // 1. Sistem Promptunu Hazırla
+        $systemPrompt = $this->getSystemPrompt($role, $user);
 
-        // RAM Raporu (DÜZELTİLMİŞ TABLO ADI)
-        $ramReport = $db->table('ram_report_analysis')->where('student_id', $student['id'])->get()->getRow();
-
-        $report = "**" . strtoupper($student['adi'] . ' ' . $student['soyadi']) . " ÖĞRENCİ RAPORU**\n\n";
-        $report .= "**İletişim ve Servis:**\n";
-        $report .= "- Veli (Anne): {$student['veli_anne_telefon']}\n";
-        $report .= "- Veli (Baba): {$student['veli_baba_telefon']}\n";
-        $servisDurumu = isset($student['servis']) ? ucfirst($student['servis']) : 'Belirtilmemiş';
-        $report .= "- Servis Durumu: {$servisDurumu}\n\n";
-
-        $report .= "**Ders Programı ve Öğretmenler:**\n";
-        if (!empty($fixedLessons)) {
-            $days = ['', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
-            foreach ($fixedLessons as $lesson) {
-                $report .= "- **{$days[$lesson['day_of_week']]}, {$lesson['start_time']}**: {$lesson['teacher_name']}\n";
-            }
-        } else {
-            $report .= "- Sabit ders programı bulunmuyor.\n";
-        }
-        $report .= "\n";
-
-        $report .= "**Gelişim Günlüğü Özeti (Son 5 Rapor):**\n";
-        if (!empty($evaluations)) {
-            foreach ($evaluations as $eval) {
-                $report .= "- **{$eval['teacher_snapshot_name']}** ({$eval['created_at']}): *{$eval['evaluation']}*\n";
-            }
-        } else {
-            $report .= "- Henüz gelişim raporu girilmemiş.\n";
-        }
-        $report .= "\n";
-
-        $report .= "**RAM Raporu Analizi:**\n";
-        if ($ramReport && !empty($ramReport->summary)) {
-            $report .= "- **Özet:** {$ramReport->summary}\n";
-        } else {
-            $report .= "- Öğrenci için RAM raporu analizi bulunmuyor.\n";
+        // 2. Eğer "boşluk", "boş saat", "müsait" gibi ifadeler varsa, boşluk analizi yap ve ekle
+        $lowerMsg = mb_strtolower($userMessage);
+        if (strpos($lowerMsg, 'boş') !== false || strpos($lowerMsg, 'müsait') !== false || strpos($lowerMsg, 'program') !== false) {
+            $gapsContext = $this->calculateScheduleGaps();
+            $systemPrompt .= "\n\nEKSTRA BAĞLAM (ÖĞRETMEN DERS BOŞLUKLARI):\n" . $gapsContext;
         }
 
-        return $report;
+        return $this->aiService->getChatResponse($userMessage, $systemPrompt, $history);
     }
 
-    /**
-     * Rapor 3.5: RAM Raporu Yapay Zeka Özeti ve Analizi
-     */
-    private function handleRamReportQuery(?int $studentId, string $studentNameFallback): string
+    protected function getSystemPrompt(string $role, object $user): string
     {
-        if (!$studentId) {
-            return "Analiz için lütfen geçerli bir öğrenci adı belirtin. '{$studentNameFallback}' adında bir öğrenci bulunamadı.";
-        }
+        $studentModel = new \App\Models\StudentModel();
+        $userProfileModel = new \App\Models\UserProfileModel();
 
-        $analysisModel = new RamReportAnalysisModel();
-        $analysis = $analysisModel->where('student_id', $studentId)->first();
-
-        if (!$analysis || empty($analysis['ram_text_content'])) {
-            return "Bu öğrenci için henüz bir RAM raporu analizi bulunmuyor. Öncelikle PDF veya Word formatında bir RAM raporunun yüklendiğinden ve sistemin bunu okuyabildiğinden emin olun.";
-        }
-
-        $student = (new StudentModel())->find($studentId);
-        $ramReportText = $analysis['ram_text_content'];
-
-        $systemPrompt = "Sen özel eğitim alanında uzman bir yapay zeka asistanısın. Sana verilen RAM (Rehberlik ve Araştırma Merkezi) raporu metnini analiz et. Bu metinden yola çıkarak, öğrencinin tanısı, bilişsel, sosyal, duygusal ve fiziksel gelişim özelliklerini, eğitimsel performansını, güçlü ve desteklenmesi gereken yönlerini belirle. Bu bilgileri kurum yöneticisinin kolayca anlayabileceği profesyonel bir dille, başlıklar halinde (örn: Tanı, Bilişsel Gelişim, Güçlü Yönler, Yönetici Notu vb.) özetle. Cevabın doğrudan analiz olsun, gereksiz selamlama kullanma. Çıktıyı Markdown formatında yapılandır.";
+        // --- A. ANLIK İSTATİSTİKLER (DASHBOARD) ---
         
-        $userPrompt = "Lütfen aşağıdaki RAM raporu metnini analiz ederek {$student['adi']} {$student['soyadi']} adlı öğrenci için detaylı bir akademik özet oluştur:\n\n{$ramReportText}";
+        // 1. Genel Sayılar
+        $totalStudents = $studentModel->where('deleted_at', null)->countAllResults();
+        $totalTeachers = count($userProfileModel->getTeachers()); // getTeachers array döner
 
-        $aiService = new AIService();
-        $summary = $aiService->getChatResponse($userPrompt, $systemPrompt, $this->getChatHistoryForAI());
+        // 2. Cinsiyet Dağılımı
+        $girls = $studentModel->where('cinsiyet', 'Kadın')->where('deleted_at', null)->countAllResults();
+        $boys = $studentModel->where('cinsiyet', 'Erkek')->where('deleted_at', null)->countAllResults();
 
-        $response = "**{$student['adi']} {$student['soyadi']}** öğrencisine ait yapay zeka destekli RAM Raporu analizi:\n\n";
-        $response .= $summary;
+        // 3. Eğitim Programları (Basit LIKE sorguları ile)
+        $programs = [
+            'Fizik Tedavi (Bedensel)' => $studentModel->like('egitim_programi', 'Bedensel')->where('deleted_at', null)->countAllResults(),
+            'Dil ve Konuşma' => $studentModel->like('egitim_programi', 'Dil')->where('deleted_at', null)->countAllResults(),
+            'Zihinsel Engelliler' => $studentModel->like('egitim_programi', 'Zihinsel')->where('deleted_at', null)->countAllResults(),
+            'Öğrenme Güçlüğü' => $studentModel->like('egitim_programi', 'Öğrenme')->where('deleted_at', null)->countAllResults(),
+            'Otizm (OSB)' => $studentModel->like('egitim_programi', 'Otizm')->where('deleted_at', null)->countAllResults(),
+        ];
+        $programStats = "";
+        foreach ($programs as $name => $count) {
+            $programStats .= "- $name: $count öğrenci\n";
+        }
 
-        return $response;
+        // 4. Yaş İstatistikleri
+        $db = db_connect();
+        $ageStats = $db->query("
+            SELECT 
+                AVG(TIMESTAMPDIFF(YEAR, dogum_tarihi, CURDATE())) as avg_age,
+                MIN(TIMESTAMPDIFF(YEAR, dogum_tarihi, CURDATE())) as min_age,
+                MAX(TIMESTAMPDIFF(YEAR, dogum_tarihi, CURDATE())) as max_age
+            FROM students 
+            WHERE deleted_at IS NULL AND dogum_tarihi IS NOT NULL
+        ")->getRow();
+        
+        $avgAge = number_format($ageStats->avg_age ?? 0, 1);
+        $minAge = $ageStats->min_age ?? 0;
+        $maxAge = $ageStats->max_age ?? 0;
+
+        // --- B. PROMPT OLUŞTURMA ---
+        return "Sen İkihece OTS'nin 'Pusula' adındaki yönetici asistanısın (Admin Modu).
+        Şu an sistemin tam yetkili yöneticisi (Admin) ile konuşuyorsun.
+
+        GÖREVİN:
+        Sistemdeki her türlü veriye erişmek, teknik ve idari soruları yanıtlamak, olası sistemsel sorunları veya veri tutarsızlıklarını raporlamak.
+        
+        MEVCUT ANLIK DURUM (DASHBOARD):
+        - Toplam Öğrenci: $totalStudents
+        - Toplam Öğretmen: $totalTeachers
+        - Cinsiyet Dağılımı: $girls Kız, $boys Erkek
+        - Yaş Ortalaması: $avgAge (En küçük: $minAge, En büyük: $maxAge)
+        - Eğitim Programlarına Göre Dağılım:
+        $programStats
+
+        YETENEKLERİN VE İPUÇLARI:
+        1. **GENEL SORULAR:** Yukarıdaki 'MEVCUT ANLIK DURUM' verilerini kullanarak sayısal soruları hemen cevapla.
+        
+        2. **LİSTELEME VE DETAYLI ANALİZ (SQL KULLAN):**
+           Kullanıcı detaylı bir liste isterse, `run_sql_query` aracını kullanarak veritabanından çek.
+           
+           Aşağıdaki SQL İPUÇLARINI kullan:
+           - **RAM Raporu Bitenler:** `SELECT adi, soyadi, ram_bitis FROM students WHERE ram_bitis < CURDATE() AND deleted_at IS NULL`
+           - **RAM Raporu Olmayanlar:** `SELECT adi, soyadi FROM students WHERE (ram_raporu IS NULL OR ram_raporu = '') AND deleted_at IS NULL`
+           - **Konum Bilgisi Eksik:** `SELECT adi, soyadi FROM students WHERE (google_konum IS NULL OR google_konum = '') AND deleted_at IS NULL`
+           - **İletişim Bilgisi Eksik:** `SELECT adi, soyadi FROM students WHERE (iletisim IS NULL OR iletisim = '') AND deleted_at IS NULL`
+           - **Veli Bilgisi Eksik:** `SELECT adi, soyadi FROM students WHERE (veli_anne IS NULL AND veli_baba IS NULL) AND deleted_at IS NULL`
+           - **Yaş Analizi (En Büyük/Küçük):** `SELECT adi, soyadi, dogum_tarihi FROM students WHERE deleted_at IS NULL ORDER BY dogum_tarihi ASC (veya DESC) LIMIT 10`
+           - **Devamsızlık (En Çok):** `SELECT s.adi, s.soyadi, COUNT(sa.id) as devamsizlik_sayisi FROM students s JOIN student_absences sa ON s.id = sa.student_id GROUP BY s.id ORDER BY devamsizlik_sayisi DESC LIMIT 10`
+           - **Gelişim Günlüğü Yazılmamış:** `SELECT s.adi, s.soyadi FROM students s LEFT JOIN student_evaluations se ON s.id = se.student_id WHERE se.id IS NULL AND s.deleted_at IS NULL`
+           - **Sabit Dersi Olmayanlar:** `SELECT s.adi, s.soyadi FROM students s LEFT JOIN fixed_lessons fl ON s.id = fl.student_id WHERE fl.id IS NULL AND s.deleted_at IS NULL`
+           - **Aynı Yaş ve Tanı:** `SELECT adi, soyadi, egitim_programi, TIMESTAMPDIFF(YEAR, dogum_tarihi, CURDATE()) as yas FROM students WHERE deleted_at IS NULL ORDER BY egitim_programi, yas`
+           - **Sistem Logları (Örnek):** `SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 10` (Eğer tablo varsa)
+
+        3. **ÜSLUP:**
+           - Teknik, net ve kapsamlı ol.
+           - Admin olduğum için her türlü detayı verebilirsin.
+           - Eğer SQL sorgusu çalıştıracaksan, kullanıcıya 'Veritabanını tarıyorum...' gibi bir geri bildirim ver.
+        ";
+    }
+
+    protected function getUserRole($user): string
+    {
+        return 'Yönetici'; // Admin yetkisi genellikle Yönetici rolü altında tanımlıdır
     }
 
     /**
-     * Rapor 4: Bu ay yeni kayıt olan öğrenciler
+     * Öğretmenlerin sabit ders programındaki boşlukları hesaplar.
      */
-    private function handleNewStudentsList(): string
+    private function calculateScheduleGaps(): string
     {
-        $firstDay = date('Y-m-01');
-        $newStudents = (new StudentModel())->where('created_at >=', $firstDay)->findAll();
+        $userProfileModel = new \App\Models\UserProfileModel();
+        $fixedLessonModel = new \App\Models\FixedLessonModel();
 
-        if (empty($newStudents)) {
-            return "Bu ay henüz yeni öğrenci kaydı yapılmadı.";
+        // 1. Tüm Öğretmenleri Getir
+        $teachers = $userProfileModel->getTeachers();
+        
+        // 2. Tüm Sabit Dersleri Getir
+        $allFixedLessons = $fixedLessonModel->findAll();
+        
+        // 3. Dersleri Öğretmen ve Güne Göre Grupla
+        $scheduleMap = [];
+        foreach ($allFixedLessons as $fl) {
+            $tId = $fl['teacher_id'];
+            $day = $fl['day_of_week'];
+            // start_time '09:00:00' formatında gelebilir, ilk 5 karakteri al
+            $time = substr($fl['start_time'], 0, 5); 
+            $scheduleMap[$tId][$day][$time] = true;
         }
 
-        $report = "**BU AY YENİ KAYIT OLAN ÖĞRENCİLER (" . date('F Y') . ")**\n\n";
-        foreach ($newStudents as $student) {
-            $report .= "- **{$student['adi']} {$student['soyadi']}** (Kayıt Tarihi: " . date('d.m.Y', strtotime($student['created_at'])) . ")\n";
-        }
-        return $report;
-    }
+        // 4. Boşlukları Analiz Et
+        $days = [
+            1 => 'Pazartesi', 2 => 'Salı', 3 => 'Çarşamba', 
+            4 => 'Perşembe', 5 => 'Cuma', 6 => 'Cumartesi'
+        ];
+        $slots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
 
-    /**
-     * Rapor 5: Bu ay kurumdan ayrılan öğrenciler
-     */
-    private function handleChurnedStudentsList(): string
-    {
-        $firstDay = date('Y-m-01');
-        $lastDay = date('Y-m-t');
-        $firstDayLastMonth = date('Y-m-01', strtotime('-1 month'));
-        $lastDayLastMonth = date('Y-m-t', strtotime('-1 month'));
-        $db = db_connect();
+        $output = "";
+        $count = 0;
 
-        // 1. Soft-deleted students this month
-        $softDeletedStudents = $db->table('students')
-            ->where('deleted_at >=', $firstDay . ' 00:00:00')
-            ->where('deleted_at <=', $lastDay . ' 23:59:59')
-            ->get()->getResultArray();
-
-        // 2. Inactive students (active last month, not this month)
-        $inactiveStudentsQuery = $db->query(" 
-            SELECT s.adi, s.soyadi FROM students s
-            WHERE s.deleted_at IS NULL AND
-                (SELECT COUNT(l.id) FROM lessons l JOIN lesson_students ls ON l.id = ls.lesson_id WHERE ls.student_id = s.id AND l.lesson_date BETWEEN '{$firstDayLastMonth}' AND '{$lastDayLastMonth}') > 0
-            AND
-                (SELECT COUNT(l.id) FROM lessons l JOIN lesson_students ls ON l.id = ls.lesson_id WHERE ls.student_id = s.id AND l.lesson_date BETWEEN '{$firstDay}' AND '{$lastDay}') = 0
-        ");
-        $inactiveStudents = $inactiveStudentsQuery->getResultArray();
-
-        if (empty($softDeletedStudents) && empty($inactiveStudents)) {
-            return "Bu ay kurumdan ilişiği kesilen veya pasif duruma düşen bir öğrenci olmadı.";
-        }
-
-        $report = "**BU AY AYRILAN & PASİFLEŞEN ÖĞRENCİLER**\n\n";
-
-        if (!empty($softDeletedStudents)) {
-            $report .= "--- **İlişiği Kesilenler (Kaydı Silinenler)** ---\n";
-            foreach ($softDeletedStudents as $student) {
-                $deletedDate = date('d.m.Y', strtotime($student['deleted_at']));
-                $report .= "- {$student['adi']} {$student['soyadi']} (Silinme Tarihi: {$deletedDate})\n";
-            }
-            $report .= "\n";
-        }
-
-        if (!empty($inactiveStudents)) {
-            $report .= "--- **Pasifleşenler (Geçen Ay Aktif, Bu Ay Ders Almayan)** ---\n";
-            foreach ($inactiveStudents as $student) {
-                $report .= "- {$student['adi']} {$student['soyadi']}\n";
-            }
-            $report .= "\n";
-        }
-
-        return $report;
-    }
-
-    private function findUserByName(string $name, string $group): ?object
-    {
-        $db = db_connect();
-        $users = $db->table('users')
-            ->select('users.id, user_profiles.first_name, user_profiles.last_name')
-            ->join('user_profiles', 'user_profiles.user_id = users.id')
-            ->join('auth_groups_users', 'auth_groups_users.user_id = users.id')
-            ->where('auth_groups_users.group', $group)
-            ->get()->getResult();
-
-        $searchLower = $this->turkish_strtolower(trim($name));
-
-        foreach ($users as $u) {
-            $fullNameLower = $this->turkish_strtolower($u->first_name . ' ' . $u->last_name);
-            if ($searchLower === $fullNameLower || str_contains($fullNameLower, $searchLower)) {
-                return $u;
-            }
-        }
-        return null;
-    }
-
-    private function findStudentByName(string $name): ?array
-    {
-        $studentModel = new StudentModel();
-        $students = $studentModel->where('deleted_at', null)->asArray()->findAll();
-
-        $searchLower = $this->turkish_strtolower(trim($name));
-
-        foreach ($students as $s) {
-            $fullNameLower = $this->turkish_strtolower($s['adi'] . ' ' . $s['soyadi']);
-            if ($searchLower === $fullNameLower || str_contains($fullNameLower, $searchLower)) {
-                return $s;
-            }
-        }
-        return null;
-    }
-
-    private function handleListTeachers(): string
-    {
-        $db = db_connect();
-        $teachers = $db->table('users')
-            ->select('user_profiles.first_name, user_profiles.last_name')
-            ->join('user_profiles', 'user_profiles.user_id = users.id')
-            ->join('auth_groups_users', 'auth_groups_users.user_id = users.id')
-            ->where('auth_groups_users.group', 'ogretmen')
-            ->get()->getResultArray();
-
-        if (empty($teachers)) {
-            return "Kurumda kayıtlı öğretmen bulunmamaktadır.";
-        }
-
-        $report = "**KURUMDAKİ ÖĞRETMENLER**\n\n";
         foreach ($teachers as $teacher) {
-            $report .= "- {$teacher['first_name']} {$teacher['last_name']}\n";
+            $tId = $teacher['user_id']; // getTeachers array'inde user_id var
+            $tName = $teacher['first_name'] . ' ' . $teacher['last_name'];
+            
+            $teacherGaps = [];
+            
+            foreach ($days as $dayNum => $dayName) {
+                $emptySlots = [];
+                foreach ($slots as $slot) {
+                    if (!isset($scheduleMap[$tId][$dayNum][$slot])) {
+                        $emptySlots[] = $slot;
+                    }
+                }
+                
+                // Eğer o gün hiç ders yoksa "Tüm Gün Boş" de, yoksa saatleri yaz
+                if (count($emptySlots) == count($slots)) {
+                    $teacherGaps[] = "$dayName: TÜM GÜN";
+                } elseif (!empty($emptySlots)) {
+                    // Çok fazla saat varsa özetle
+                    if (count($emptySlots) > 5) {
+                        $teacherGaps[] = "$dayName: " . count($emptySlots) . " saat boş";
+                    } else {
+                        $teacherGaps[] = "$dayName: " . implode(', ', $emptySlots);
+                    }
+                }
+            }
+
+            if (!empty($teacherGaps)) {
+                $output .= "- $tName: " . implode(' | ', $teacherGaps) . "\n";
+                $count++;
+            }
+            
+            // Token limitini korumak için max 15 öğretmen listele
+            if ($count >= 15) {
+                $output .= "... (ve diğerleri)";
+                break;
+            }
         }
 
-        return $report;
-    }
-
-    private function handleTeacherEvaluations(string $teacherName): string
-    {
-        $teacher = $this->findUserByName($teacherName, 'ogretmen');
-        if (!$teacher) {
-            return "`{$teacherName}` adında bir öğretmen bulunamadı.";
-        }
-
-        $db = db_connect();
-        $evaluations = $db->table('student_evaluations')
-            ->select('students.adi, students.soyadi, COUNT(student_evaluations.id) as count')
-            ->join('students', 'students.id = student_evaluations.student_id')
-            ->where('student_evaluations.teacher_id', $teacher->id)
-            ->groupBy('students.adi, students.soyadi')
-            ->orderBy('count', 'DESC')
-            ->get()
-            ->getResultArray();
-
-        if (empty($evaluations)) {
-            return "`{$teacherName}` adlı öğretmen henüz hiç gelişim günlüğü yazmamış.";
-        }
-
-        $report = "**" . strtoupper($teacherName) . " TARAFINDAN YAZILAN GELİŞİM GÜNLÜKLERİ**\n\n";
-        $report .= "Öğretmen, aşağıdaki öğrencilere toplam " . count($evaluations) . " farklı öğrenci için gelişim günlüğü yazmıştır:\n\n";
-        foreach ($evaluations as $evaluation) {
-            $report .= "- **{$evaluation['adi']} {$evaluation['soyadi']}** ({$evaluation['count']} adet)\n";
-        }
-
-        return $report;
+        return empty($output) ? "Tüm öğretmenlerin programı tamamen dolu." : $output;
     }
 }

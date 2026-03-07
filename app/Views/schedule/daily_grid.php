@@ -25,19 +25,24 @@
 
     <div id="printableArea">
         <h3 class="text-center d-none d-print-block mb-3"><?= esc($title) ?></h3>
-        <div class="alert alert-light border d-print-none small mb-3">
+        <div id="colorCodesExplanation" class="alert alert-light border d-print-none small mb-3 alert-dismissible fade show" role="alert">
             <strong><i class="bi bi-palette-fill"></i> Renk Kodları:</strong>
             <span class="badge text-bg-success mx-1">Yeşil</span>: Öğrencinin bu saatte sabit dersi var.
             <span class="badge text-bg-warning mx-1">Sarı</span>: Öğrencinin sabit dersi var, ancak farklı bir gün/saatte.
             <span class="badge text-bg-secondary mx-1">Gri</span>: Öğrencinin tanımlı bir sabit dersi yok.
             <span class="badge text-bg-danger mx-1">Kırmızı</span>: Öğrenci aynı anda başka bir öğretmende de ders alıyor (ÇAKIŞMA).
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
         </div>
 
         <div id="schedule-content-wrapper">
             <?php if (empty($teachers)): ?>
                 <div class="alert alert-warning text-center">Bu programı görüntülemek için yetkiniz olan bir öğretmen bulunmamaktadır.</div>
             <?php else: ?>
-                <div class="card shadow">
+                <div class="card shadow" id="scheduleCard">
+                    <div class="card-header d-flex justify-content-between align-items-center py-2 d-print-none">
+                        <h6 class="m-0 font-weight-bold text-success"><i class="bi bi-calendar-week"></i> Günlük Program</h6>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="toggleFullScreen('scheduleCard')" title="Tam Ekran"><i class="bi bi-fullscreen"></i></button>
+                    </div>
                     <div class="card-body">
                         <div class="" style="overflow-x: auto; overflow-y: visible;"> 
                             <table class="table table-bordered schedule-grid text-center" style="min-width: 900px;" id="schedule-table">
@@ -54,20 +59,29 @@
                                         <tr data-teacher-id="<?= $teacher->id ?>">
                                             <td class="align-middle fw-bold">
                                                 <div class="d-flex align-items-center">
-                                                    <img src="<?= base_url(ltrim($teacher->profile_photo ?? '/assets/images/user.jpg', '/')) ?>" class="rounded-circle me-3 d-print-none" width="40" height="40" style="object-fit: cover;">
+                                                    <div class="dropdown d-print-none me-3">
+                                                        <a href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" class="d-block">
+                                                            <img src="<?= base_url(ltrim($teacher->profile_photo ?? '/assets/images/user.jpg', '/')) ?>" class="rounded-circle shadow-sm" width="40" height="40" style="object-fit: cover; cursor: pointer;">
+                                                        </a>
+                                                        <ul class="dropdown-menu">
+                                                            <li><button class="dropdown-item bildirim-gonder-tek" data-teacher-id="<?= esc($teacher->id) ?>"><i class="bi bi-bell me-2 text-success"></i> Bildirim Gönder</button></li>
+                                                            <li><button class="dropdown-item add-fixed-lessons" data-teacher-id="<?= esc($teacher->id) ?>" data-date="<?= esc($displayDate) ?>"><i class="bi bi-calendar-check me-2 text-primary"></i> Sabit Dersleri Ekle</button></li>
+                                                            <li><hr class="dropdown-divider"></li>
+                                                            <li><button class="dropdown-item delete-day-lessons text-danger" data-teacher-id="<?= esc($teacher->id) ?>" data-date="<?= esc($displayDate) ?>" data-teacher-name="<?= esc($teacher->first_name . ' ' . $teacher->last_name) ?>"><i class="bi bi-calendar-x me-2"></i> Günün Derslerini Sil</button></li>
+                                                        </ul>
+                                                    </div>
+                                                    
+                                                    <!-- Print Mode Image (Non-clickable) -->
+                                                    <img src="<?= base_url(ltrim($teacher->profile_photo ?? '/assets/images/user.jpg', '/')) ?>" class="rounded-circle me-3 d-none d-print-block" width="40" height="40" style="object-fit: cover;">
+
                                                     <div>
                                                         <div class="fw-bold text-nowrap text-start">
-															<a href="<?= site_url('teachers/show/' . $teacher->id) ?>" class="text-decoration-none text-dark">
-																<?= esc($teacher->first_name . ' ' . $teacher->last_name) ?>
-															</a>
-														</div>
+                                                            <a href="<?= site_url('teachers/show/' . $teacher->id) ?>" class="text-decoration-none text-dark">
+                                                                <?= esc($teacher->first_name . ' ' . $teacher->last_name) ?>
+                                                            </a>
+                                                        </div>
                                                         <small class="text-muted d-block text-truncate fw-lighter text-start" style="max-width: 150px;"><?= esc($teacher->branch) ?></small>
                                                     </div>
-                                                </div>
-                                                <div class="mt-2 btn-group w-100 action-buttons d-print-none">
-                                                     <button class="btn btn-sm btn-success bildirim-gonder-tek" data-teacher-id="<?= esc($teacher->id) ?>" title="Bildirim Gönder"><i class="bi bi-bell"></i></button>
-                                                     <button class="btn btn-sm btn-primary add-fixed-lessons" data-teacher-id="<?= esc($teacher->id) ?>" data-date="<?= esc($displayDate) ?>" title="Sabit Dersleri Ekle"><i class="bi bi-calendar-check"></i></button>
-                                                     <button class="btn btn-sm btn-danger delete-day-lessons" data-teacher-id="<?= esc($teacher->id) ?>" data-date="<?= esc($displayDate) ?>" data-teacher-name="<?= esc($teacher->first_name . ' ' . $teacher->last_name) ?>" title="Günün Derslerini Sil"><i class="bi bi-calendar-x"></i></button>
                                                 </div>
                                             </td>
                                             <?php for ($hour = config('Ots')->scheduleStartHour; $hour < config('Ots')->scheduleEndHour; $hour++): ?>
@@ -78,7 +92,8 @@
                                                 <?php if ($slotContent): ?>
                                                     <?php if ($slotContent['type'] === 'evaluation'): ?>
                                                         <td class="align-middle bg-info-subtle has-evaluation" data-evaluation-id="<?= $slotContent['id'] ?>">
-                                                            <span class="badge text-bg-info"><i class="bi bi-chat-square-text"></i> DEĞER</span>
+                                                            <span class="badge text-bg-info">DEĞERLENDİRME</span>
+                                                            <i class="bi bi-pencil-square d-print-none"></i>
                                                         </td>
                                                     <?php elseif ($slotContent['type'] === 'leave'): ?>
                                                         <td class="align-middle on-leave">
@@ -257,7 +272,6 @@
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
-    
     .badge {
         border: 1px solid #333 !important;
         background-color: transparent !important;
@@ -278,6 +292,14 @@
 
 <script>
 $(document).ready(function() {
+    // Renk kodları bilgilendirmesi için oturum kontrolü
+    if (sessionStorage.getItem('colorCodesDismissed') === 'true') {
+        $('#colorCodesExplanation').remove();
+    }
+    $('#colorCodesExplanation').on('close.bs.alert', function () {
+        sessionStorage.setItem('colorCodesDismissed', 'true');
+    });
+
     // MODAL DEFINITIONS
     const lessonModal = new bootstrap.Modal(document.getElementById('lessonFormModal'));
     const evaluationDetailModal = new bootstrap.Modal(document.getElementById('evaluationDetailModal'));
@@ -666,5 +688,38 @@ $(document).ready(function() {
     });
 
 });
+</script>
+<script>
+    function toggleFullScreen(elementId) {
+        var element = document.getElementById(elementId);
+        if (!document.fullscreenElement) {
+            if (element.requestFullscreen) {
+                element.requestFullscreen();
+            } else if (element.mozRequestFullScreen) { /* Firefox */
+                element.mozRequestFullScreen();
+            } else if (element.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
+                element.webkitRequestFullscreen();
+            } else if (element.msRequestFullscreen) { /* IE/Edge */
+                element.msRequestFullscreen();
+            }
+            // Tam ekrana geçince arkaplanı beyaz yap, yoksa siyah olabilir
+            element.classList.add('bg-white');
+            element.classList.add('p-3'); 
+            element.style.overflowY = 'auto'; // Kaydırma çubuklarını aktif et
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+            element.classList.remove('bg-white');
+            element.classList.remove('p-3');
+            element.style.overflowY = '';
+        }
+    }
 </script>
 <?= $this->endSection() ?>
