@@ -40,12 +40,39 @@ public function getLessonsForMonth()
         $lessonModel = new LessonModel();
         $start = $this->request->getVar('start');
         $end   = $this->request->getVar('end');
+
+        $userModel = new UserModel();
+        $loggedInUser = auth()->user();
+
+        $teacherQuery = $userModel->select('users.id')
+            ->join('auth_groups_users', 'auth_groups_users.user_id = users.id')
+            ->where('auth_groups_users.group', 'ogretmen')
+            ->where('users.active', 1);
+
+        if ($loggedInUser->inGroup('sekreter') && !$loggedInUser->inGroup('admin', 'mudur')) {
+            $assignmentModel = new AssignmentModel();
+            $assignedTeacherIds = $assignmentModel->where('manager_user_id', $loggedInUser->id)->findColumn('managed_user_id');
+            if (empty($assignedTeacherIds)) {
+                return $this->response->setJSON([]);
+            }
+            $teacherQuery->whereIn('users.id', $assignedTeacherIds);
+        }
+
+        $teachers = $teacherQuery->asArray()->findAll();
+        $activeTeacherIds = array_column($teachers, 'id');
+
+        if (empty($activeTeacherIds)) {
+            return $this->response->setJSON([]);
+        }
+
         $db_lessons = $lessonModel
             ->select("lesson_date, COUNT(id) as lesson_count")
+            ->whereIn('teacher_id', $activeTeacherIds)
             ->where('lesson_date >=', date('Y-m-d', strtotime($start)))
             ->where('lesson_date <=', date('Y-m-d', strtotime($end)))
             ->groupBy("lesson_date")
             ->findAll();
+
         $events = [];
         foreach ($db_lessons as $day) {
             $events[] = [
@@ -87,14 +114,20 @@ public function dailyGrid($date = null)
             $teachers = $teacherQuery->orderBy('user_profiles.first_name', 'ASC')->asObject()->findAll();
         }
 
+        $teacherIds = array_map(fn($t) => $t->id, $teachers);
+
         $lessonModel = new LessonModel();
-        $lessons = $lessonModel
-            ->select('lessons.*, GROUP_CONCAT(s.id) as student_ids, GROUP_CONCAT(CONCAT(s.adi, " ", s.soyadi) SEPARATOR "||") as student_names')
-            ->join('lesson_students ls', 'ls.lesson_id = lessons.id', 'left')
-            ->join('students s', 's.id = ls.student_id', 'left')
-            ->where('lesson_date', $date)
-            ->groupBy('lessons.id')
-            ->findAll();
+        $lessons = [];
+        if (!empty($teacherIds)) {
+            $lessons = $lessonModel
+                ->select('lessons.*, GROUP_CONCAT(s.id) as student_ids, GROUP_CONCAT(CONCAT(s.adi, " ", s.soyadi) SEPARATOR "||") as student_names')
+                ->join('lesson_students ls', 'ls.lesson_id = lessons.id', 'left')
+                ->join('students s', 's.id = ls.student_id', 'left')
+                ->where('lesson_date', $date)
+                ->whereIn('lessons.teacher_id', $teacherIds)
+                ->groupBy('lessons.id')
+                ->findAll();
+        }
             
         $allStudentIdsOnPage = [];
         foreach ($lessons as $lesson) {
@@ -106,12 +139,13 @@ public function dailyGrid($date = null)
 
         // Çakışma kontrolü: Aynı öğrenci aynı saatte birden fazla öğretmende mi?
         $conflictMap = [];
-        if (!empty($allStudentIdsOnPage)) {
+        if (!empty($allStudentIdsOnPage) && !empty($teacherIds)) {
             $lessonStudentModel = new LessonStudentModel();
             $conflictData = $lessonStudentModel
                 ->select('lesson_students.student_id, lessons.start_time, COUNT(DISTINCT lessons.teacher_id) as teacher_count')
                 ->join('lessons', 'lessons.id = lesson_students.lesson_id')
                 ->where('lessons.lesson_date', $date)
+                ->whereIn('lessons.teacher_id', $teacherIds)
                 ->whereIn('lesson_students.student_id', $allStudentIdsOnPage)
                 ->groupBy('lesson_students.student_id, lessons.start_time')
                 ->findAll();
