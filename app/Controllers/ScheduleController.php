@@ -108,10 +108,10 @@ public function dailyGrid($date = null)
             if (empty($assignedTeacherIds)) { $teachers = []; } 
             else {
                 $teacherQuery->whereIn('users.id', $assignedTeacherIds);
-                $teachers = $teacherQuery->orderBy('user_profiles.first_name', 'ASC')->asObject()->findAll();
+                $teachers = $teacherQuery->orderBy('user_profiles.display_order', 'ASC')->orderBy('user_profiles.first_name', 'ASC')->asObject()->findAll();
             }
         } else {
-            $teachers = $teacherQuery->orderBy('user_profiles.first_name', 'ASC')->asObject()->findAll();
+            $teachers = $teacherQuery->orderBy('user_profiles.display_order', 'ASC')->orderBy('user_profiles.first_name', 'ASC')->asObject()->findAll();
         }
 
         $teacherIds = array_map(fn($t) => $t->id, $teachers);
@@ -1231,5 +1231,36 @@ public function addFixedLessonsForDay()
         \CodeIgniter\Events\Events::trigger('schedule.changed', $lesson, $lesson['teacher_id']);
 
         return $this->response->setJSON(['success' => true, 'message' => 'Ders silindi ve devamsızlık(lar) başarıyla kaydedildi.']);
+    }
+
+    public function updateTeacherOrder()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(403);
+        }
+
+        $order = $this->request->getPost('order');
+        if (empty($order)) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Sıralama verisi alınamadı.']);
+        }
+
+        $userProfileModel = new UserProfileModel();
+        
+        $db = \Config\Database::connect();
+        $db->transStart();
+        
+        foreach ($order as $index => $teacherId) {
+            $userProfileModel->where('user_id', $teacherId)
+                ->set(['display_order' => $index + 1])
+                ->update();
+        }
+        
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Sıralama güncellenirken bir hata oluştu.']);
+        }
+
+        return $this->response->setJSON(['success' => true, 'message' => 'Sıralama başarıyla güncellendi.']);
     }
 }

@@ -22,7 +22,8 @@ class UserProfileModel extends Model
         'address',
         'city_id',
         'district_id',
-        'phone_number'
+        'phone_number',
+        'display_order'
     ];
 
     protected bool $allowEmptyInserts = false;

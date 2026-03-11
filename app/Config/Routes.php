@@ -171,6 +171,7 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         $routes->POST('delete-day-lessons', 'ScheduleController::deleteLessonsForDay', ['as' => 'schedule.deleteForDay']);
         $routes->POST('add-all-fixed', 'ScheduleController::addAllFixedLessonsForDay', ['as' => 'schedule.addAllFixed']);
         $routes->POST('delete-all-day', 'ScheduleController::deleteAllLessonsForDay', ['as' => 'schedule.deleteAllForDay']);
+        $routes->POST('update-teacher-order', 'ScheduleController::updateTeacherOrder', ['as' => 'schedule.update_teacher_order']);
     });
 
 

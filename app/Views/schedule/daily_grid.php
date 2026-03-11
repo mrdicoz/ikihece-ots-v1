@@ -48,6 +48,9 @@
                             <table class="table table-bordered schedule-grid text-center" style="min-width: 900px;" id="schedule-table">
                                 <thead class="sticky-top bg-white z-1">
                                     <tr>
+                                        <?php if (auth()->user()->inGroup('admin', 'mudur', 'sekreter')): ?>
+                                            <th class="d-print-none" style="width: 40px;"></th>
+                                        <?php endif; ?>
                                         <th style="width: 250px;">Öğretmen</th>
                                         <?php for ($hour = config('Ots')->scheduleStartHour; $hour < config('Ots')->scheduleEndHour; $hour++): ?>
                                             <th><?= str_pad($hour, 2, '0', STR_PAD_LEFT) ?>:00</th>
@@ -57,6 +60,11 @@
                                 <tbody>
                                     <?php foreach ($teachers as $teacher): ?>
                                         <tr data-teacher-id="<?= $teacher->id ?>">
+                                            <?php if (auth()->user()->inGroup('admin', 'mudur', 'sekreter')): ?>
+                                                <td class="align-middle d-print-none text-muted sortable-handle" style="cursor: grab; width: 40px;">
+                                                    <i class="bi bi-grip-vertical fs-5"></i>
+                                                </td>
+                                            <?php endif; ?>
                                             <td class="align-middle fw-bold">
                                                 <div class="d-flex align-items-center">
                                                     <div class="dropdown d-print-none me-3">
@@ -290,6 +298,7 @@
 
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 $(document).ready(function() {
     // Renk kodları bilgilendirmesi için oturum kontrolü
@@ -686,6 +695,37 @@ $(document).ready(function() {
                 saveButton.prop('disabled', false).html('Kaydet ve Dersi Sil');
             });
     });
+
+    // --- SORTABLE LOGIC ---
+    <?php if (auth()->user()->inGroup('admin', 'mudur', 'sekreter')): ?>
+    const el = document.querySelector('#schedule-table tbody');
+    const sortable = Sortable.create(el, {
+        handle: '.sortable-handle',
+        animation: 150,
+        ghostClass: 'bg-light',
+        onEnd: function (evt) {
+            const order = [];
+            $('#schedule-table tbody tr').each(function() {
+                order.push($(this).data('teacher-id'));
+            });
+
+            // AJAX call to save the order
+            $.post('<?= route_to("schedule.update_teacher_order") ?>', {
+                '<?= csrf_token() ?>': '<?= csrf_hash() ?>',
+                'order': order
+            }).done(function(response) {
+                if (response.success) {
+                    // Success silently or show partial toast
+                    console.log('Sıralama güncellendi');
+                } else {
+                    alert('Sıralama kaydedilemedi: ' + response.message);
+                }
+            }).fail(function() {
+                alert('Sıralama kaydedilirken sunucu hatası oluştu.');
+            });
+        }
+    });
+    <?php endif; ?>
 
 });
 </script>
