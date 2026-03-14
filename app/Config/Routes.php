@@ -158,11 +158,13 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
 
         // Takvimin arka planda (AJAX) kullandığı rotalar
         $routes->GET('get-month-lessons', 'ScheduleController::getLessonsForMonth', ['as' => 'schedule.get_month_lessons']);
+        $routes->GET('get-offcanvas-students', 'ScheduleController::getOffcanvasStudents', ['as' => 'schedule.offcanvas_students']);
         $routes->GET('get-students', 'ScheduleController::getStudentsForSelect', ['as' => 'schedule.get_students']);
         $routes->GET('suggestions', 'ScheduleController::getStudentSuggestions', ['as' => 'schedule.suggestions']);
         $routes->POST('create-lesson', 'ScheduleController::createLesson', ['as' => 'schedule.create']);
         $routes->GET('get-lesson-details/(:num)', 'ScheduleController::getLessonDetails/$1', ['as' => 'schedule.get_details']);
         $routes->POST('delete-lesson/(:num)', 'ScheduleController::deleteLesson/$1', ['as' => 'schedule.delete_lesson']);
+        $routes->POST('move-student', 'ScheduleController::moveStudentDrop', ['as' => 'schedule.move_student']);
         $routes->GET('get-lesson-dates', 'ScheduleController::getLessonDates', ['as' => 'schedule.get_lesson_dates']);
         $routes->POST('update-lesson/(:num)', 'ScheduleController::updateLesson/$1', ['as' => 'schedule.update']);
         $routes->POST('report-absence', 'ScheduleController::reportAbsenceAnddeleteLesson', ['as' => 'schedule.reportAbsence']);

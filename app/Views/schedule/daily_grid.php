@@ -40,13 +40,16 @@
             <?php else: ?>
                 <div class="card shadow" id="scheduleCard">
                     <div class="card-header d-flex justify-content-between align-items-center py-2 d-print-none">
-                        <h6 class="m-0 font-weight-bold text-success"><i class="bi bi-calendar-week"></i> Günlük Program</h6>
+                        <div class="d-flex align-items-center">
+                            <button class="btn btn-sm btn-primary me-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#studentOffcanvas" aria-controls="studentOffcanvas"><i class="bi bi-people-fill"></i> Öğrenciler Listesi</button>
+                            <h6 class="m-0 font-weight-bold text-success"><i class="bi bi-calendar-week"></i> Günlük Program</h6>
+                        </div>
                         <button class="btn btn-sm btn-outline-secondary" onclick="toggleFullScreen('scheduleCard')" title="Tam Ekran"><i class="bi bi-fullscreen"></i></button>
                     </div>
                     <div class="card-body">
                         <div class="" style="overflow-x: auto; overflow-y: visible;"> 
                             <table class="table table-bordered schedule-grid text-center" style="min-width: 900px;" id="schedule-table">
-                                <thead class="sticky-top bg-white z-1">
+                                <thead class="sticky-top bg-body z-1">
                                     <tr>
                                         <?php if (auth()->user()->inGroup('admin', 'mudur', 'sekreter')): ?>
                                             <th class="d-print-none" style="width: 40px;"></th>
@@ -80,11 +83,11 @@
                                                     </div>
                                                     
                                                     <!-- Print Mode Image (Non-clickable) -->
-                                                    <img src="<?= base_url(ltrim($teacher->profile_photo ?? '/assets/images/user.jpg', '/')) ?>" class="rounded-circle me-3 d-none d-print-block" width="40" height="40" style="object-fit: cover;">
+                                                    <img src="<?= base_url(ltrim($teacher->profile_photo ?? '/assets/images/user.jpg', '/')) ?>" class="rounded-circle me-3 d-none d-print-none" width="40" height="40" style="object-fit: cover;">
 
                                                     <div>
                                                         <div class="fw-bold text-nowrap text-start">
-                                                            <a href="<?= site_url('teachers/show/' . $teacher->id) ?>" class="text-decoration-none text-dark">
+                                                            <a href="<?= site_url('teachers/show/' . $teacher->id) ?>" class="text-decoration-none text-body-emphasis">
                                                                 <?= esc($teacher->first_name . ' ' . $teacher->last_name) ?>
                                                             </a>
                                                         </div>
@@ -108,41 +111,89 @@
                                                             <span class="badge text-bg-secondary"><i class="bi bi-person-walking"></i> İzinli</span>
                                                         </td>
                                                     <?php else: // type is 'lesson' or default ?>
-                                                        <td class="align-middle bg-success-subtle has-lesson" data-lesson-id="<?= $slotContent['id'] ?>">
+                                                        <td class="align-middle bg-success-subtle has-lesson" data-lesson-id="<?= $slotContent['id'] ?>" data-date="<?= $displayDate ?>" data-time="<?= str_pad($hour, 2, '0', STR_PAD_LEFT) . ':00:00' ?>" data-teacher-id="<?= $teacher->id ?>">
                                                             <?php
                                                             $studentNames = explode('||', $slotContent['student_names']);
                                                             $studentIds = explode(',', $slotContent['student_ids']);
                                                             foreach (array_filter($studentIds) as $index => $studentId):
                                                                 $name = $studentNames[$index] ?? 'Bilinmeyen';
                                                                 $info = $studentInfoMap[$studentId] ?? null;
-                                                                $popoverContent = '';
-                                                                if ($info) {
-                                                                    $popoverContent = htmlspecialchars('<div><img src="' . base_url($info['photo']) . '" class="rounded-circle me-2" width="40" height="40" style="object-fit:cover"><strong>' . esc($name) . '</strong></div><div class="text-muted small mt-1"><i class="bi bi-geo-alt-fill"></i> ' . esc(($info['city'] ?? '') . ' / ' . ($info['district'] ?? '')) . '</div><hr class="my-2"><small>' . ($info['message'] ?? '') . '</small>');
-                                                                }
-                                                                    // ÖNCE ÇAKIŞMA KONTROLÜ (ÖNCELİK 1)
-                                                                    if (!empty($conflictMap[$studentId][$slotContent['start_time']])) {
-                                                                        $badgeClass = 'text-bg-danger';
-                                                                    } else {
-                                                                        // ÇAKIŞMA YOKSA DİĞER KURALLARA BAK
-                                                                        $badgeClass = 'text-bg-secondary';
-                                                                        if ($info && !empty($info['fixed_lessons'])) {
-                                                                            $isMatch = false;
-                                                                            foreach ($info['fixed_lessons'] as $fixed) {
-                                                                                if ($fixed['day_of_week'] == $dayOfWeekForGrid && $fixed['start_time'] == $slotContent['start_time']) {
-                                                                                    $isMatch = true; break;
-                                                                                }
-                                                                            }
-                                                                            $badgeClass = $isMatch ? 'text-bg-success' : 'text-bg-warning';
+
+                                                                $isMatch = false;
+                                                                if ($info && !empty($info['fixed_lessons'])) {
+                                                                    foreach ($info['fixed_lessons'] as $fixed) {
+                                                                        if ($fixed['day_of_week'] == $dayOfWeekForGrid && $fixed['start_time'] == $slotContent['start_time']) {
+                                                                            $isMatch = true; break;
                                                                         }
                                                                     }
+                                                                }
+
+                                                                if (!empty($conflictMap[$studentId][$slotContent['start_time']])) {
+                                                                    $badgeClass = 'text-bg-danger';
+                                                                } else {
+                                                                    $badgeClass = 'text-bg-secondary';
+                                                                    if ($info && !empty($info['fixed_lessons'])) {
+                                                                        $badgeClass = $isMatch ? 'text-bg-success' : 'text-bg-warning';
+                                                                    }
+                                                                }
+
+                                                                $popoverContent = '';
+                                                                if ($info) {
+                                                                    $programsHtml = '';
+                                                                    if (!empty($info['programs'])) {
+                                                                        foreach($info['programs'] as $p) {
+                                                                            $textColor = str_replace(['bg-', ' text-dark'], ['text-', ''], $p['class']);
+                                                                            $programsHtml .= '<span class="' . $textColor . ' fw-bolder fs-6" title="' . esc($p['name']) . '">' . $p['letter'] . '</span>';
+                                                                        }
+                                                                    }
+
+                                                                    $privilegesHtml = '<span class="badge border text-secondary fw-medium px-2 py-1 ms-1 bg-light d-inline-block" style="font-size: 11px; letter-spacing: 0.5px;">B:' . $info['bireysel'] . ' G:' . $info['grup'] . '</span>';
+                                                                    $servisHtml = $info['servis'] ? '<span class="text-success ms-1 d-inline-block" style="font-size: 14px;" title="Servis Kullanıyor: ' . esc($info['mesafe']) . '"><i class="bi bi-bus-front-fill"></i></span>' : '';
+                                                                    
+                                                                    $ramHtml = '';
+                                                                    if ($info['ram_status'] === 'none') {
+                                                                        $ramHtml = '<span class="badge border text-secondary fw-bold px-2 py-1 ms-1 bg-light d-inline-block" style="font-size: 11px;" title="RAM raporu yok">R <i class="bi bi-x text-danger" style="font-size: 12px; margin-left:-3px;"></i></span>';
+                                                                    } else if ($info['ram_status'] === 'active') {
+                                                                        $ramHtml = '<span class="badge border text-secondary fw-bold px-2 py-1 ms-1 bg-light d-inline-block" style="font-size: 11px;" title="RAM Bitiş: ' . $info['ram_date'] . '">R <i class="bi bi-check-circle-fill text-success" style="font-size: 10px;"></i></span>';
+                                                                    } else if ($info['ram_status'] === 'expired') {
+                                                                        $ramHtml = '<span class="badge border text-secondary fw-bold px-2 py-1 ms-1 bg-light d-inline-block" style="font-size: 11px;" title="' . $info['ram_date'] . ' tarihinde raporun süresi bitmiştir">R <i class="bi bi-exclamation-circle-fill text-danger" style="font-size: 10px;"></i></span>';
+                                                                    }
+
+                                                                    $hasHtml = '';
+                                                                    if ($info['has_status'] === 'none') {
+                                                                        $hasHtml = '<span class="badge border text-secondary fw-bold px-2 py-1 ms-1 bg-light d-inline-block" style="font-size: 11px;" title="Hastane raporu yok">H <i class="bi bi-x text-danger" style="font-size: 12px; margin-left:-3px;"></i></span>';
+                                                                    } else if ($info['has_status'] === 'active') {
+                                                                        $hasHtml = '<span class="badge border text-secondary fw-bold px-2 py-1 ms-1 bg-light d-inline-block" style="font-size: 11px;" title="Hastane Bitiş: ' . $info['has_date'] . '">H <i class="bi bi-check-circle-fill text-success" style="font-size: 10px;"></i></span>';
+                                                                    } else if ($info['has_status'] === 'expired') {
+                                                                        $hasHtml = '<span class="badge border text-secondary fw-bold px-2 py-1 ms-1 bg-light d-inline-block" style="font-size: 11px;" title="' . $info['has_date'] . ' tarihinde raporun süresi bitmiştir">H <i class="bi bi-exclamation-circle-fill text-danger" style="font-size: 10px;"></i></span>';
+                                                                    }
+
+                                                                    $badgesContainer = '<div class="d-flex align-items-center flex-wrap mt-2"><div class="d-flex gap-1 me-1">' . $programsHtml . '</div>' . $servisHtml . $privilegesHtml . $ramHtml . $hasHtml . '</div>';
+
+                                                                    // Form popover HTML securely
+                                                                    $popoverHtml = '
+                                                                        <div class="d-flex align-items-center w-100 mb-2">
+                                                                            <img src="' . base_url($info['photo']) . '" class="rounded-circle me-3" width="42" height="42" style="object-fit:cover;">
+                                                                            <div class="flex-grow-1 min-w-0">
+                                                                                <div class="fw-bold text-dark text-truncate me-1" style="font-size: 0.95rem; max-width: 180px;">' . esc($name) . '</div>
+                                                                            </div>
+                                                                        </div>
+                                                                        ' . $badgesContainer . '
+                                                                        <hr class="my-2 border-secondary opacity-25">
+                                                                        <div class="small mb-1">' . ($info['message'] ?? '') . '</div>
+                                                                        <div class="text-muted small mt-2" style="font-size: 0.8rem;"><i class="bi bi-geo-alt-fill"></i> ' . esc(($info['city'] ?? '') . ' / ' . ($info['district'] ?? '')) . '</div>
+                                                                    ';
+
+                                                                    $popoverContent = htmlspecialchars(trim(preg_replace('/\s+/', ' ', $popoverHtml)));
+                                                                }
                                                             ?>
-                                                                <span class="badge <?= $badgeClass ?> student-badge" data-bs-toggle="popover" data-bs-html="true" data-bs-trigger="hover" title="Öğrenci Bilgisi" data-bs-content="<?= $popoverContent ?>"><?= esc(trim($name)) ?></span>
+                                                                <span class="badge <?= $badgeClass ?> student-badge draggable-student" draggable="true" data-student-id="<?= esc($studentId) ?>" data-lesson-id="<?= $slotContent['id'] ?>" data-bs-toggle="popover" data-bs-html="true" data-bs-trigger="hover" title="Öğrenci Bilgisi" data-bs-content="<?= $popoverContent ?>"><?= esc(trim($name)) ?> <i class="bi bi-grip-vertical text-dark opacity-50 pe-none d-print-none"></i></span>
                                                             <?php endforeach; ?>
                                                         </td>
                                                     <?php endif; ?>
                                                 <?php else: ?>
                                                     <td class="align-middle available-slot" data-date="<?= $displayDate ?>" data-time="<?= str_pad($hour, 2, '0', STR_PAD_LEFT) . ':00:00' ?>" data-teacher-id="<?= $teacher->id ?>">
-                                                        <i class="bi bi-person-fill-add d-print-none"></i>
+                                                        <i class="bi bi-person-fill-add d-print-none pe-none"></i>
                                                     </td>
                                                 <?php endif; ?>
                                             <?php endfor; ?>
@@ -228,6 +279,63 @@
             </form>
         </div>
     </div>
+</div>
+
+<!-- Student Offcanvas -->
+<div class="offcanvas offcanvas-start shadow" tabindex="-1" id="studentOffcanvas" aria-labelledby="studentOffcanvasLabel" data-bs-backdrop="false" data-bs-scroll="true" style="width: 350px;">
+  <div class="offcanvas-header border-bottom bg-body-tertiary">
+    <h5 class="offcanvas-title fw-bold" id="studentOffcanvasLabel"><i class="bi bi-people-fill text-primary me-2"></i>Öğrenciler Listesi</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body p-0 d-flex flex-column">
+    <div class="p-3 border-bottom shadow-sm z-1 bg-body">
+        <p class="text-muted small mb-3"><i class="bi bi-info-circle me-1"></i>Listeden öğrenci ismini tutarak tabloda istediğiniz <strong class="text-body-emphasis">"+"</strong> alanına sürükleyip bırakabilirsiniz.</p>
+        
+        <div class="row g-2 mb-2">
+            <div class="col-6">
+                <select id="offcanvas-sort" class="form-select form-select-sm" style="box-shadow: none;">
+                    <option value="freq">Günün Sık Gelenleri</option>
+                    <option value="telafi">Telafi Sırası (En Çok)</option>
+                    <option value="az">Alfabetik (A-Z)</option>
+                </select>
+            </div>
+            <div class="col-6">
+                <select id="offcanvas-teacher-filter" class="form-select form-select-sm" style="box-shadow: none;">
+                    <option value="">Tüm Öğretmenler</option>
+                    <?php foreach ($teachers as $t): ?>
+                        <option value="<?= esc($t->first_name . ' ' . $t->last_name) ?>"><?= esc($t->first_name . ' ' . $t->last_name) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+            <input type="text" class="form-control border-start-0 ps-0" id="offcanvas-search" placeholder="Öğrenci ara..." style="box-shadow: none;">
+        </div>
+    </div>
+    
+    <div id="offcanvas-student-loading" class="text-center py-5 d-none flex-grow-1">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Yükleniyor...</span>
+        </div>
+    </div>
+    
+    <div id="offcanvas-student-list" class="list-group list-group-flush flex-grow-1" style="overflow-y: auto;">
+        <!-- Students will be loaded here via AJAX -->
+    </div>
+  </div>
+</div>
+
+<!-- Student Context Menu -->
+<div id="student-context-menu" class="dropdown-menu shadow border-0" style="display:none; position: absolute; z-index: 9999; min-width: 220px;">
+    <button class="dropdown-item py-2 text-warning-emphasis fw-medium" id="cmReportAbsence">
+        <i class="bi bi-person-x-fill me-2 text-warning"></i> Devamsızlığı Bildir ve Sil
+    </button>
+    <div class="dropdown-divider my-1"></div>
+    <button class="dropdown-item py-2 text-danger fw-medium" id="cmDeleteLesson">
+        <i class="bi bi-trash3-fill me-2"></i> Dersi Sil
+    </button>
 </div>
 
 <?= $this->endSection() ?>
@@ -696,6 +804,61 @@ $(document).ready(function() {
             });
     });
 
+    // --- CONTEXT MENU LOGIC ---
+    let currentCmLessonId = null;
+
+    $(document).on('contextmenu', '.student-badge', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        currentCmLessonId = $(this).data('lesson-id');
+        
+        const menu = $('#student-context-menu');
+        // Ensure menu stays within viewport
+        let posX = e.pageX;
+        let posY = e.pageY;
+        
+        menu.css({ display: 'block', left: posX + 'px', top: posY + 'px' });
+        
+        const menuWidth = menu.outerWidth();
+        const menuHeight = menu.outerHeight();
+        if (posX + menuWidth > $(window).width()) { posX -= menuWidth; }
+        if (posY + menuHeight > $(window).height() + $(window).scrollTop()) { posY -= menuHeight; }
+        
+        menu.css({ left: posX + 'px', top: posY + 'px' });
+        
+        $('[data-bs-toggle="popover"]').popover('hide');
+    });
+
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#student-context-menu').length) {
+            $('#student-context-menu').hide();
+        }
+    });
+
+    $('#cmReportAbsence').on('click', function(e) {
+        e.preventDefault();
+        $('#student-context-menu').hide();
+        if (currentCmLessonId) {
+            reportAbsenceTriggerBtn.data('lesson-id', currentCmLessonId).trigger('click');
+        }
+    });
+
+    $('#cmDeleteLesson').on('click', function(e) {
+        e.preventDefault();
+        $('#student-context-menu').hide();
+        if (currentCmLessonId) {
+            if (confirm('Bu dersi programdan silmek istediğinize emin misiniz?')) {
+                $.post(`<?= site_url('schedule/delete-lesson/') ?>${currentCmLessonId}`, { '<?= csrf_token() ?>': '<?= csrf_hash() ?>' })
+                    .done(function(response) {
+                        alert(response.message);
+                        if (response.success) refreshSchedule(true);
+                    })
+                    .fail(function() { alert('Ders silinirken sunucu hatası oluştu.'); });
+            }
+        }
+    });
+
     // --- SORTABLE LOGIC ---
     <?php if (auth()->user()->inGroup('admin', 'mudur', 'sekreter')): ?>
     const el = document.querySelector('#schedule-table tbody');
@@ -726,6 +889,247 @@ $(document).ready(function() {
         }
     });
     <?php endif; ?>
+
+    // --- OFFCANVAS & DRAG/DROP LOGIC ---
+    let offcanvasLoaded = false;
+    let allOffcanvasStudents = [];
+
+    const studentOffcanvas = document.getElementById('studentOffcanvas');
+    if (studentOffcanvas) {
+        studentOffcanvas.addEventListener('show.bs.offcanvas', function () {
+            if (!offcanvasLoaded) {
+                $('#offcanvas-student-loading').removeClass('d-none');
+                
+                // Get the current date from the URL or any available element (for instance, the "addAllFixedLessonsBtn")
+                const currentDate = $('#addAllFixedLessonsBtn').data('date') || '<?= esc($displayDate) ?>';
+                
+                $.get('<?= route_to("schedule.offcanvas_students") ?>', { date: currentDate }, function(data) {
+                    allOffcanvasStudents = data;
+                    renderOffcanvasStudents(allOffcanvasStudents);
+                    offcanvasLoaded = true;
+                    $('#offcanvas-student-loading').addClass('d-none');
+                }).fail(function() {
+                    $('#offcanvas-student-loading').addClass('d-none');
+                    $('#offcanvas-student-list').html('<div class="alert alert-danger mx-3 mt-3">Öğrenciler yüklenirken bir hata oluştu.</div>');
+                });
+            }
+        });
+    }
+
+    function renderOffcanvasStudents(students) {
+        let html = '';
+        if (students.length === 0) {
+            html = '<div class="text-center text-muted p-4">Öğrenci bulunamadı.</div>';
+        } else {
+            students.forEach(student => {
+                let badgeHtml = '';
+                if (student.is_fixed) {
+                    badgeHtml += `<span class="badge ms-1 rounded-pill shadow-sm" style="font-size: 0.65rem; background-color: #e6f4ea; color: #137333; font-weight: 600;">Sabit</span>`;
+                }
+                if (student.freq > 0) {
+                    badgeHtml += `<span class="badge ms-1 rounded-pill shadow-sm" style="font-size: 0.65rem; background-color: #e8f0fe; color: #1967d2; font-weight: 600;">Sık</span>`;
+                }
+                
+                let programsHtml = student.programs.map(p => `<span class="badge ${p.class} rounded-circle d-inline-flex align-items-center justify-content-center p-0" title="${p.name}" style="width: 20px; height: 20px; font-size: 11px;">${p.letter}</span>`).join('');
+                let privilegesHtml = `<span class="badge border text-secondary fw-medium px-2 py-1 ms-1 bg-light" style="font-size: 11px; letter-spacing: 0.5px;">B:${student.bireysel} G:${student.grup}</span>`;
+                let servisHtml = student.servis ? `<span class="text-success ms-1" style="font-size: 14px;" title="Servis Kullanıyor: ${student.mesafe}"><i class="bi bi-bus-front-fill"></i></span>` : '';
+                let ramHtml = '';
+                if (student.ram_status === 'none') {
+                    ramHtml = `<span class="badge border text-secondary fw-bold px-1 py-1 ms-1 bg-light d-inline-flex align-items-center gap-1" style="font-size: 11px;" title="RAM raporu yok">R <i class="bi bi-x text-danger" style="font-size: 12px; margin-left:-3px;"></i></span>`;
+                } else if (student.ram_status === 'active') {
+                    ramHtml = `<span class="badge border text-secondary fw-bold px-1 py-1 ms-1 bg-light d-inline-flex align-items-center gap-1" style="font-size: 11px;" title="RAM Bitiş: ${student.ram_date}">R <i class="bi bi-check-circle-fill text-success" style="font-size: 10px;"></i></span>`;
+                } else if (student.ram_status === 'expired') {
+                    ramHtml = `<span class="badge border text-secondary fw-bold px-1 py-1 ms-1 bg-light d-inline-flex align-items-center gap-1" style="font-size: 11px;" title="${student.ram_date} tarihinde raporun süresi bitmiştir">R <i class="bi bi-exclamation-circle-fill text-danger" style="font-size: 10px;"></i></span>`;
+                }
+
+                let hasHtml = '';
+                if (student.has_status === 'none') {
+                    hasHtml = `<span class="badge border text-secondary fw-bold px-1 py-1 ms-1 bg-light d-inline-flex align-items-center gap-1" style="font-size: 11px;" title="Hastane raporu yok">H <i class="bi bi-x text-danger" style="font-size: 12px; margin-left:-3px;"></i></span>`;
+                } else if (student.has_status === 'active') {
+                    hasHtml = `<span class="badge border text-secondary fw-bold px-1 py-1 ms-1 bg-light d-inline-flex align-items-center gap-1" style="font-size: 11px;" title="Hastane Bitiş: ${student.has_date}">H <i class="bi bi-check-circle-fill text-success" style="font-size: 10px;"></i></span>`;
+                } else if (student.has_status === 'expired') {
+                    hasHtml = `<span class="badge border text-secondary fw-bold px-1 py-1 ms-1 bg-light d-inline-flex align-items-center gap-1" style="font-size: 11px;" title="${student.has_date} tarihinde raporun süresi bitmiştir">H <i class="bi bi-exclamation-circle-fill text-danger" style="font-size: 10px;"></i></span>`;
+                }
+                
+                let bgColorClass = student.scheduled_color_class ? student.scheduled_color_class : 'bg-body';
+                
+                html += `
+                    <a href="#" class="list-group-item list-group-item-action py-2 border-start-0 border-end-0 offcanvas-student-item ${bgColorClass}" draggable="true" data-student-id="${student.id}" title="Öğrenciyi sürükleyin">
+                        <div class="d-flex align-items-center w-100">
+                            <!-- Profil Fotoğrafı -->
+                            <img src="${student.photo}" class="rounded-circle me-3" width="42" height="42" style="object-fit:cover;">
+                            
+                            <!-- Bilgiler -->
+                            <div class="flex-grow-1 min-w-0">
+                                <!-- İsim (Satır 1) -->
+                                <div class="d-flex align-items-center mb-1 flex-wrap">
+                                    <span class="fw-semibold text-body-emphasis text-truncate me-1" style="font-size: 0.95rem; max-width: 140px;" title="${student.name}">${student.name}</span>
+                                    ${badgeHtml}
+                                </div>
+                                
+                                <!-- Rozetler (Satır 2) -->
+                                <div class="d-flex align-items-center flex-wrap">
+                                    <div class="d-flex gap-1 me-1">${programsHtml}</div>
+                                    ${servisHtml}
+                                    ${privilegesHtml}
+                                    ${ramHtml}
+                                    ${hasHtml}
+                                </div>
+                            </div>
+                            
+                            <!-- Sürükleme Tutamacı -->
+                            <i class="bi bi-grip-vertical ms-1 text-muted opacity-25 pe-none"></i>
+                        </div>
+                    </a>
+                `;
+            });
+        }
+        $('#offcanvas-student-list').html(html);
+    }
+
+    function applyOffcanvasFilters() {
+        if (!allOffcanvasStudents || allOffcanvasStudents.length === 0) return;
+        
+        const term = $('#offcanvas-search').val().toLowerCase();
+        const sortType = $('#offcanvas-sort').val();
+        const teacherFilter = $('#offcanvas-teacher-filter').val();
+        
+        // 1. Filter
+        let filtered = allOffcanvasStudents.filter(s => {
+            let matchSearch = term === '' || s.name.toLowerCase().includes(term);
+            let matchTeacher = true;
+            if (teacherFilter !== '') {
+                // Determine if student has history with this teacher
+                if (!s.teachers || !s.teachers[teacherFilter]) {
+                    matchTeacher = false;
+                }
+            }
+            return matchSearch && matchTeacher;
+        });
+        
+        // 2. Sort
+        filtered.sort((a, b) => {
+            if (teacherFilter !== '') {
+                // If a teacher is selected, sort primarily by how often they took lessons with THAT teacher
+                const aFreq = a.teachers ? (a.teachers[teacherFilter] || 0) : 0;
+                const bFreq = b.teachers ? (b.teachers[teacherFilter] || 0) : 0;
+                if (aFreq !== bFreq) {
+                    return bFreq - aFreq; // descending
+                }
+            }
+            
+            if (sortType === 'telafi') {
+                if (a.total_telafi !== b.total_telafi) return b.total_telafi - a.total_telafi;
+                return a.name.localeCompare(b.name);
+            } else if (sortType === 'az') {
+                return a.name.localeCompare(b.name);
+            } else { // 'freq'
+                if (a.freq !== b.freq) return b.freq - a.freq;
+                return a.name.localeCompare(b.name);
+            }
+        });
+        
+        renderOffcanvasStudents(filtered);
+    }
+
+    $('#offcanvas-search').on('input', applyOffcanvasFilters);
+    $('#offcanvas-sort, #offcanvas-teacher-filter').on('change', applyOffcanvasFilters);
+
+    let draggedStudentId = null;
+    let draggedLessonId = null; // To handle moving from a cell
+
+    $(document).on('dragstart', '.offcanvas-student-item, .draggable-student', function(e) {
+        draggedStudentId = $(this).data('student-id');
+        draggedLessonId = $(this).data('lesson-id') || null; // null if from offcanvas
+        
+        // Hide popovers if dragging from table
+        if(draggedLessonId) {
+            $(this).popover('hide');
+        }
+        
+        // Use JSON structure within text/plain format for maximum compatibility
+        const transferData = {
+            studentId: draggedStudentId,
+            lessonId: draggedLessonId,
+            source: draggedLessonId ? 'table' : 'offcanvas'
+        };
+        e.originalEvent.dataTransfer.setData('text/plain', JSON.stringify(transferData));
+        e.originalEvent.dataTransfer.effectAllowed = 'copyMove';
+        $(this).css('opacity', '0.5');
+        
+        // Prevent click event (editing lesson) right after dropping
+        e.stopPropagation();
+    });
+
+    $(document).on('dragend', '.offcanvas-student-item, .draggable-student', function(e) {
+        $(this).css('opacity', '1');
+        $('.available-slot, .has-lesson').removeClass('bg-warning-subtle');
+        draggedStudentId = null;
+        draggedLessonId = null;
+    });
+
+    $(document).on('dragover', '.available-slot, .has-lesson', function(e) {
+        e.preventDefault(); 
+        $(this).addClass('bg-warning-subtle shadow-inner'); 
+        e.originalEvent.dataTransfer.dropEffect = 'copy';
+    });
+
+    $(document).on('dragleave', '.available-slot, .has-lesson', function(e) {
+        e.preventDefault();
+        $(this).removeClass('bg-warning-subtle shadow-inner');
+    });
+
+    $(document).on('drop', '.available-slot, .has-lesson', function(e) {
+        e.preventDefault();
+        $(this).removeClass('bg-warning-subtle shadow-inner');
+        
+        let transferData;
+        try {
+            transferData = JSON.parse(e.originalEvent.dataTransfer.getData('text/plain'));
+        } catch(err) {
+            transferData = { studentId: draggedStudentId, lessonId: draggedLessonId };
+        }
+        
+        const studentId = transferData.studentId;
+        const sourceLessonId = transferData.lessonId;
+        
+        if (!studentId) return;
+
+        const slot = $(this);
+        const targetLessonId = slot.data('lesson-id') || null;
+        
+        // Prevent dropping the student into the exact same lesson visually
+        if (sourceLessonId && targetLessonId === sourceLessonId) return;
+
+        const targetTeacherId = slot.data('teacher-id');
+        const lessonDate = slot.data('date');
+        const startTime = slot.data('time');
+        const endTime = calculateEndTime(startTime.substring(0, 5)) + ':00';
+
+        const originalHtml = slot.html();
+        slot.html('<div class="spinner-border spinner-border-sm text-primary"></div>');
+
+        $.post('<?= route_to("schedule.move_student") ?>', {
+            '<?= csrf_token() ?>': '<?= csrf_hash() ?>',
+            student_id: studentId,
+            source_lesson_id: sourceLessonId,
+            target_lesson_id: targetLessonId,
+            target_teacher_id: targetTeacherId,
+            lesson_date: lessonDate,
+            start_time: startTime,
+            end_time: endTime
+        }).done(res => {
+            if (res.success) {
+                refreshSchedule(true);
+            } else {
+                alert(res.message || 'İşlem sırasında bir hata oluştu.');
+                slot.html(originalHtml);
+            }
+        }).fail(() => {
+            alert('Sunucu ile iletişim kurulamadı. İşlem başarısız.');
+            slot.html(originalHtml);
+        });
+    });
 
 });
 </script>

@@ -162,12 +162,25 @@ public function dailyGrid($date = null)
             $dayNames = ['', 'Pzt', 'Salı', 'Çrş', 'Perş', 'Cuma', 'Cmt', 'Paz'];
 
             $studentDetails = $studentModel->withDeleted()
-                ->select('students.id, students.profile_image, c.name as city_name, d.name as district_name')
+                ->select('students.id, students.adi, students.soyadi, students.profile_image, c.name as city_name, d.name as district_name, students.telafi_bireysel_hak, students.telafi_grup_hak, students.servis, students.mesafe, students.egitim_programi, students.ram_bitis, students.hastane_raporu_bitis_tarihi')
                 ->join('cities c', 'c.id = students.city_id', 'left')
                 ->join('districts d', 'd.id = students.district_id', 'left')
                 ->whereIn('students.id', $allStudentIdsOnPage)
                 ->findAll();
             $studentDetailsMap = array_column($studentDetails, null, 'id');
+
+            // Frequency fetch
+            $historyModel = new LessonHistoryModel();
+            $mysqlDayOfWeek = (date('N', strtotime($date)) % 7) + 1;
+            $counts = $historyModel->builder()->select('student_name, COUNT(id) as freq')
+                    ->where('DAYOFWEEK(lesson_date)', $mysqlDayOfWeek)
+                    ->groupBy('student_name')
+                    ->get()
+                    ->getResultArray();
+            $freqMap = [];
+            foreach($counts as $c) {
+                $freqMap[$c['student_name']] = (int)$c['freq'];
+            }
 
             $allFixedLessons = $fixedLessonModel
                 ->select('fixed_lessons.student_id, fixed_lessons.day_of_week, fixed_lessons.start_time, up.first_name, up.last_name')
@@ -194,13 +207,56 @@ public function dailyGrid($date = null)
                         $messageParts[] = "<b>{$dayName} {$time}</b> - {$teacherName}";
                     }
                 }
+
+                $fullName = trim(($studentInfo['adi'] ?? '') . ' ' . ($studentInfo['soyadi'] ?? ''));
                 
+                // Format programs
+                $programs = [];
+                if (!empty($studentInfo['egitim_programi'])) {
+                    $progs = json_decode($studentInfo['egitim_programi'], true);
+                    if (!is_array($progs)) $progs = explode(',', $studentInfo['egitim_programi']);
+                    foreach($progs as $p) {
+                        $p = trim($p);
+                        if (empty($p)) continue;
+                        $badgeClass = 'bg-secondary'; $badgeHarf = '?';
+                        if (str_contains($p, 'Bedensel')) { $badgeClass = 'bg-danger'; $badgeHarf = 'F'; }
+                        elseif (str_contains($p, 'Dil ve Konuşma')) { $badgeClass = 'bg-primary'; $badgeHarf = 'D'; }
+                        elseif (str_contains($p, 'Zihinsel')) { $badgeClass = 'bg-success'; $badgeHarf = 'Z'; }
+                        elseif (str_contains($p, 'Öğrenme') || str_contains($p, 'Özel Öğrenme')) { $badgeClass = 'bg-warning text-dark'; $badgeHarf = 'Ö'; }
+                        elseif (str_contains($p, 'Otizm') || str_contains($p, 'Yaygın Gelişimsel') || str_contains($p, 'Spektrum')) { $badgeClass = 'bg-info text-dark'; $badgeHarf = 'O'; }
+                        $programs[] = ['letter' => $badgeHarf, 'class' => $badgeClass, 'name' => $p];
+                    }
+                }
+
+                $today = date('Y-m-d');
+                $ramStatus = 'none'; $ramDate = '';
+                if (!empty($studentInfo['ram_bitis'])) {
+                    $ramDate = date('d.m.Y', strtotime($studentInfo['ram_bitis']));
+                    $ramStatus = ($studentInfo['ram_bitis'] < $today) ? 'expired' : 'active';
+                }
+
+                $hasStatus = 'none'; $hasDate = '';
+                if (!empty($studentInfo['hastane_raporu_bitis_tarihi'])) {
+                    $hasDate = date('d.m.Y', strtotime($studentInfo['hastane_raporu_bitis_tarihi']));
+                    $hasStatus = ($studentInfo['hastane_raporu_bitis_tarihi'] < $today) ? 'expired' : 'active';
+                }
+
                 $studentInfoMap[$studentId] = [
                     'photo'         => $studentInfo['profile_image'] ?? 'assets/images/user.jpg',
                     'city'          => $studentInfo['city_name'] ?? null,
                     'district'      => $studentInfo['district_name'] ?? null,
                     'message'       => !empty($messageParts) ? implode('<br>', $messageParts) : 'Bu öğrencinin sabit dersi yok.',
-                    'fixed_lessons' => $fixedInfo 
+                    'fixed_lessons' => $fixedInfo,
+                    'freq'          => $freqMap[$fullName] ?? 0,
+                    'bireysel'      => (int)($studentInfo['telafi_bireysel_hak'] ?? 0),
+                    'grup'          => (int)($studentInfo['telafi_grup_hak'] ?? 0),
+                    'servis'        => in_array(strtolower($studentInfo['servis'] ?? ''), ['var', 'arasira']),
+                    'mesafe'        => $studentInfo['mesafe'] ?? '',
+                    'programs'      => $programs,
+                    'ram_status'    => $ramStatus,
+                    'ram_date'      => $ramDate,
+                    'has_status'    => $hasStatus,
+                    'has_date'      => $hasDate
                 ];
             }
         }
@@ -441,6 +497,88 @@ public function dailyGrid($date = null)
     }
 
     /**
+     * Sürükle bırak ile öğrenciyi mevcut veya yeni derse taşır.
+     * Öğrenci eski bir dersten geliyorsa oradan çıkarır, içi boşalırsa o dersi siler.
+     */
+    public function moveStudentDrop()
+    {
+        if (!$this->request->isAJAX()) { return $this->response->setStatusCode(403); }
+        
+        $studentId = $this->request->getPost('student_id');
+        $sourceLessonId = $this->request->getPost('source_lesson_id');
+        $targetLessonId = $this->request->getPost('target_lesson_id');
+        $targetTeacherId = $this->request->getPost('target_teacher_id');
+        $lessonDate = $this->request->getPost('lesson_date');
+        $startTime = $this->request->getPost('start_time');
+        $endTime = $this->request->getPost('end_time');
+
+        if (!$studentId || (!$targetLessonId && (!$targetTeacherId || !$lessonDate || !$startTime))) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Gerekli bilgiler eksik.']);
+        }
+
+        $db = \Config\Database::connect();
+        $db->transStart();
+
+        $lessonStudentModel = new \App\Models\LessonStudentModel();
+        $lessonModel = new \App\Models\LessonModel();
+
+        // 1. Eski dersten çıkar (Sürükleme tablodan yapıldıysa)
+        if ($sourceLessonId && $sourceLessonId !== $targetLessonId) {
+            $lessonStudentModel->where('lesson_id', $sourceLessonId)
+                               ->where('student_id', $studentId)
+                               ->delete();
+                               
+            $remaining = $lessonStudentModel->where('lesson_id', $sourceLessonId)->countAllResults();
+            if ($remaining == 0) {
+                // Ders içindeki tüm öğrenciler çıktıysa dersin kendisini de sil
+                $lessonModel->delete($sourceLessonId);
+            }
+        }
+
+        // 2. Yeni hedefe ekle
+        if ($targetLessonId && $sourceLessonId !== $targetLessonId) {
+            // Hedef mevcut bir ders
+            $exists = $lessonStudentModel->where('lesson_id', $targetLessonId)->where('student_id', $studentId)->countAllResults();
+            if ($exists == 0) {
+                $lessonStudentModel->insert(['lesson_id' => $targetLessonId, 'student_id' => $studentId]);
+            }
+        } elseif (!$targetLessonId) {
+            // Hedef boş bir alan, ancak o saatte ders açılmış olabilir
+            $existingLesson = $lessonModel->where('teacher_id', $targetTeacherId)
+                                          ->where('lesson_date', $lessonDate)
+                                          ->where('start_time', $startTime)
+                                          ->first();
+            if ($existingLesson) {
+                // Ders zaten varmış, öğrenciyi içine ekle
+                $exists = $lessonStudentModel->where('lesson_id', $existingLesson['id'])->where('student_id', $studentId)->countAllResults();
+                if ($exists == 0) {
+                    $lessonStudentModel->insert(['lesson_id' => $existingLesson['id'], 'student_id' => $studentId]);
+                }
+            } else {
+                // O saat hiç ders açılmamış tamamen boş, dersi kur ve ekle
+                $lessonModel->insert([
+                    'teacher_id' => $targetTeacherId,
+                    'lesson_date' => $lessonDate,
+                    'start_time' => $startTime,
+                    'end_time' => $endTime
+                ]);
+                $newLessonId = $lessonModel->getInsertID();
+                $lessonStudentModel->insert(['lesson_id' => $newLessonId, 'student_id' => $studentId]);
+            }
+        }
+
+        if ($db->transStatus() === false) {
+            $db->transRollback();
+            return $this->response->setJSON(['success' => false, 'message' => 'Veritabanı hatası nedeniyle işlem tamamlanamadı.']);
+        }
+        
+        $db->transCommit();
+        \CodeIgniter\Events\Events::trigger('schedule.changed', ['date' => $lessonDate], $targetTeacherId);
+        
+        return $this->response->setJSON(['success' => true]);
+    }
+
+    /**
      * Mevcut bir dersi siler.
      */
     public function deleteLesson($lessonId)
@@ -673,6 +811,258 @@ public function getStudentSuggestions()
             log_message('error', '[ScheduleController] HATA: ' . $e->getMessage() . ' | DOSYA: ' . $e->getFile() . ' | SATIR: ' . $e->getLine());
             return $this->response->setStatusCode(500)->setJSON(['message' => 'Sunucu hatası oluştu.']);
         }
+    }
+
+    public function getOffcanvasStudents()
+    {
+        if (!$this->request->isAJAX()) { return $this->response->setStatusCode(403, 'Forbidden'); }
+
+        $date = $this->request->getGet('date') ?? date('Y-m-d');
+        $dayOfWeek = date('N', strtotime($date));
+        $mysqlDayOfWeek = ($dayOfWeek % 7) + 1; // 1 = Sunday in MySQL, PHP N: 1=Mon, 7=Sun
+        
+        $studentModel = new StudentModel();
+        $fixedLessonModel = new \App\Models\FixedLessonModel();
+        $lessonModel = new \App\Models\LessonModel();
+        $lessonStudentModel = new \App\Models\LessonStudentModel();
+        
+        // We'll get all students + needed fields
+        $students = $studentModel->select('id, adi, soyadi, profile_image, telafi_bireysel_hak, telafi_grup_hak, mesafe, servis, egitim_programi, ram_bitis, hastane_raporu_bitis_tarihi')
+            ->orderBy('adi', 'ASC')
+            ->findAll();
+        
+        $loggedInUser = auth()->user();
+        $db = \Config\Database::connect();
+        $teacherQuery = $db->table('users')
+            ->select('users.id')
+            ->join('auth_groups_users', 'auth_groups_users.user_id = users.id')
+            ->where('auth_groups_users.group', 'ogretmen')
+            ->where('users.active', 1);
+
+        if ($loggedInUser->inGroup('sekreter') && !$loggedInUser->inGroup('admin', 'mudur')) {
+            $assignmentModel = new \App\Models\AssignmentModel();
+            $assignedTeacherIds = $assignmentModel->where('manager_user_id', $loggedInUser->id)->findColumn('managed_user_id');
+            if (empty($assignedTeacherIds)) {
+                $teacherQuery->where('0', 1); // Yield zero results
+            } else {
+                $teacherQuery->whereIn('users.id', $assignedTeacherIds);
+            }
+        }
+        $validTeacherRows = $teacherQuery->get()->getResultArray();
+        $teacherIds = array_column($validTeacherRows, 'id');
+
+        // Check for lessons today to determine cell colors
+        $todaysLessons = [];
+        if (!empty($teacherIds)) {
+            $todaysLessons = $lessonModel->select('id, start_time, teacher_id')
+                ->where('lesson_date', $date)
+                ->whereIn('teacher_id', $teacherIds)
+                ->findAll();
+        }
+        
+        $todaysLessonMap = [];
+        $lessonIds = array_column($todaysLessons, 'id');
+        $todaysLessonStudents = [];
+        $conflictMapForOffcanvas = [];
+
+        if (!empty($lessonIds)) {
+            $todaysLessonStudentsRaw = $lessonStudentModel->whereIn('lesson_id', $lessonIds)->findAll();
+            $lessonDetailMap = array_column($todaysLessons, null, 'id');
+            
+            foreach ($todaysLessonStudentsRaw as $ls) {
+                if (isset($lessonDetailMap[$ls['lesson_id']])) {
+                    $lessonDetail = $lessonDetailMap[$ls['lesson_id']];
+                    $todaysLessonStudents[$ls['student_id']][] = $lessonDetail;
+                }
+            }
+
+            // Conflict check map for offcanvas students
+            // Only count teachers the user is allowed to see/are active
+            $conflictDataRaw = $lessonStudentModel
+                ->select('lesson_students.student_id, lessons.start_time, COUNT(DISTINCT lessons.teacher_id) as teacher_count')
+                ->join('lessons', 'lessons.id = lesson_students.lesson_id')
+                ->where('lessons.lesson_date', $date)
+                ->whereIn('lessons.teacher_id', $teacherIds)
+                ->groupBy('lesson_students.student_id, lessons.start_time')
+                ->findAll();
+
+            foreach ($conflictDataRaw as $conflict) {
+                if ($conflict['teacher_count'] > 1) {
+                    $conflictMapForOffcanvas[$conflict['student_id']][$conflict['start_time']] = true;
+                }
+            }
+        }
+            
+        // Get lesson counts strictly for this day of week to sort by frequency
+        $historyModel = new LessonHistoryModel();
+        $builder = $historyModel->builder();
+        $counts = $builder->select('student_name, COUNT(id) as freq')
+                ->where('DAYOFWEEK(lesson_date)', $mysqlDayOfWeek)
+                ->groupBy('student_name')
+                ->get()
+                ->getResultArray();
+                
+        $freqMap = [];
+        foreach($counts as $c) {
+            $freqMap[$c['student_name']] = (int)$c['freq'];
+        }
+
+        // Get lesson counts by ANY teacher for filtering
+        $teacherCountsDb = $historyModel->builder()
+            ->select('student_name, teacher_name, COUNT(id) as t_freq')
+            ->groupBy('student_name, teacher_name')
+            ->get()
+            ->getResultArray();
+            
+        $teacherFreqMap = [];
+        foreach($teacherCountsDb as $tc) {
+            if(!isset($teacherFreqMap[$tc['student_name']])) {
+                $teacherFreqMap[$tc['student_name']] = [];
+            }
+            $teacherFreqMap[$tc['student_name']][$tc['teacher_name']] = (int)$tc['t_freq'];
+        }
+
+        // Get fixed lesson statuses for this day of week
+        $fixedLessons = $fixedLessonModel->select('student_id')
+            ->where('day_of_week', $dayOfWeek)
+            ->groupBy('student_id')
+            ->findAll();
+        
+        // Get ALL fixed lessons for these students to check if they match TODAY's assignments
+        $allFixedLessonsDb = $fixedLessonModel->findAll();
+        $allFixedLessonsMap = [];
+        foreach($allFixedLessonsDb as $fl) {
+            $allFixedLessonsMap[$fl['student_id']][] = $fl;
+        }
+
+        $fixedMap = [];
+        foreach($fixedLessons as $fl) {
+            $fixedMap[$fl['student_id']] = true;
+        }
+
+        $formatted = [];
+        foreach($students as $s) {
+            $fullName = trim($s['adi'] . ' ' . $s['soyadi']);
+            $freq = $freqMap[$fullName] ?? 0;
+            $isFixed = isset($fixedMap[$s['id']]);
+            
+            // Format programs (single letter styling)
+            $programs = [];
+            if (!empty($s['egitim_programi'])) {
+                $progs = json_decode($s['egitim_programi'], true);
+                if (!is_array($progs)) {
+                    $progs = explode(',', $s['egitim_programi']);
+                }
+                foreach($progs as $p) {
+                    $p = trim($p);
+                    if (empty($p)) continue;
+                    $badgeClass = 'bg-secondary'; $badgeHarf = '?';
+                    if (str_contains($p, 'Bedensel')) { $badgeClass = 'bg-danger'; $badgeHarf = 'F'; }
+                    elseif (str_contains($p, 'Dil ve Konuşma')) { $badgeClass = 'bg-primary'; $badgeHarf = 'D'; }
+                    elseif (str_contains($p, 'Zihinsel')) { $badgeClass = 'bg-success'; $badgeHarf = 'Z'; }
+                    elseif (str_contains($p, 'Öğrenme') || str_contains($p, 'Özel Öğrenme')) { $badgeClass = 'bg-warning text-dark'; $badgeHarf = 'Ö'; }
+                    elseif (str_contains($p, 'Otizm') || str_contains($p, 'Yaygın Gelişimsel') || str_contains($p, 'Spektrum')) { $badgeClass = 'bg-info text-dark'; $badgeHarf = 'O'; }
+                    
+                    $programs[] = ['letter' => $badgeHarf, 'class' => $badgeClass, 'name' => $p];
+                }
+            }
+            
+            $today = date('Y-m-d');
+            
+            // RAM Status Logic
+            $ramStatus = 'none';
+            $ramDate = '';
+            if (!empty($s['ram_bitis'])) {
+                $ramDate = date('d.m.Y', strtotime($s['ram_bitis']));
+                if ($s['ram_bitis'] < $today) {
+                    $ramStatus = 'expired';
+                } else {
+                    $ramStatus = 'active';
+                }
+            }
+
+            // Hastane Status Logic
+            $hasStatus = 'none';
+            $hasDate = '';
+            if (!empty($s['hastane_raporu_bitis_tarihi'])) {
+                $hasDate = date('d.m.Y', strtotime($s['hastane_raporu_bitis_tarihi']));
+                if ($s['hastane_raporu_bitis_tarihi'] < $today) {
+                    $hasStatus = 'expired';
+                } else {
+                    $hasStatus = 'active';
+                }
+            }
+
+            // Color Class Logic for Offcanvas
+            $studentAssignments = $todaysLessonStudents[$s['id']] ?? [];
+            $scheduledColorClass = ''; // Empty means not scheduled today
+            
+            if (!empty($studentAssignments)) {
+                $scheduledColorClass = 'bg-secondary-subtle'; // default if assigned
+                
+                // Let's check all assignments for this student today
+                foreach ($studentAssignments as $assignment) {
+                    $startTime = $assignment['start_time'];
+                    
+                    // Check Conflict first
+                    if (!empty($conflictMapForOffcanvas[$s['id']][$startTime])) {
+                        $scheduledColorClass = 'bg-danger-subtle';
+                        break; // Highest priority, stop checking
+                    }
+                    
+                    // Check Fixed Match for this specific time
+                    $isExactFixedMatch = false;
+                    $studentFixedAll = $allFixedLessonsMap[$s['id']] ?? [];
+                    foreach ($studentFixedAll as $fixed) {
+                        if ($fixed['day_of_week'] == $dayOfWeek && $fixed['start_time'] == $startTime) {
+                            $isExactFixedMatch = true;
+                            break;
+                        }
+                    }
+
+                    if ($isExactFixedMatch) {
+                        if ($scheduledColorClass !== 'bg-danger-subtle') {
+                            $scheduledColorClass = 'bg-success-subtle';
+                        }
+                    } else {
+                        // Is not matching time/day. Check if they have ANY fixed lesson (which would make them warning colored here if they aren't danger/success)
+                        if (!empty($studentFixedAll) && $scheduledColorClass === 'bg-secondary-subtle') {
+                            $scheduledColorClass = 'bg-warning-subtle';
+                        }
+                    }
+                }
+            }
+
+            $formatted[] = [
+                'id' => $s['id'],
+                'name' => $fullName,
+                'photo' => $s['profile_image'] ? base_url($s['profile_image']) : base_url('assets/images/user.jpg'),
+                'freq' => $freq,
+                'bireysel' => (int)($s['telafi_bireysel_hak'] ?? 0),
+                'grup' => (int)($s['telafi_grup_hak'] ?? 0),
+                'total_telafi' => (int)($s['telafi_bireysel_hak'] ?? 0) + (int)($s['telafi_grup_hak'] ?? 0),
+                'mesafe' => $s['mesafe'] ?? '',
+                'servis' => in_array(strtolower($s['servis'] ?? ''), ['var', 'arasira']),
+                'programs' => $programs,
+                'is_fixed' => $isFixed,
+                'teachers' => $teacherFreqMap[$fullName] ?? [],
+                'scheduled_color_class' => $scheduledColorClass,
+                'ram_status' => $ramStatus,
+                'ram_date' => $ramDate,
+                'has_status' => $hasStatus,
+                'has_date' => $hasDate
+            ];
+        }
+        
+        // Default Sort: Frequency DESC, Name ASC
+        usort($formatted, function($a, $b) {
+            if ($a['freq'] == $b['freq']) {
+                return strcasecmp($a['name'], $b['name']);
+            }
+            return $b['freq'] <=> $a['freq'];
+        });
+        
+        return $this->response->setJSON($formatted);
     }
 
     // --- BU YARDIMCI FONKSİYON DA GÜNCELLENDİ ---
