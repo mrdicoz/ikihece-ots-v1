@@ -71,8 +71,12 @@
                                             <td class="align-middle fw-bold">
                                                 <div class="d-flex align-items-center">
                                                     <div class="dropdown d-print-none me-3">
-                                                        <a href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" class="d-block">
+                                                        <a href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" class="d-block position-relative">
                                                             <img src="<?= base_url(ltrim($teacher->profile_photo ?? '/assets/images/user.jpg', '/')) ?>" class="rounded-circle shadow-sm" width="40" height="40" style="object-fit: cover; cursor: pointer;">
+                                                            <!-- Bildirim Durum Noktası -->
+                                                            <span class="position-absolute bottom-0 end-0 border border-2 border-white rounded-circle" 
+                                                                  style="width: 12px; height: 12px; background-color: <?= ($teacher->push_count > 0) ? '#198754' : '#dc3545' ?>;"
+                                                                  title="<?= ($teacher->push_count > 0) ? 'Bildirimler Aktif' : 'Bildirimler Kapalı' ?>"></span>
                                                         </a>
                                                         <ul class="dropdown-menu">
                                                             <li><button class="dropdown-item bildirim-gonder-tek" data-teacher-id="<?= esc($teacher->id) ?>"><i class="bi bi-bell me-2 text-success"></i> Bildirim Gönder</button></li>

@@ -97,6 +97,8 @@ public function dailyGrid($date = null)
         
         $teacherQuery = $userModel
             ->select('users.id, user_profiles.first_name, user_profiles.last_name, user_profiles.profile_photo, user_profiles.branch')
+            // Bildirim aboneliği olup olmadığını kontrol eden subquery
+            ->select('(SELECT COUNT(*) FROM push_subscriptions WHERE push_subscriptions.user_id = users.id) as push_count')
             ->join('auth_groups_users', 'auth_groups_users.user_id = users.id')
             ->join('user_profiles', 'user_profiles.user_id = users.id', 'left')
             ->where('auth_groups_users.group', 'ogretmen')
