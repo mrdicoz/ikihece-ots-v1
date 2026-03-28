@@ -371,12 +371,14 @@
         // Delete Student Modal Script
         const deleteModalEl = document.getElementById('deleteStudentModal');
         if (deleteModalEl) {
-            const studentName = "<?= esc($student['adi'] . ' ' . $student['soyadi']) ?>";
+            const studentName = <?= json_encode($student['adi'] . ' ' . $student['soyadi']) ?>;
             const confirmInput = deleteModalEl.querySelector('#studentNameConfirm');
             const confirmButton = deleteModalEl.querySelector('#confirmDeleteButton');
             if (confirmInput) {
                 confirmInput.addEventListener('input', function() {
-                    if(confirmButton) confirmButton.disabled = this.value.trim().toLowerCase() !== studentName.toLowerCase();
+                    const inputVal = this.value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('tr-TR');
+                    const targetVal = studentName.trim().replace(/\s+/g, ' ').toLocaleLowerCase('tr-TR');
+                    if(confirmButton) confirmButton.disabled = inputVal !== targetVal;
                 });
                 deleteModalEl.addEventListener('hidden.bs.modal', function () {
                     confirmInput.value = '';
