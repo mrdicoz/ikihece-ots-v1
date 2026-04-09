@@ -21,7 +21,7 @@ class StudentModel extends Model
         'veli_baba', 'veli_baba_telefon', 'veli_baba_tc', 
         'veli_anne', 'veli_anne_telefon', 'veli_anne_tc', 
         'servis', 'mesafe', 'orgun_egitim', 'egitim_sekli', 'egitim_programi', 
-        'ram', 'ram_baslagic', 'ram_bitis', 'ram_raporu', 
+        'ram', 'ram_baslagic', 'ram_bitis', 'ram_raporu', 'bep_plani',
         'hastane_adi', 'hastane_raporu_baslama_tarihi', 'hastane_raporu_bitis_tarihi', 
         'hastane_randevu_tarihi', 'hastane_randevu_saati', 'hastane_aciklama', 
         'profile_image', 'normal_bireysel_hak', 'normal_grup_hak', 

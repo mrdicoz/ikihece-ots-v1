@@ -117,6 +117,9 @@ $routes->group('', ['filter' => 'session'], static function ($routes) {
         
         // RAM Raporu görüntüleme
         $routes->GET('view-ram-report/(:num)', 'StudentController::viewRamReport/$1', ['as' => 'students.viewRamReport']);
+        $routes->GET('view-bep-plan/(:num)', 'StudentController::viewBepPlan/$1', ['as' => 'students.viewBepPlan']);
+        $routes->GET('delete-ram-report/(:num)', 'StudentController::deleteRamReport/$1', ['as' => 'students.deleteRamReport']);
+        $routes->GET('delete-bep-plan/(:num)', 'StudentController::deleteBepPlan/$1', ['as' => 'students.deleteBepPlan']);
         $routes->POST('analyze-single-ram/(:num)', 'StudentController::analyzeSingleRam/$1');
       	$routes->get('absences', 'StudentController::absences', ['as' => 'students.absences']);
 

@@ -141,6 +141,17 @@ public function create()
         $ramReportPath = WRITEPATH . 'uploads/ram_reports/' . $newName;
     }
 
+    // BEP Planı yükleme
+    $bepFile = $this->request->getFile('bep_plani');
+    if ($bepFile && $bepFile->isValid() && !$bepFile->hasMoved()) {
+        $newName = $bepFile->getRandomName();
+        if (!is_dir(WRITEPATH . 'uploads/bep_plans')) {
+            mkdir(WRITEPATH . 'uploads/bep_plans', 0777, true);
+        }
+        $bepFile->move(WRITEPATH . 'uploads/bep_plans', $newName);
+        $data['bep_plani'] = $newName;
+    }
+
     // Tek insert işlemi ve sonucunu kontrol et
     $insertResult = $model->insert($data);
 
@@ -313,6 +324,21 @@ public function update($id = null)
         $data['ram_raporu'] = $newName;
     }
 
+    // BEP Planı yükleme
+    $bepFile = $this->request->getFile('bep_plani');
+    if ($bepFile && $bepFile->isValid() && !$bepFile->hasMoved()) {
+        $student = $model->find($id);
+        if (!empty($student['bep_plani']) && file_exists(WRITEPATH . 'uploads/bep_plans/' . $student['bep_plani'])) {
+            @unlink(WRITEPATH . 'uploads/bep_plans/' . $student['bep_plani']);
+        }
+        $newName = $bepFile->getRandomName();
+        if (!is_dir(WRITEPATH . 'uploads/bep_plans')) {
+            mkdir(WRITEPATH . 'uploads/bep_plans', 0777, true);
+        }
+        $bepFile->move(WRITEPATH . 'uploads/bep_plans', $newName);
+        $data['bep_plani'] = $newName;
+    }
+
     if ($model->update($id, $data)) {
         $guncelOgrenciData = $model->find($id);
         \CodeIgniter\Events\Events::trigger('student.updated', $guncelOgrenciData, auth()->user());
@@ -368,6 +394,56 @@ public function update($id = null)
             ->setHeader('Content-Type', 'application/pdf')
             ->setHeader('Content-Disposition', 'inline; filename="' . $student['ram_raporu'] . '"')
             ->setBody(file_get_contents($filePath));
+    }
+
+    public function viewBepPlan($studentId)
+    {
+        $studentModel = new StudentModel();
+        $student = $studentModel->find($studentId);
+        if (empty($student) || empty($student['bep_plani'])) {
+            throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound('İstenen BEP planı bulunamadı.');
+        }
+        $filePath = WRITEPATH . 'uploads/bep_plans/' . $student['bep_plani'];
+        if (!file_exists($filePath)) {
+            throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound('BEP planı dosyası sunucuda mevcut değil.');
+        }
+        return $this->response
+            ->setHeader('Content-Type', 'application/pdf')
+            ->setHeader('Content-Disposition', 'inline; filename="' . $student['bep_plani'] . '"')
+            ->setBody(file_get_contents($filePath));
+    }
+
+    public function deleteRamReport($studentId)
+    {
+        $studentModel = new StudentModel();
+        $student = $studentModel->find($studentId);
+        if ($student) {
+            if (!empty($student['ram_raporu']) && file_exists(WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu'])) {
+                @unlink(WRITEPATH . 'uploads/ram_reports/' . $student['ram_raporu']);
+            }
+            $studentModel->update($studentId, ['ram_raporu' => null]);
+
+            // RAM analizini de temizleyelim
+            $db = \Config\Database::connect();
+            $db->table('ram_report_analysis')->where('student_id', $studentId)->delete();
+            
+            return redirect()->back()->with('success', 'RAM raporu başarıyla silindi.');
+        }
+        return redirect()->back()->with('error', 'Öğrenci bulunamadı.');
+    }
+
+    public function deleteBepPlan($studentId)
+    {
+        $studentModel = new StudentModel();
+        $student = $studentModel->find($studentId);
+        if ($student) {
+            if (!empty($student['bep_plani']) && file_exists(WRITEPATH . 'uploads/bep_plans/' . $student['bep_plani'])) {
+                @unlink(WRITEPATH . 'uploads/bep_plans/' . $student['bep_plani']);
+            }
+            $studentModel->update($studentId, ['bep_plani' => null]);
+            return redirect()->back()->with('success', 'BEP planı başarıyla silindi.');
+        }
+        return redirect()->back()->with('error', 'Öğrenci bulunamadı.');
     }
     
     public function getDistricts($cityId)

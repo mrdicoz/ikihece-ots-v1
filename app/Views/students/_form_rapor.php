@@ -4,7 +4,20 @@
     <div class="col-md-4"><label class="form-label">RAM Başlangıç</label><input type="date" name="ram_baslagic" class="form-control" value="<?= old('ram_baslagic', $student['ram_baslagic'] ?? '') ?>"></div>
     <div class="col-md-4"><label class="form-label">RAM Bitiş</label><input type="date" name="ram_bitis" class="form-control" value="<?= old('ram_bitis', $student['ram_bitis'] ?? '') ?>"></div>
     <div class="col-md-4"><label class="form-label">RAM Raporu Yükle</label><input type="file" name="ram_raporu" class="form-control" accept="application/pdf">
-        <?php if (!empty($student['ram_raporu'])): ?><small class="form-text text-muted">Mevcut: <a href="<?= site_url('students/view-ram-report/' . $student['id']) ?>" target="_blank">Görüntüle</a></small><?php endif; ?>
+        <?php if (!empty($student['ram_raporu'])): ?>
+            <small class="form-text text-muted">
+                Mevcut: <a href="<?= site_url('students/view-ram-report/' . $student['id']) ?>" target="_blank">Görüntüle</a>
+                <a href="<?= site_url('students/delete-ram-report/' . $student['id']) ?>" class="text-danger ms-2" onclick="return confirm('RAM raporunu silmek istediğinizden emin misiniz?')"><i class="bi bi-trash-fill"></i> Sil</a>
+            </small>
+        <?php endif; ?>
+    </div>
+    <div class="col-md-4"><label class="form-label">BEP Planı Yükle</label><input type="file" name="bep_plani" class="form-control" accept="application/pdf">
+        <?php if (!empty($student['bep_plani'])): ?>
+            <small class="form-text text-muted">
+                Mevcut: <a href="<?= site_url('students/view-bep-plan/' . $student['id']) ?>" target="_blank">Görüntüle</a>
+                <a href="<?= site_url('students/delete-bep-plan/' . $student['id']) ?>" class="text-danger ms-2" onclick="return confirm('BEP planını silmek istediğinizden emin misiniz?')"><i class="bi bi-trash-fill"></i> Sil</a>
+            </small>
+        <?php endif; ?>
     </div>
     <hr class="my-4">
     <div class="col-md-12"><label class="form-label">Hastane Adı</label><input type="text" name="hastane_adi" class="form-control" value="<?= old('hastane_adi', $student['hastane_adi'] ?? '') ?>"></div>

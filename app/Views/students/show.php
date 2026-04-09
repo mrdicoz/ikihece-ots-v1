@@ -31,22 +31,32 @@
                     <p class="text-muted">TCKN: <?= esc($student['tckn']) ?></p>
                     <hr>
                         <?php if (!empty($student['ram_raporu'])): ?>
-                            <button type="button" class="btn btn-success w-100 mt-2" data-bs-toggle="modal" data-bs-target="#reportModal" data-src="<?= site_url('students/view-ram-report/' . $student['id']) ?>">
-                                <i class="bi bi-eye-fill"></i> Raporu Görüntüle
+                            <button type="button" class="btn btn-success w-100 mt-2" data-bs-toggle="modal" data-bs-target="#reportModal" data-src="<?= site_url('students/view-ram-report/' . $student['id']) ?>" data-title="RAM Raporu">
+                                <i class="bi bi-eye-fill"></i> RAM Raporunu Görüntüle
                             </button>
                             
-                            <?php if (!$isAnalyzed): ?>
+                            <?php /* if (!$isAnalyzed): ?>
                                 <button type="button" 
                                         class="btn btn-warning w-100 mt-2" 
                                         id="analyzeRamBtn" 
                                         data-student-id="<?= $student['id'] ?>">
                                     <i class="bi bi-cpu-fill"></i> RAM Raporunu Analiz Et
                                 </button>
-                            <?php endif; ?>
+                            <?php endif; */ ?>
                             
                         <?php else: ?>
                             <button type="button" class="btn btn-secondary w-100 mt-2" disabled>
-                                <i class="bi bi-eye-slash-fill"></i> Rapor Yok
+                                <i class="bi bi-eye-slash-fill"></i> RAM Raporu Yok
+                            </button>
+                        <?php endif; ?>
+
+                        <?php if (!empty($student['bep_plani'])): ?>
+                            <button type="button" class="btn btn-success w-100 mt-2" data-bs-toggle="modal" data-bs-target="#reportModal" data-src="<?= site_url('students/view-bep-plan/' . $student['id']) ?>" data-title="BEP Eğitim Planı">
+                                <i class="bi bi-eye-fill"></i> BEP Planını Görüntüle
+                            </button>
+                        <?php else: ?>
+                            <button type="button" class="btn btn-secondary w-100 mt-2" disabled>
+                                <i class="bi bi-eye-slash-fill"></i> BEP Planı Yok
                             </button>
                         <?php endif; ?>
                     
@@ -251,7 +261,7 @@
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="reportModalLabel"><?= esc($student['adi'] . ' ' . $student['soyadi']) ?> - RAM Raporu</h5>
+                <h5 class="modal-title" id="reportModalLabel"><?= esc($student['adi'] . ' ' . $student['soyadi']) ?> - <span id="modal-doc-type">Rapor</span></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-0 text-center" style="height: 80vh; background-color: #f1f1f1;">
@@ -350,6 +360,10 @@
             reportModalEl.addEventListener('show.bs.modal', function (event) {
                 const button = event.relatedTarget;
                 const pdfUrl = button.getAttribute('data-src');
+                const docType = button.getAttribute('data-title') || 'Rapor';
+                
+                document.getElementById('modal-doc-type').textContent = docType;
+                
                 if (!pdfUrl) return;
                 loadingSpinner.style.display = 'block';
                 pdfCanvas.style.display = 'none';
