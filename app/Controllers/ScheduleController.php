@@ -66,7 +66,7 @@ public function getLessonsForMonth()
         }
 
         $db_lessons = $lessonModel
-            ->select("lesson_date, COUNT(id) as lesson_count")
+            ->select("lesson_date, COUNT(DISTINCT CONCAT(teacher_id, '-', start_time)) as lesson_count")
             ->whereIn('teacher_id', $activeTeacherIds)
             ->where('lesson_date >=', date('Y-m-d', strtotime($start)))
             ->where('lesson_date <=', date('Y-m-d', strtotime($end)))
@@ -479,6 +479,15 @@ public function dailyGrid($date = null)
 
         if (empty($studentIds)) {
             return $this->response->setJSON(['success' => false, 'message' => 'Lütfen en az bir öğrenci seçin.']);
+        }
+
+        // Aynı öğretmen, gün ve saat için zaten bir ders var mı kontrolü
+        $existingLesson = $lessonModel->where('teacher_id', $data['teacher_id'])
+                                      ->where('lesson_date', $data['lesson_date'])
+                                      ->where('start_time', $data['start_time'])
+                                      ->first();
+        if ($existingLesson) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Bu öğretmenin bu saatte zaten bir dersi var. Dersi düzenleyerek öğrenci ekleyebilirsiniz.']);
         }
 
         $db->transStart();
